@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Harmoni
+Comment=Harmoni OS — AI-first desktop session
+Exec=/usr/local/bin/harmoni-session
+Type=Application
+DesktopNames=Harmoni

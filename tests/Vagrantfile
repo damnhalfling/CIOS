@@ -1,0 +1,43 @@
+# -*- mode: ruby -*-
+# Symbiont — VM test environment
+# Usage: cd tests && vagrant up
+#
+# This creates a clean Debian VM, copies the .deb, and runs the install test.
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "debian/bookworm64"
+  config.vm.hostname = "symbiont-test"
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.memory = "2048"
+    vb.cpus = 2
+    vb.gui = false  # set to true to see the boot/login flow
+    vb.name = "symbiont-test-vm"
+  end
+
+  # Copy the .deb into the VM
+  config.vm.provision "file", source: "../symbiont_*_amd64.deb", destination: "/tmp/symbiont.deb"
+
+  # Run the install test
+  config.vm.provision "shell", inline: <<-SHELL
+    set -e
+    export DEBIAN_FRONTEND=noninteractive
+
+    echo "=== Installing base dependencies ==="
+    apt-get update -qq
+    apt-get install -y -qq python3 python3-pip python3-venv python3-tk \
+      openbox wmctrl xdotool curl xclip
+
+    echo "=== Installing Symbiont ==="
+    dpkg -i /tmp/symbiont.deb || apt-get install -f -y -qq
+
+    echo "=== Running tests ==="
+    bash /usr/share/symbiont/tests/test-vm-install.sh /tmp/symbiont.deb || true
+
+    echo "=== Validating session ==="
+    test -f /usr/share/xsessions/symbiont.desktop && echo "✓ Session registered"
+    test -x /usr/local/bin/symbiont-session && echo "✓ Session script executable"
+
+    echo "=== VM test complete ==="
+  SHELL
+end

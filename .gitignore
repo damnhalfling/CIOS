@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+dist/
+build/
+.venv/
+
+# Node (demo)
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Symbiont runtime
+*.db
+*.log
+
+# Secrets / credentials
+.env
+.env.*
+*.pem
+*.key
+settings.json
+~/.aws/
+
+# Packages
+*.deb
+
+# Private docs (not for public repo)
+docs/TODO_PRIVATE.md

@@ -1,0 +1,893 @@
+"""Bridge — clean interface between UI and backend.
+
+Exposes:
+    execute_command(command: str) -> dict
+    execute_streaming(command: str, on_step: callback) -> dict
+
+Features:
+- Conversation context (3-turn memory for follow-ups)
+- Clarification questions ("Qual rede?" / "Senha?")
+- Pronoun resolution ("fecha esse" → last app)
+- MCP activity notification (adaptive polling)
+- Post-action validation (force re-scan + verify state changed)
+- Error enrichment (every error gets a recovery suggestion)
+- Retry on transient failures (timeout, busy → auto-retry once)
+"""
+
+import logging
+import re
+import time
+from dataclasses import dataclass, field
+from typing import Optional, Callable
+
+from harmoni.core.config import ensure_dirs
+from harmoni.core.error_recovery import enrich_error, is_retryable
+from harmoni.core.executor import Executor
+from harmoni.core.humanizer import humanize_result, humanize_error
+from harmoni.core.intent_parser import Intent, IntentType, parse_intent
+from harmoni.core.memory import Memory
+from harmoni.core.model_router import resolve_unknown_intent
+from harmoni.core.intent_classifier import classify_intent, learn_from_success
+from harmoni.core.planner import Planner, PlanResult
+
+logger = logging.getLogger(__name__)
+
+# Intents that change system state (need post-action validation)
+_STATE_CHANGING_INTENTS = frozenset([
+    IntentType.NETWORK,
+    IntentType.AUDIO,
+    IntentType.POWER,
+    IntentType.SESSION,
+    IntentType.PACKAGE,
+    IntentType.BLUETOOTH,
+])
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  CONVERSATION CONTEXT (#74)
+# ═══════════════════════════════════════════════════════════════════════════
+
+@dataclass
+class ConversationTurn:
+    """A single turn in the conversation."""
+    user_input: str
+    intent_type: str  # IntentType.value
+    params: dict = field(default_factory=dict)
+    result_summary: str = ""
+    outcome: str = ""
+    timestamp: float = 0.0
+
+
+@dataclass
+class PendingQuestion:
+    """A question waiting for user's answer."""
+    intent: Intent
+    question_type: str  # "ssid", "password", "target", "app", "port", "confirm_action"
+    options: list[str] = field(default_factory=list)  # available choices
+    timestamp: float = 0.0
+
+
+# Pronouns that reference previous context
+_PRONOUNS_PT = {"esse", "essa", "isso", "este", "esta", "nesse", "nessa", "nisso", "dele", "dela", "aquele", "aquela"}
+_PRONOUNS_EN = {"that", "this", "it", "those", "the same", "that one"}
+_ALL_PRONOUNS = _PRONOUNS_PT | _PRONOUNS_EN
+
+
+class HarmoniBridge:
+    """Single entry point for all UI → backend communication."""
+
+    def __init__(self, on_progress: Optional[Callable[[str, int, int], None]] = None) -> None:
+        """Initialize bridge with all subsystems.
+
+        Args:
+            on_progress: Optional callback(stage, current, total) for boot progress.
+                         Used by splash screen to show real loading stages.
+        """
+        _t0 = time.monotonic()
+        self._boot_times: dict[str, float] = {}
+
+        ensure_dirs()
+        self._executor = Executor()
+        self._memory = Memory()
+        self._planner = Planner(self._executor, self._memory)
+        # Conversation state
+        self._conversation: list[ConversationTurn] = []
+        self._pending_question: Optional[PendingQuestion] = None
+
+        self._boot_times["init_core"] = (time.monotonic() - _t0) * 1000
+
+        # Check and auto-install missing system dependencies
+        _t_deps = time.monotonic()
+        if on_progress:
+            on_progress("Verificando dependências…", 1, 5)
+        try:
+            from harmoni.infra.deps import check_and_install_deps
+            missing = check_and_install_deps()
+            if missing:
+                logger.warning("Missing deps after check: %s", missing)
+        except Exception as e:
+            logger.debug("Dep check failed (non-critical): %s", e)
+        self._boot_times["deps_check"] = (time.monotonic() - _t_deps) * 1000
+
+        # Start MCP (system context polling + watchers) with progress
+        _t1 = time.monotonic()
+        if on_progress:
+            on_progress("Detectando sistema…", 2, 5)
+        from harmoni.core.mcp import context
+        context.start(on_progress=self._mcp_progress_adapter(on_progress))
+        self._boot_times["mcp_start"] = (time.monotonic() - _t1) * 1000
+
+        self._boot_times["total"] = (time.monotonic() - _t0) * 1000
+        logger.info(
+            "Bridge initialized in %.0fms (core: %.0fms, deps: %.0fms, mcp: %.0fms)",
+            self._boot_times["total"],
+            self._boot_times["init_core"],
+            self._boot_times.get("deps_check", 0),
+            self._boot_times["mcp_start"],
+        )
+
+    @staticmethod
+    def _mcp_progress_adapter(
+        on_progress: Optional[Callable[[str, int, int], None]],
+    ) -> Optional[Callable[[str, int, int], None]]:
+        """Adapt MCP progress to splash progress (offset stage numbers)."""
+        if not on_progress:
+            return None
+        def adapter(stage: str, current: int, total: int) -> None:
+            # MCP stages are 1-6, splash total is ~8 (MCP + GUI)
+            on_progress(stage, 1 + current, 2 + total)
+        return adapter
+
+    @property
+    def boot_times(self) -> dict[str, float]:
+        """Boot timing data (ms). Includes MCP sub-timings."""
+        from harmoni.core.mcp import context
+        combined = dict(self._boot_times)
+        for k, v in context.boot_times.items():
+            combined[f"mcp.{k}"] = v
+        return combined
+
+    # ═══════════════════════════════════════════════════════════════════
+    #  PUBLIC API
+    # ═══════════════════════════════════════════════════════════════════
+
+    def execute_command(self, command: str, confirmed: bool = False) -> dict:
+        """Execute a natural language command."""
+        command = command.strip()
+        if not command:
+            return self._empty_response()
+
+        try:
+            return self._process(command, confirmed)
+        except Exception as e:
+            logger.exception("Unhandled error in execute_command")
+            return self._graceful_error(e)
+
+    def execute_streaming(
+        self,
+        command: str,
+        confirmed: bool = False,
+        on_step: Optional[Callable[[str, int, int], None]] = None,
+    ) -> dict:
+        """Execute a command with real-time step streaming."""
+        command = command.strip()
+        if not command:
+            return self._empty_response()
+
+        try:
+            return self._process_streaming(command, confirmed, on_step)
+        except Exception as e:
+            logger.exception("Unhandled error in execute_streaming")
+            return self._graceful_error(e)
+
+    # ═══════════════════════════════════════════════════════════════════
+    #  CORE PROCESSING
+    # ═══════════════════════════════════════════════════════════════════
+
+    def _process(self, user_input: str, confirmed: bool) -> dict:
+        from harmoni.core.mcp import context
+        from harmoni.ui.topbar import signal_topbar_processing, signal_topbar_idle
+
+        # (#75) If there's a pending question, treat input as answer
+        if self._pending_question:
+            return self._handle_answer(user_input, confirmed)
+
+        # (#76) Resolve pronouns using conversation context
+        resolved_input = self._resolve_pronouns(user_input)
+
+        signal_topbar_processing("Entendendo…")
+        intent = parse_intent(resolved_input)
+
+        # LLM fallback for unknown intents — hybrid model:
+        # 1. Try lightweight classifier (cache + LLM classification)
+        # 2. Fall back to full resolve_unknown_intent only if classifier fails
+        if intent.type == IntentType.UNKNOWN:
+            from harmoni.core.model_router import is_any_provider_available
+
+            # Try classifier first (cache hit is instant, LLM call is lightweight)
+            signal_topbar_processing("Classificando…")
+            classified = classify_intent(resolved_input)
+            if classified:
+                intent = classified
+            elif is_any_provider_available():
+                # Full LLM fallback as last resort
+                signal_topbar_processing("Consultando IA…")
+                resolved = resolve_unknown_intent(resolved_input)
+                if resolved:
+                    intent = resolved
+                else:
+                    signal_topbar_idle()
+                    return self._unknown_intent_response()
+            else:
+                signal_topbar_idle()
+                return self._unknown_intent_response()
+
+        # (#75) Check if intent needs clarification
+        clarification = self._needs_clarification(intent)
+        if clarification:
+            signal_topbar_idle()
+            return clarification
+
+        # Confirmation check for destructive actions
+        if not confirmed:
+            confirm_msg = self._needs_confirmation(intent)
+            if confirm_msg:
+                signal_topbar_idle()
+                return self._confirm_response(confirm_msg)
+
+        # Sudo password check (after confirmation, before execution)
+        sudo_check = self._needs_sudo_password(intent)
+        if sudo_check:
+            signal_topbar_idle()
+            return sudo_check
+
+        # Execute
+        signal_topbar_processing("Executando…")
+        result = self._execute_intent(intent, context)
+        signal_topbar_idle()
+
+        # (#74) Record turn in conversation
+        self._record_turn(user_input, intent, result)
+
+        # Learn from successful executions (feeds the classifier cache)
+        if result.get("status") in ("success", "recovered"):
+            learn_from_success(user_input, intent)
+
+        return result
+
+    def _process_streaming(
+        self,
+        user_input: str,
+        confirmed: bool,
+        on_step: Optional[Callable[[str, int, int], None]],
+    ) -> dict:
+        """Process with real-time step callbacks."""
+        from harmoni.core.mcp import context
+        from harmoni.ui.topbar import signal_topbar_processing, signal_topbar_idle
+
+        signal_topbar_processing("Entendendo…")
+        if on_step:
+            on_step("Entendendo…", 0, 0)
+
+        # (#75) If there's a pending question, treat input as answer
+        if self._pending_question:
+            return self._handle_answer(user_input, confirmed)
+
+        # (#76) Resolve pronouns
+        resolved_input = self._resolve_pronouns(user_input)
+
+        intent = parse_intent(resolved_input)
+
+        # LLM fallback — hybrid model (same as _process)
+        if intent.type == IntentType.UNKNOWN:
+            from harmoni.core.model_router import is_any_provider_available
+
+            # Try classifier first
+            if on_step:
+                on_step("Classificando…", 1, 0)
+            classified = classify_intent(resolved_input)
+            if classified:
+                intent = classified
+            elif is_any_provider_available():
+                if on_step:
+                    on_step("Consultando IA…", 1, 0)
+                resolved = resolve_unknown_intent(resolved_input)
+                if resolved:
+                    intent = resolved
+                else:
+                    return self._unknown_intent_response()
+            else:
+                return self._unknown_intent_response()
+
+        # (#75) Clarification
+        clarification = self._needs_clarification(intent)
+        if clarification:
+            return clarification
+
+        # Confirmation
+        if not confirmed:
+            confirm_msg = self._needs_confirmation(intent)
+            if confirm_msg:
+                return self._confirm_response(confirm_msg)
+
+        # Sudo password check (after confirmation, before execution)
+        sudo_check = self._needs_sudo_password(intent)
+        if sudo_check:
+            return sudo_check
+
+        if on_step:
+            on_step("Executando…", 1, 0)
+
+        # Execute
+        signal_topbar_processing("Executando…")
+        context.notify_activity()
+        plan_result = self._execute_with_retry(intent)
+
+        # Post-action validation
+        if plan_result.outcome == "success" and intent.type in _STATE_CHANGING_INTENTS:
+            self._validate_post_action(intent, plan_result, context)
+
+        steps, summary, outcome, voice_mode = humanize_result(plan_result)
+
+        # Stream steps
+        if on_step and steps:
+            for i, step in enumerate(steps):
+                on_step(step, i, len(steps))
+
+        status = "error" if outcome == "failure" else outcome
+        if status == "error" and summary:
+            summary = enrich_error(summary, context={"intent": intent.type.value})
+
+        signal_topbar_idle()
+
+        result = {
+            "steps": steps,
+            "result": summary,
+            "status": status,
+            "confirm": None,
+            "voice_mode": voice_mode,
+        }
+
+        # Record turn
+        self._record_turn(user_input, intent, result)
+
+        # Learn from successful executions (feeds the classifier cache)
+        if result.get("status") in ("success", "recovered"):
+            learn_from_success(user_input, intent)
+
+        return result
+
+    def _execute_intent(self, intent: Intent, context) -> dict:
+        """Execute an intent with retry, validation, and error enrichment."""
+        context.notify_activity()
+        plan_result = self._execute_with_retry(intent)
+
+        # Post-action validation
+        if plan_result.outcome == "success" and intent.type in _STATE_CHANGING_INTENTS:
+            self._validate_post_action(intent, plan_result, context)
+
+        steps, summary, outcome, voice_mode = humanize_result(plan_result)
+        status = "error" if outcome == "failure" else outcome
+
+        if status == "error" and summary:
+            summary = enrich_error(summary, context={"intent": intent.type.value})
+
+        return {
+            "steps": steps,
+            "result": summary,
+            "status": status,
+            "confirm": None,
+            "voice_mode": voice_mode,
+        }
+
+    # ═══════════════════════════════════════════════════════════════════
+    #  CONVERSATION CONTEXT (#74)
+    # ═══════════════════════════════════════════════════════════════════
+
+    def _record_turn(self, user_input: str, intent: Intent, result: dict) -> None:
+        """Record a conversation turn for context."""
+        turn = ConversationTurn(
+            user_input=user_input,
+            intent_type=intent.type.value,
+            params=dict(intent.params),
+            result_summary=result.get("result", "")[:100],
+            outcome=result.get("status", ""),
+            timestamp=time.time(),
+        )
+        self._conversation.append(turn)
+        # Keep only last 3 turns
+        if len(self._conversation) > 3:
+            self._conversation = self._conversation[-3:]
+
+    def _get_last_turn(self) -> Optional[ConversationTurn]:
+        """Get the most recent conversation turn."""
+        return self._conversation[-1] if self._conversation else None
+
+    # ═══════════════════════════════════════════════════════════════════
+    #  CLARIFICATION QUESTIONS (#75)
+    # ═══════════════════════════════════════════════════════════════════
+
+    def _needs_clarification(self, intent: Intent) -> Optional[dict]:
+        """Check if intent is missing required info and ask for it."""
+
+        # NETWORK: connect without SSID
+        if intent.type == IntentType.NETWORK:
+            action = intent.params.get("action", "")
+            if action == "connect" and not intent.params.get("ssid"):
+                from harmoni.skills import network as net_skill
+                from harmoni.core.mcp import context as mcp
+                # Check if already connected
+                if mcp.wifi.connected:
+                    return None  # MCO will handle "already connected"
+                # List available networks
+                networks = net_skill.list_networks()
+                if networks:
+                    options = [n.ssid for n in networks[:8]]
+                    lines = [f"  {n.ssid} — {n.signal}%" for n in networks[:8]]
+                    self._pending_question = PendingQuestion(
+                        intent=intent,
+                        question_type="ssid",
+                        options=options,
+                        timestamp=time.time(),
+                    )
+                    return {
+                        "steps": ["Scanning networks"],
+                        "result": "Qual rede?\n" + "\n".join(lines),
+                        "status": "success",
+                        "confirm": None,
+                        "voice_mode": "full",
+                    }
+
+        # APP_LAUNCH: no app specified
+        if intent.type == IntentType.APP_LAUNCH:
+            if not intent.params.get("app"):
+                self._pending_question = PendingQuestion(
+                    intent=intent,
+                    question_type="app",
+                    timestamp=time.time(),
+                )
+                return {
+                    "steps": [],
+                    "result": "Qual app você quer abrir?",
+                    "status": "success",
+                    "confirm": None,
+                    "voice_mode": "full",
+                }
+
+        # PROCESS_CONTROL: no port
+        if intent.type == IntentType.PROCESS_CONTROL:
+            if intent.params.get("port") is None and intent.params.get("action") == "kill":
+                self._pending_question = PendingQuestion(
+                    intent=intent,
+                    question_type="port",
+                    timestamp=time.time(),
+                )
+                return {
+                    "steps": [],
+                    "result": "Qual porta?",
+                    "status": "success",
+                    "confirm": None,
+                    "voice_mode": "full",
+                }
+
+        # FILE_ORGANIZE: no target
+        if intent.type == IntentType.FILE_ORGANIZE:
+            if not intent.params.get("target"):
+                self._pending_question = PendingQuestion(
+                    intent=intent,
+                    question_type="target",
+                    options=["downloads", "desktop", "documentos"],
+                    timestamp=time.time(),
+                )
+                return {
+                    "steps": [],
+                    "result": "Qual pasta? (downloads, desktop, documentos)",
+                    "status": "success",
+                    "confirm": None,
+                    "voice_mode": "full",
+                }
+
+        # PACKAGE / SELF_UPDATE: need sudo password
+        # Only ask for password AFTER confirmation (confirmed=True means user already said yes)
+        if intent.type in (IntentType.PACKAGE, IntentType.SELF_UPDATE):
+            action = intent.params.get("action", "")
+            needs_sudo = action in ("install", "remove", "update", "upgrade")
+            if intent.type == IntentType.SELF_UPDATE:
+                needs_sudo = action == "update"
+            if needs_sudo and not intent.params.get("sudo_password"):
+                # Don't ask for password yet — let confirmation happen first
+                # This method is called before confirmation check, so we skip here
+                # Password will be asked via _needs_sudo_clarification after confirm
+                pass
+
+        return None
+
+    def _handle_answer(self, answer: str, confirmed: bool) -> dict:
+        """Process user's answer to a pending question."""
+        from harmoni.core.mcp import context
+
+        question = self._pending_question
+        self._pending_question = None
+
+        if not question:
+            return self._process(answer, confirmed)
+
+        # Check if answer is too old (>60s)
+        if time.time() - question.timestamp > 60:
+            # Expired — treat as new command
+            return self._process(answer, confirmed)
+
+        intent = question.intent
+        answer_clean = answer.strip()
+
+        # Inject answer into intent params based on question type
+        if question.question_type == "sudo_password":
+            intent.params["sudo_password"] = answer_clean
+            # Execute directly (already confirmed)
+            result = self._execute_intent(intent, context)
+            self._record_turn("[senha]", intent, result)
+            return result
+
+        elif question.question_type == "ssid":
+            # User might say the SSID name or a number (index)
+            if answer_clean.isdigit() and question.options:
+                idx = int(answer_clean) - 1
+                if 0 <= idx < len(question.options):
+                    intent.params["ssid"] = question.options[idx]
+                else:
+                    intent.params["ssid"] = answer_clean
+            else:
+                # Match against available options (fuzzy)
+                matched = self._fuzzy_match_option(answer_clean, question.options)
+                intent.params["ssid"] = matched or answer_clean
+
+        elif question.question_type == "password":
+            intent.params["password"] = answer_clean
+
+        elif question.question_type == "app":
+            intent.params["app"] = answer_clean
+
+        elif question.question_type == "port":
+            # Extract number from answer
+            port_match = re.search(r"(\d{2,5})", answer_clean)
+            if port_match:
+                intent.params["port"] = int(port_match.group(1))
+            else:
+                return {
+                    "steps": [],
+                    "result": "Não entendi a porta. Diga um número, ex: 3000",
+                    "status": "error",
+                    "confirm": None,
+                    "voice_mode": "full",
+                }
+
+        elif question.question_type == "target":
+            intent.params["target"] = answer_clean
+
+        # Now check if we need password for wifi
+        if intent.type == IntentType.NETWORK and intent.params.get("action") == "connect":
+            ssid = intent.params.get("ssid", "")
+            if ssid and not intent.params.get("password"):
+                # Check if it's a known network (no password needed)
+                from harmoni.core.mcp import context as mcp
+                known = [n.lower() for n in mcp.known_networks]
+                if ssid.lower() not in known:
+                    # Ask for password
+                    self._pending_question = PendingQuestion(
+                        intent=intent,
+                        question_type="password",
+                        timestamp=time.time(),
+                    )
+                    return {
+                        "steps": [],
+                        "result": f"Senha para {ssid}?",
+                        "status": "success",
+                        "confirm": None,
+                        "voice_mode": "full",
+                    }
+
+        # Execute with the completed intent
+        result = self._execute_intent(intent, context)
+        self._record_turn(answer, intent, result)
+        return result
+
+    # ═══════════════════════════════════════════════════════════════════
+    #  SUDO PASSWORD (#sudo)
+    # ═══════════════════════════════════════════════════════════════════
+
+    def _needs_sudo_password(self, intent: Intent) -> Optional[dict]:
+        """Check if intent needs sudo and password isn't provided yet.
+
+        Called AFTER confirmation, BEFORE execution.
+        Returns a password prompt response, or None to proceed.
+        """
+        if intent.params.get("sudo_password"):
+            return None  # already have it
+
+        needs_sudo = False
+        if intent.type == IntentType.PACKAGE:
+            needs_sudo = intent.params.get("action", "") in ("install", "remove", "update", "upgrade")
+        elif intent.type == IntentType.SELF_UPDATE:
+            needs_sudo = intent.params.get("action", "") == "update"
+
+        if not needs_sudo:
+            return None
+
+        from harmoni.skills.package_manager import needs_sudo_password
+        if not needs_sudo_password():
+            return None  # NOPASSWD configured, no need to ask
+
+        self._pending_question = PendingQuestion(
+            intent=intent,
+            question_type="sudo_password",
+            timestamp=time.time(),
+        )
+        return {
+            "steps": [],
+            "result": "Senha de administrador:",
+            "status": "success",
+            "confirm": None,
+            "voice_mode": "full",
+        }
+
+    def _fuzzy_match_option(self, answer: str, options: list[str]) -> Optional[str]:
+        """Fuzzy match user answer against available options."""
+        answer_lower = answer.lower()
+        # Exact match
+        for opt in options:
+            if opt.lower() == answer_lower:
+                return opt
+        # Substring match
+        for opt in options:
+            if answer_lower in opt.lower() or opt.lower() in answer_lower:
+                return opt
+        return None
+
+    # ═══════════════════════════════════════════════════════════════════
+    #  PRONOUN RESOLUTION (#76)
+    # ═══════════════════════════════════════════════════════════════════
+
+    def _resolve_pronouns(self, user_input: str) -> str:
+        """Replace pronouns with concrete references from conversation context."""
+        if not self._conversation:
+            return user_input
+
+        # Check if input contains a pronoun
+        words = set(user_input.lower().split())
+        has_pronoun = bool(words & _ALL_PRONOUNS)
+        if not has_pronoun:
+            return user_input
+
+        last = self._get_last_turn()
+        if not last:
+            return user_input
+
+        # Extract the "object" from the last turn
+        obj = self._extract_object(last)
+        if not obj:
+            return user_input
+
+        # Replace the pronoun with the object
+        result = user_input
+        for pronoun in _ALL_PRONOUNS:
+            # Word boundary replacement
+            pattern = re.compile(r'\b' + re.escape(pronoun) + r'\b', re.IGNORECASE)
+            if pattern.search(result):
+                result = pattern.sub(obj, result, count=1)
+                logger.debug("Pronoun resolved: '%s' → '%s' (object: %s)", user_input, result, obj)
+                break
+
+        return result
+
+    def _extract_object(self, turn: ConversationTurn) -> Optional[str]:
+        """Extract the main object/target from a conversation turn."""
+        params = turn.params
+
+        # App launch → app name
+        if turn.intent_type == "app_launch":
+            return params.get("app", "")
+
+        # Network → SSID
+        if turn.intent_type == "network":
+            return params.get("ssid", "")
+
+        # File organize → target folder
+        if turn.intent_type == "file_organize":
+            return params.get("target", "")
+
+        # Process control → port
+        if turn.intent_type == "process_control":
+            port = params.get("port")
+            return str(port) if port else ""
+
+        # Package → package name
+        if turn.intent_type == "package":
+            return params.get("package", "")
+
+        # Window → target
+        if turn.intent_type == "window":
+            return params.get("target", "")
+
+        # Workflow → project name
+        if turn.intent_type == "workflow_start":
+            return params.get("project", "")
+
+        # File search → query
+        if turn.intent_type in ("files_search", "files_open"):
+            return params.get("query", "")
+
+        # Audio → try to extract from input
+        if turn.intent_type == "audio":
+            return ""
+
+        # Fallback: try to extract a noun from the original input
+        # Simple heuristic: last word that's not a verb/preposition
+        return ""
+
+    # ═══════════════════════════════════════════════════════════════════
+    #  RETRY, VALIDATION, ERROR HANDLING
+    # ═══════════════════════════════════════════════════════════════════
+
+    def _execute_with_retry(self, intent: Intent) -> PlanResult:
+        """Execute intent with automatic retry on transient failures."""
+        result = self._planner.execute(intent)
+
+        if result.outcome == "failure" and result.error and is_retryable(result.error):
+            logger.info("Transient failure detected, retrying: %s", result.error[:80])
+            time.sleep(0.5)
+            retry_result = self._planner.execute(intent)
+            if retry_result.outcome != "failure":
+                retry_result.outcome = "recovered"
+                return retry_result
+            return result
+
+        return result
+
+    def _validate_post_action(self, intent: Intent, result: PlanResult, context) -> None:
+        """After a state-changing action, verify MCP reflects the change."""
+        time.sleep(0.3)
+
+        if intent.type == IntentType.NETWORK:
+            context.force_update_wifi()
+            action = intent.params.get("action", "")
+            if action == "connect" and not context.wifi.connected:
+                time.sleep(1.0)
+                context.force_update_wifi()
+                if not context.wifi.connected:
+                    result.summary += "\n⚠ Conexão pode estar instável."
+                    result.outcome = "recovered"
+            elif action == "disconnect" and context.wifi.connected:
+                time.sleep(0.5)
+                context.force_update_wifi()
+
+        elif intent.type == IntentType.AUDIO:
+            context.force_update_audio()
+
+        elif intent.type == IntentType.POWER:
+            context.force_update()
+
+    def _graceful_error(self, e: Exception) -> dict:
+        """Never show traceback. Always human message + suggestion."""
+        msg = humanize_error(str(e))
+        enriched = enrich_error(msg, context={"intent": "unknown"})
+        return {
+            "steps": [],
+            "result": enriched,
+            "status": "error",
+            "confirm": None,
+            "voice_mode": "full",
+        }
+
+    # ═══════════════════════════════════════════════════════════════════
+    #  RESPONSE HELPERS
+    # ═══════════════════════════════════════════════════════════════════
+
+    def _empty_response(self) -> dict:
+        return {"steps": [], "result": "", "status": "success", "confirm": None, "voice_mode": "full"}
+
+    def _unknown_intent_response(self) -> dict:
+        return {
+            "steps": [],
+            "result": enrich_error("Não entendi o que você quer.", context={"intent": "unknown"}),
+            "status": "error",
+            "confirm": None,
+            "voice_mode": "full",
+        }
+
+    def _confirm_response(self, msg: str) -> dict:
+        return {"steps": [], "result": "", "status": "success", "confirm": msg, "voice_mode": "full"}
+
+    # ═══════════════════════════════════════════════════════════════════
+    #  CONFIRMATION
+    # ═══════════════════════════════════════════════════════════════════
+
+    def _needs_confirmation(self, intent) -> Optional[str]:
+        if intent.type == IntentType.FILE_ORGANIZE:
+            target = intent.params.get("target", "folder")
+            return f"Organize files in {target}? This will move files into folders by type."
+        if intent.type == IntentType.DISK_ANALYSIS:
+            if intent.params.get("action") == "clean":
+                return "Clean cache and trash? This will free up disk space."
+        if intent.type == IntentType.SESSION:
+            from harmoni.skills.session_control import is_destructive, get_session_action
+            action_name = intent.params.get("action", "")
+            if is_destructive(action_name):
+                action = get_session_action(action_name)
+                desc = action.description if action else action_name
+                return f"{desc}? This cannot be undone."
+        if intent.type == IntentType.PACKAGE:
+            action = intent.params.get("action", "")
+            package = intent.params.get("package", "")
+            # If we already have the sudo password, skip confirmation
+            # (the password prompt already serves as confirmation)
+            if intent.params.get("sudo_password"):
+                return None
+            if action == "install":
+                return f"Instalar '{package}'?"
+            if action == "remove":
+                return f"Remover '{package}'?"
+            if action == "upgrade":
+                return "Atualizar todos os pacotes do sistema?"
+        if intent.type == IntentType.SELF_UPDATE:
+            action = intent.params.get("action", "")
+            if action == "update":
+                return "Atualizar o Harmoni? Vai baixar e instalar a nova versão."
+        return None
+
+    # ═══════════════════════════════════════════════════════════════════
+    #  LIFECYCLE & STATUS
+    # ═══════════════════════════════════════════════════════════════════
+
+    def close(self) -> None:
+        from harmoni.core.mcp import context
+        context.stop()
+        self._memory.close()
+
+    def get_system_status(self) -> dict:
+        """Return current system metrics for the status panel.
+
+        Uses MCP cached state for instant response. Falls back to
+        direct psutil only for fields MCP doesn't track.
+        """
+        import psutil
+        import platform
+        import os
+
+        # Use MCP cache for fast reads (no subprocess, no blocking)
+        from harmoni.core.mcp import context
+        state = context.snapshot()
+
+        # Only call psutil for net counters (not cached in MCP)
+        net = psutil.net_io_counters()
+
+        return {
+            "cpu_percent": round(state.system.cpu_percent, 1),
+            "cpu_cores": state.system.cpu_cores,
+            "mem_percent": round(state.system.mem_percent, 1),
+            "mem_used_gb": round(state.system.mem_used_gb, 1),
+            "mem_total_gb": round(state.system.mem_total_gb, 1),
+            "disk_percent": round(state.system.disk_percent, 1),
+            "disk_free_gb": round(state.system.disk_free_gb, 1),
+            "disk_total_gb": round(psutil.disk_usage("/").total / (1024**3), 1),
+            "net_sent_mb": round(net.bytes_sent / (1024**2), 1),
+            "net_recv_mb": round(net.bytes_recv / (1024**2), 1),
+            "hostname": platform.node(),
+            "kernel": platform.release(),
+            "user": os.environ.get("USER", "user"),
+        }
+
+    def get_recent_activity(self) -> list[dict]:
+        """Return recent memory records for the activity timeline."""
+        import time as _time
+        records = self._memory.recent(5)
+        items = []
+        for r in records:
+            t = _time.strftime("%H:%M", _time.localtime(r.timestamp))
+            icon = "✓" if r.outcome == "success" else ("⟳" if r.outcome == "recovered" else "✗")
+            items.append({
+                "time": t,
+                "text": r.user_input[:50],
+                "outcome": r.outcome,
+                "icon": icon,
+            })
+        return items
