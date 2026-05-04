@@ -69,7 +69,33 @@ Se não for 100% confiável → fluxo guiado. Se for confiável → automático.
 |------|----------|--------|
 | Harmoni Intelligence | IA cloud opcional (news, explain, write, translate) | Após P0-P3 |
 | Demo voz | Wake word, confirmação por voz, 3 fluxos matadores | Após Intelligence |
+| Wayland compositor | Compositor próprio (wlroots-based) | Antes de distribuição |
 | Distribuição | 1-liner, AppImage, distro própria | Quando tiver impacto |
+
+---
+
+## Nota: Migração X11 → Wayland
+
+**Decisão:** manter X11 agora, migrar quando for hora de distribuir.
+
+**Por que migrar (eventualmente):**
+- Harmoni roda apps reais (editor, browser) — isolamento de segurança faz sentido
+- Compositor próprio = controle total sobre window placement, hotkeys, segurança
+- Distros estão convergindo pra Wayland como padrão
+
+**O que muda:**
+- Openbox → compositor wlroots-based próprio (Harmoni É o compositor)
+- `wmctrl` → protocolos Wayland nativos (controle direto, sem hack)
+- `xclip` → `wl-copy`/`wl-paste`
+- Hotkey global → layer-shell protocol
+- Tkinter → continua via XWayland (ou migra pra widget toolkit nativo)
+
+**O que NÃO muda (zero impacto):**
+- Skills core (nmcli, pactl, apt, bluetoothctl, psutil)
+- MCP, planner, intent parser, humanizer, memory
+- Toda a camada cognitiva
+
+**Estimativa:** ~2-4 semanas de trabalho focado. Acoplamento X11 é localizado (UI + 3 skills).
 
 ---
 

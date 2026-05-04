@@ -280,12 +280,7 @@ if [ "$INSTALL_MODE" = "2" ] || [ "$INSTALL_MODE" = "3" ]; then
             echo "[Harmoni] Backed up current display manager to .bak.harmoni"
         fi
 
-        # Set LightDM as default
-        mkdir -p /etc/X11
-        echo "/usr/sbin/lightdm" > /etc/X11/default-display-manager
-        dpkg-reconfigure -f noninteractive lightdm 2>/dev/null || true
-
-        # Apply Harmoni LightDM configs
+        # Apply Harmoni LightDM configs (files only — no service restart)
         mkdir -p /etc/lightdm
         if [ -f /etc/lightdm/lightdm.conf ]; then
             cp /etc/lightdm/lightdm.conf /etc/lightdm/lightdm.conf.bak.harmoni
@@ -296,7 +291,40 @@ if [ "$INSTALL_MODE" = "2" ] || [ "$INSTALL_MODE" = "3" ]; then
         cp /usr/share/harmoni/config/lightdm.conf /etc/lightdm/lightdm.conf
         cp /usr/share/harmoni/config/slick-greeter.conf /etc/lightdm/slick-greeter.conf
 
-        echo "[Harmoni] LightDM configured. Harmoni is the default session."
+        # Set LightDM as default — takes effect on next boot (no restart now)
+        mkdir -p /etc/X11
+        echo "/usr/sbin/lightdm" > /etc/X11/default-display-manager
+
+        # Schedule dpkg-reconfigure for next boot instead of running now
+        # Running it now kills the current display manager session (logout mid-install)
+        cat > /etc/harmoni-postboot.sh << 'POSTBOOT'
+#!/bin/bash
+# One-shot: finalize display manager switch on first boot after install
+dpkg-reconfigure -f noninteractive lightdm 2>/dev/null || true
+rm -f /etc/harmoni-postboot.sh
+rm -f /etc/systemd/system/harmoni-postboot.service
+systemctl daemon-reload 2>/dev/null || true
+POSTBOOT
+        chmod 755 /etc/harmoni-postboot.sh
+
+        cat > /etc/systemd/system/harmoni-postboot.service << 'SVCUNIT'
+[Unit]
+Description=Harmoni — finalize display manager configuration
+After=multi-user.target
+ConditionPathExists=/etc/harmoni-postboot.sh
+
+[Service]
+Type=oneshot
+ExecStart=/etc/harmoni-postboot.sh
+RemainAfterExit=no
+
+[Install]
+WantedBy=multi-user.target
+SVCUNIT
+        systemctl daemon-reload 2>/dev/null || true
+        systemctl enable harmoni-postboot.service 2>/dev/null || true
+
+        echo "[Harmoni] LightDM configured. Will activate on next boot."
     else
         echo "[Harmoni] ⚠ Could not install LightDM now."
         echo "  After install completes, run:"
@@ -308,68 +336,82 @@ fi
 # ── Mode 3: Remove GNOME/KDE ──
 if [ "$INSTALL_MODE" = "3" ]; then
     echo ""
-    echo "[Harmoni] Clean install — removing other desktop environments..."
+    echo "[Harmoni] Clean install — desktop removal scheduled for next boot."
+    echo "[Harmoni] ⚠ Removing the active desktop NOW would kill your session."
+    echo "[Harmoni] After reboot into Harmoni, run: sudo harmoni-clean-desktops"
 
-    # Detect what's installed and remove it
-    _REMOVED=""
+    # Create a script to remove other desktops safely (run manually after reboot)
+    cat > /usr/local/bin/harmoni-clean-desktops << 'CLEANSCRIPT'
+#!/bin/bash
+# Harmoni — Remove other desktop environments
+# Run this AFTER rebooting into Harmoni session
+set -e
 
-    # GNOME
-    if dpkg -l | grep -q "gnome-shell"; then
-        echo "[Harmoni] Removing GNOME..."
-        apt-get remove -y --purge gnome-shell gnome-session gnome-control-center \
-            gnome-terminal nautilus gdm3 2>/dev/null || true
-        apt-get remove -y --purge 'gnome-*' 2>/dev/null || true
-        _REMOVED="${_REMOVED} GNOME"
-    fi
+if [ "$(id -u)" -ne 0 ]; then
+    echo "Run with sudo: sudo harmoni-clean-desktops"
+    exit 1
+fi
 
-    # KDE/Plasma
-    if dpkg -l | grep -q "plasma-desktop"; then
-        echo "[Harmoni] Removing KDE Plasma..."
-        apt-get remove -y --purge plasma-desktop plasma-workspace sddm \
-            kde-standard 2>/dev/null || true
-        apt-get remove -y --purge 'kde-*' 'plasma-*' 2>/dev/null || true
-        _REMOVED="${_REMOVED} KDE"
-    fi
+echo "[Harmoni] Removing other desktop environments..."
+_REMOVED=""
 
-    # XFCE
-    if dpkg -l | grep -q "xfce4-session"; then
-        echo "[Harmoni] Removing XFCE..."
-        apt-get remove -y --purge xfce4-session xfce4-panel xfdesktop4 \
-            xfwm4 2>/dev/null || true
-        apt-get remove -y --purge 'xfce4-*' 2>/dev/null || true
-        _REMOVED="${_REMOVED} XFCE"
-    fi
+# GNOME
+if dpkg -l | grep -q "gnome-shell"; then
+    echo "[Harmoni] Removing GNOME..."
+    apt-get remove -y --purge gnome-shell gnome-session gnome-control-center \
+        gnome-terminal nautilus gdm3 2>/dev/null || true
+    apt-get remove -y --purge 'gnome-*' 2>/dev/null || true
+    _REMOVED="${_REMOVED} GNOME"
+fi
 
-    # MATE
-    if dpkg -l | grep -q "mate-session-manager"; then
-        echo "[Harmoni] Removing MATE..."
-        apt-get remove -y --purge mate-session-manager mate-panel \
-            mate-desktop 2>/dev/null || true
-        apt-get remove -y --purge 'mate-*' 2>/dev/null || true
-        _REMOVED="${_REMOVED} MATE"
-    fi
+# KDE/Plasma
+if dpkg -l | grep -q "plasma-desktop"; then
+    echo "[Harmoni] Removing KDE Plasma..."
+    apt-get remove -y --purge plasma-desktop plasma-workspace sddm \
+        kde-standard 2>/dev/null || true
+    apt-get remove -y --purge 'kde-*' 'plasma-*' 2>/dev/null || true
+    _REMOVED="${_REMOVED} KDE"
+fi
 
-    # Cinnamon
-    if dpkg -l | grep -q "cinnamon-session"; then
-        echo "[Harmoni] Removing Cinnamon..."
-        apt-get remove -y --purge cinnamon-session cinnamon-desktop \
-            nemo 2>/dev/null || true
-        apt-get remove -y --purge 'cinnamon-*' 2>/dev/null || true
-        _REMOVED="${_REMOVED} Cinnamon"
-    fi
+# XFCE
+if dpkg -l | grep -q "xfce4-session"; then
+    echo "[Harmoni] Removing XFCE..."
+    apt-get remove -y --purge xfce4-session xfce4-panel xfdesktop4 \
+        xfwm4 2>/dev/null || true
+    apt-get remove -y --purge 'xfce4-*' 2>/dev/null || true
+    _REMOVED="${_REMOVED} XFCE"
+fi
 
-    # Clean up orphaned packages
-    echo "[Harmoni] Cleaning up orphaned packages..."
-    apt-get autoremove -y --purge 2>/dev/null || true
-    apt-get clean 2>/dev/null || true
+# MATE
+if dpkg -l | grep -q "mate-session-manager"; then
+    echo "[Harmoni] Removing MATE..."
+    apt-get remove -y --purge mate-session-manager mate-panel \
+        mate-desktop 2>/dev/null || true
+    apt-get remove -y --purge 'mate-*' 2>/dev/null || true
+    _REMOVED="${_REMOVED} MATE"
+fi
 
-    if [ -n "$_REMOVED" ]; then
-        echo "[Harmoni] Removed:${_REMOVED}"
-    else
-        echo "[Harmoni] No other desktop environments found."
-    fi
+# Cinnamon
+if dpkg -l | grep -q "cinnamon-session"; then
+    echo "[Harmoni] Removing Cinnamon..."
+    apt-get remove -y --purge cinnamon-session cinnamon-desktop \
+        nemo 2>/dev/null || true
+    apt-get remove -y --purge 'cinnamon-*' 2>/dev/null || true
+    _REMOVED="${_REMOVED} Cinnamon"
+fi
 
-    echo "[Harmoni] ✓ Clean install complete. Only Harmoni remains."
+# Clean up
+echo "[Harmoni] Cleaning up orphaned packages..."
+apt-get autoremove -y --purge 2>/dev/null || true
+apt-get clean 2>/dev/null || true
+
+if [ -n "$_REMOVED" ]; then
+    echo "[Harmoni] ✓ Removed:${_REMOVED}"
+else
+    echo "[Harmoni] No other desktop environments found."
+fi
+CLEANSCRIPT
+    chmod 755 /usr/local/bin/harmoni-clean-desktops
 fi
 
 # ── Mode 1: Session only ──
