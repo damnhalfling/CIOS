@@ -1,58 +1,76 @@
 # Harmoni OS — TODO
 
-> Tarefas pendentes do sistema open source.
-> Atualizado: Maio 2026 — v0.12.0
+> Escopo TRAVADO. NÃO adicionar features. Fechar o loop.
+> Atualizado: Maio 2026 — v0.13.0
 
 ---
 
-## 🔴 Prioridade Alta
+## ✅ CONCLUÍDO — Produto percebido
 
-### Harmoni Intelligence — OS side
+### P0 — Killer workflow perfeito ✅
+| # | Task | Status |
+|---|------|--------|
+| 150 | Dev Start 100% confiável (stale deps, polling port, editor+browser) | ✅ |
+| 151 | Memória contextual ("continuar projeto X") | ✅ |
+| 152 | Feedback perfeito (humanizer, streaming, topbar transitions) | ✅ |
+
+### P1 — Confiabilidade core ✅
+| # | Task | Status |
+|---|------|--------|
+| 102 | Test matrix real (Ubuntu, Debian, VM sem GPU) | ✅ |
+| 103 | Fluxos guiados (GuidedFlow multi-step) | ✅ |
+| 104 | Degradação graciosa de dependências | ✅ |
+
+### P2 — Polimento invisível ✅
+| # | Task | Status |
+|---|------|--------|
+| 160 | Boot: fade transition (300ms alpha) | ✅ |
+| 161 | Feedback visual consistente (audit 21 handlers) | ✅ |
+| 162 | Audit de outputs (zero tela técnica) | ✅ |
+
+### P3 — Demo
+| # | Task | Status |
+|---|------|--------|
+| 170 | Gravação manual em máquina real | ⏳ Pendente |
+
+---
+
+## 🟡 DEPOIS — Intelligence (OS side)
+
+Só APÓS P0-P3 estarem fechados.
+
 | # | Task | Esforço |
 |---|------|---------|
-| 140 | Token Optimizer (Ollama comprime input antes de enviar ao cloud) | 2 dias |
-| 141 | Intelligence Client (cliente HTTP com auth JWT) | 1 dia |
-| 142 | Intents Intelligence no parser (NEWS, EXPLAIN, WRITE, SUMMARIZE, TRANSLATE) | 1 dia |
+| 140 | Token Optimizer (Ollama comprime input) | 2 dias |
+| 141 | Intelligence Client (HTTP + JWT) | 1 dia |
+| 142 | Intents Intelligence no parser | 1 dia |
 | 143 | Handlers Intelligence no planner | 1 dia |
-| 144 | UX de ativação ("Posso resolver com Harmoni Intelligence. [Ativar]") | 0.5 dia |
-| 145 | Humanizer Intelligence (traduções PT/EN para respostas cloud) | 0.5 dia |
-| 146 | Auth flow (Google OAuth → browser → callback → JWT → salva local) | 1 dia |
-
-### Confiabilidade
-| # | Task | Esforço |
-|---|------|---------|
-| 102 | Test matrix real (Ubuntu clean, Debian clean, VM sem GPU) | 2 dias |
+| 144 | UX de ativação | 0.5 dia |
+| 145 | Humanizer Intelligence | 0.5 dia |
+| 146 | Auth flow (Google OAuth) | 1 dia |
 
 ---
 
-## 🟡 Prioridade Média
+## ⚪ FUTURO
 
-### Demo Voz
-| # | Task | Esforço |
-|---|------|---------|
-| 84 | Wake word / push-to-talk contínuo | 2 dias |
-| 85 | Confirmação por voz — "sim"/"não"/"cancela" | 1 dia |
-| 86 | Navegação por voz — "configurações"/"volta" | 1 dia |
-| 87-91 | 3 fluxos matadores + momento mágico + roteiro 60s | 4.5 dias |
-
-### Distribuição
-| # | Task | Esforço |
-|---|------|---------|
-| 109 | Install script 1-liner (detecta distro) | 1 dia |
-| 110 | AppImage portable | 2 dias |
-| 111 | Distro própria base Debian (ISO) — Harmoni OS | 1 semana+ |
+| Bloco | Quando |
+|-------|--------|
+| Demo voz (wake word, confirmação, 3 fluxos) | Após Intelligence |
+| Distribuição (1-liner, AppImage, ISO) | Quando tiver impacto |
 
 ---
 
-## Ordem de execução
+## Ordem
 
 ```
-AGORA  → Intelligence OS side (#140-146)
-DEPOIS → Confiabilidade (#102)
-DEPOIS → Demo voz (#84-91)
-DEPOIS → Distribuição (#109-111)
+AGORA  → P0: Killer workflow perfeito
+AGORA  → P1: Confiabilidade core
+AGORA  → P2: Polimento invisível
+AGORA  → P3: Demo
+DEPOIS → Intelligence OS side
+FUTURO → Demo voz + Distribuição
 ```
 
 ---
 
-*Atualizado: Maio 2026 — v0.12.0*
+*Atualizado: Maio 2026 — v0.13.0*

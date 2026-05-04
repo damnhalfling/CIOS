@@ -197,3 +197,118 @@ class TestMemoryRecent:
 
     def test_recent_empty_db(self, memory):
         assert memory.recent(10) == []
+
+
+# --- Session Context Tests ---
+
+from harmoni.core.memory import SessionContext
+
+
+def _make_session(name: str = "fidelidade", **overrides) -> SessionContext:
+    """Helper to create a SessionContext with sensible defaults."""
+    defaults = dict(
+        project_name=name,
+        project_path=f"/home/user/projects/{name}",
+        project_type="node",
+        editor_command="code",
+        server_pid=1234,
+        server_port=3000,
+        browser_url="http://localhost:3000",
+        start_command="npm run dev",
+        timestamp=time.time(),
+    )
+    defaults.update(overrides)
+    return SessionContext(**defaults)
+
+
+class TestSessionSaveAndGet:
+    """Saving and retrieving session contexts."""
+
+    def test_save_and_get_session(self, memory):
+        ctx = _make_session("fidelidade")
+        memory.save_session(ctx)
+
+        result = memory.get_session("fidelidade")
+        assert result is not None
+        assert result.project_name == "fidelidade"
+        assert result.project_path == "/home/user/projects/fidelidade"
+        assert result.project_type == "node"
+        assert result.editor_command == "code"
+        assert result.server_pid == 1234
+        assert result.server_port == 3000
+        assert result.browser_url == "http://localhost:3000"
+        assert result.start_command == "npm run dev"
+
+    def test_save_replaces_existing_session(self, memory):
+        ctx1 = _make_session("fidelidade", server_port=3000, timestamp=1000.0)
+        ctx2 = _make_session("fidelidade", server_port=4000, timestamp=2000.0)
+
+        memory.save_session(ctx1)
+        memory.save_session(ctx2)
+
+        result = memory.get_session("fidelidade")
+        assert result is not None
+        assert result.server_port == 4000
+        assert result.timestamp == 2000.0
+
+    def test_get_session_nonexistent(self, memory):
+        assert memory.get_session("nonexistent") is None
+
+    def test_save_session_with_none_server_pid(self, memory):
+        ctx = _make_session("myapp", server_pid=None)
+        memory.save_session(ctx)
+
+        result = memory.get_session("myapp")
+        assert result is not None
+        assert result.server_pid is None
+
+    def test_save_session_with_empty_optional_fields(self, memory):
+        ctx = SessionContext(
+            project_name="minimal",
+            project_path="/tmp/minimal",
+            project_type="python",
+            timestamp=time.time(),
+        )
+        memory.save_session(ctx)
+
+        result = memory.get_session("minimal")
+        assert result is not None
+        assert result.editor_command == ""
+        assert result.server_pid is None
+        assert result.server_port == 0
+        assert result.browser_url == ""
+        assert result.start_command == ""
+
+
+class TestSessionGetLatest:
+    """Retrieving the most recent session across all projects."""
+
+    def test_get_latest_session(self, memory):
+        memory.save_session(_make_session("alpha", timestamp=1000.0))
+        memory.save_session(_make_session("beta", timestamp=3000.0))
+        memory.save_session(_make_session("gamma", timestamp=2000.0))
+
+        latest = memory.get_latest_session()
+        assert latest is not None
+        assert latest.project_name == "beta"
+
+    def test_get_latest_session_empty_db(self, memory):
+        assert memory.get_latest_session() is None
+
+
+class TestSessionListSessions:
+    """Listing all saved sessions."""
+
+    def test_list_sessions_ordered_by_timestamp_desc(self, memory):
+        memory.save_session(_make_session("alpha", timestamp=1000.0))
+        memory.save_session(_make_session("beta", timestamp=3000.0))
+        memory.save_session(_make_session("gamma", timestamp=2000.0))
+
+        sessions = memory.list_sessions()
+        assert len(sessions) == 3
+        assert sessions[0].project_name == "beta"
+        assert sessions[1].project_name == "gamma"
+        assert sessions[2].project_name == "alpha"
+
+    def test_list_sessions_empty_db(self, memory):
+        assert memory.list_sessions() == []

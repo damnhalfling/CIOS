@@ -14,7 +14,15 @@ from harmoni.core.config import MAX_RETRIES
 from harmoni.core.executor import Executor, ExecResult
 from harmoni.core.intent_parser import Intent, IntentType
 from harmoni.core.memory import Memory, MemoryRecord
-from harmoni.skills.dev_start import detect_project, execute_dev_start
+from harmoni.skills.dev_start import (
+    detect_project,
+    execute_dev_start,
+    _is_port_in_use,
+    _detect_editor,
+    _open_editor,
+    _open_browser,
+    ProjectInfo,
+)
 from harmoni.skills.process_control import (
     find_process_on_port,
     kill_process_on_port,
@@ -146,14 +154,17 @@ def _sanitize_error(error: str, skill: str = "") -> str:
 
     import re
 
+    # Strip raw stderr prefix
+    cleaned = re.sub(r'\bstderr:\s*', '', error)
     # Strip file paths
-    cleaned = re.sub(r'/[\w/.\-]+', '', error)
+    cleaned = re.sub(r'/[\w/.\-]+', '', cleaned)
     # Strip tracebacks
     cleaned = re.sub(r'File ".*?", line \d+.*', '', cleaned)
     # Strip error codes
     cleaned = re.sub(r'\b(errno|E[A-Z]{2,}|error\s*\d+)\b', '', cleaned, flags=re.I)
     # Strip PID references
     cleaned = re.sub(r'\(PID \d+\)', '', cleaned)
+    cleaned = re.sub(r'PID \d+', '', cleaned)
     # Strip subprocess noise
     cleaned = re.sub(r'(subprocess|Popen|CalledProcessError).*', '', cleaned, flags=re.I)
     # Strip Python exception class names
@@ -291,6 +302,7 @@ class Planner:
             IntentType.EXPLORE_SYSTEM: self._handle_explore_system,
             IntentType.LIST_APPS: self._handle_list_apps,
             IntentType.WORKFLOW_START: self._handle_workflow_start,
+            IntentType.CONTINUE_PROJECT: self._handle_continue_project,
             IntentType.INTENT_MEDIA: self._handle_intent_media,
             IntentType.INTENT_BROWSE: self._handle_intent_browse,
             IntentType.INTENT_WRITE: self._handle_intent_write,
@@ -340,7 +352,7 @@ class Planner:
     def _handle_dev_start(self, intent: Intent) -> PlanResult:
         project = detect_project(intent.params.get("directory", "."))
         plan_steps, results, pid = execute_dev_start(
-            self.executor, project=project
+            self.executor, project=project, memory=self.memory,
         )
 
         # Check if any step failed
@@ -360,15 +372,15 @@ class Planner:
                         plan_steps=plan_steps + retry_plan,
                         results=results + retry_results,
                         outcome="recovered",
-                        summary=f"Fixed port conflict and started server (PID {retry_pid})",
+                        summary="Fixed port conflict and started server",
                     )
 
             return PlanResult(
                 plan_steps=plan_steps,
                 results=results,
                 outcome="failure",
-                summary=f"Failed: {insight.root_cause}. {insight.suggestion}",
-                error=f"{insight.root_cause}\n{combined_output[:500]}",
+                summary=f"Failed: {_sanitize_error(insight.root_cause, 'dev_start')}. {insight.suggestion}",
+                error=_sanitize_error(insight.root_cause, "dev_start"),
             )
 
         summary = plan_steps[-1] if plan_steps else "Done"
@@ -386,7 +398,7 @@ class Planner:
         kill_plan, kill_result = kill_process_on_port(self.executor, project.port)
         time.sleep(1)
         plan_steps, results, pid = execute_dev_start(
-            self.executor, project=project
+            self.executor, project=project, memory=self.memory,
         )
         return kill_plan + plan_steps, [kill_result] + results, pid
 
@@ -406,7 +418,7 @@ class Planner:
         if action == "query":
             info = find_process_on_port(port)
             if info:
-                summary = f"Port {port}: {info['name']} (PID {info['pid']})"
+                summary = f"Port {port}: {info['name']} is using it"
             else:
                 summary = f"Port {port} is free"
             return PlanResult(
@@ -422,7 +434,7 @@ class Planner:
             results=[result],
             outcome="success" if result.success else "failure",
             summary=f"Killed process on port {port}" if result.success else f"Failed to kill process on port {port}",
-            error=result.stderr if not result.success else None,
+            error=_sanitize_error(result.stderr, "process_control") if not result.success else None,
         )
 
     def _handle_log_analysis(self, intent: Intent) -> PlanResult:
@@ -494,7 +506,7 @@ class Planner:
                 plan_steps.append("Retrying server start")
                 project = detect_project(last.context.get("directory", "."))
                 start_plan, start_results, pid = execute_dev_start(
-                    self.executor, project=project
+                    self.executor, project=project, memory=self.memory,
                 )
                 plan_steps.extend(start_plan)
                 results.extend(start_results)
@@ -504,7 +516,7 @@ class Planner:
                         plan_steps=plan_steps,
                         results=results,
                         outcome="recovered",
-                        summary=f"Fixed port conflict and restarted server (PID {pid})",
+                        summary="Fixed port conflict and restarted server",
                     )
 
         elif "module" in insight.root_cause.lower() or "install" in insight.suggestion.lower():
@@ -518,7 +530,7 @@ class Planner:
                 if install_result.success and last.intent == "dev_start":
                     plan_steps.append("Retrying server start")
                     start_plan, start_results, pid = execute_dev_start(
-                        self.executor, project=project
+                        self.executor, project=project, memory=self.memory,
                     )
                     plan_steps.extend(start_plan)
                     results.extend(start_results)
@@ -527,7 +539,7 @@ class Planner:
                             plan_steps=plan_steps,
                             results=results,
                             outcome="recovered",
-                            summary=f"Reinstalled deps and restarted server (PID {pid})",
+                            summary="Reinstalled components and restarted — running now",
                         )
 
         # If we couldn't auto-fix
@@ -560,18 +572,24 @@ class Planner:
             )
 
         result = self.executor.run(command)
+        if result.success:
+            # Summarize output without raw technical content
+            output = result.stdout[:500].strip()
+            summary = output if output else "Done"
+        else:
+            summary = _sanitize_error(result.stderr, "command")
         return PlanResult(
             plan_steps=[f"Execute: {command}"],
             results=[result],
             outcome="success" if result.success else "failure",
-            summary=result.stdout[:500] if result.success else result.stderr[:500],
-            error=result.stderr if not result.success else None,
+            summary=summary,
+            error=_sanitize_error(result.stderr, "command") if not result.success else None,
         )
 
     def _handle_status(self, intent: Intent) -> PlanResult:
         ports = list_listening_ports()
         if ports:
-            lines = [f"  :{p['port']}  {p['name']} (PID {p['pid']})" for p in ports[:15]]
+            lines = [f"  :{p['port']}  {p['name']}" for p in ports[:15]]
             summary = "Listening ports:\n" + "\n".join(lines)
         else:
             summary = "No services currently listening."
@@ -627,7 +645,7 @@ class Planner:
                 results=[],
                 outcome="failure",
                 summary=f"Organized {result.moved} files with {len(result.errors)} errors",
-                error="\n".join(result.errors[:3]),
+                error=_sanitize_error(result.errors[0], "file_organize") if result.errors else None,
             )
 
         summary_parts = [f"{result.moved} files organized"]
@@ -804,7 +822,7 @@ class Planner:
                 error=None if ok else msg)
 
         return PlanResult(
-            plan_steps=[], results=[], outcome="failure",
+            plan_steps=["Checking Wi-Fi"], results=[], outcome="failure",
             summary="Unknown network action")
 
     def _handle_audio(self, intent: Intent) -> PlanResult:
@@ -861,7 +879,7 @@ class Planner:
                 outcome="success" if ok else "failure", summary=msg)
 
         return PlanResult(
-            plan_steps=[], results=[], outcome="failure",
+            plan_steps=["Checking volume"], results=[], outcome="failure",
             summary="Unknown audio action")
 
     def _handle_disk(self, intent: Intent) -> PlanResult:
@@ -874,7 +892,7 @@ class Planner:
                     plan_steps=steps, results=[],
                     outcome="recovered" if freed > 0 else "failure",
                     summary=f"Freed {freed // (1024*1024)}MB with {len(errors)} errors",
-                    error="\n".join(errors[:3]))
+                    error=_sanitize_error(errors[0], "disk") if errors else None)
             return PlanResult(
                 plan_steps=steps, results=[],
                 outcome="success",
@@ -958,7 +976,7 @@ class Planner:
                 outcome="success" if ok else "failure", summary=msg)
 
         return PlanResult(
-            plan_steps=[], results=[], outcome="failure",
+            plan_steps=["Checking battery"], results=[], outcome="failure",
             summary="Unknown power action")
 
     def _handle_package(self, intent: Intent) -> PlanResult:
@@ -1025,7 +1043,7 @@ class Planner:
                 summary=result.message)
 
         return PlanResult(
-            plan_steps=[], results=[], outcome="failure",
+            plan_steps=["Checking packages"], results=[], outcome="failure",
             summary="Unknown package action")
 
     def _handle_clipboard(self, intent: Intent) -> PlanResult:
@@ -1079,7 +1097,7 @@ class Planner:
                 outcome="success", summary="Clipboard history cleared")
 
         return PlanResult(
-            plan_steps=[], results=[], outcome="failure",
+            plan_steps=["Checking clipboard"], results=[], outcome="failure",
             summary="Unknown clipboard action")
 
     def _handle_window(self, intent: Intent) -> PlanResult:
@@ -1160,7 +1178,7 @@ class Planner:
                 summary=f"Switched to desktop {desktop}" if ok else f"Failed: {err}")
 
         return PlanResult(
-            plan_steps=[], results=[], outcome="failure",
+            plan_steps=["Listing windows"], results=[], outcome="failure",
             summary="Unknown window action")
 
     def _handle_bluetooth(self, intent: Intent) -> PlanResult:
@@ -1283,7 +1301,7 @@ class Planner:
             device_name = intent.params.get("device", "")
             if not device_name:
                 return PlanResult(
-                    plan_steps=[], results=[], outcome="failure",
+                    plan_steps=["Checking Bluetooth"], results=[], outcome="failure",
                     summary="Which device should I remove?")
             steps, ok, msg = _resilient_call(
                 bt_skill.remove, device_name, skill="bluetooth")
@@ -1292,7 +1310,7 @@ class Planner:
                 outcome="success" if ok else "failure", summary=msg)
 
         return PlanResult(
-            plan_steps=[], results=[], outcome="failure",
+            plan_steps=["Checking Bluetooth"], results=[], outcome="failure",
             summary="Unknown Bluetooth action")
 
     def _handle_self_update(self, intent: Intent) -> PlanResult:
@@ -1326,7 +1344,7 @@ class Planner:
                 summary=msg)
 
         return PlanResult(
-            plan_steps=[], results=[], outcome="failure",
+            plan_steps=["Checking version"], results=[], outcome="failure",
             summary="Ação de atualização desconhecida")
 
     def _handle_explore_system(self, intent: Intent) -> PlanResult:
@@ -1420,11 +1438,9 @@ class Planner:
         # Build summary
         parts = [f"Workspace ready: {os.path.basename(match)}"]
         if editor_opened:
-            parts.append(f"Editor opened")
+            parts.append("Editor opened")
         if browser_opened:
             parts.append(f"Browser on localhost:{project.port}")
-        if project.start_command:
-            parts.append(f"Start: {project.start_command}")
 
         # Record for auto-learning
         from harmoni.skills.auto_learn import AutoLearner
@@ -1438,6 +1454,136 @@ class Planner:
             plan_steps=plan_steps, results=[],
             outcome="success",
             summary="\n".join(parts))
+
+    def _handle_continue_project(self, intent: Intent) -> PlanResult:
+        """Restore a previous workspace session.
+
+        Flow:
+        1. Parse project name from intent params (or use latest session)
+        2. Look up SessionContext from Memory
+        3. Check if server is still running (socket test on saved port)
+        4. If running → skip server start, open editor + browser only
+        5. If not running → full Dev Start with saved project path
+        6. If project path doesn't exist → error + suggest available projects
+        """
+        project_name = intent.params.get("project", "")
+
+        # If no project specified, use the most recent session
+        if not project_name:
+            latest = self.memory.get_latest_session()
+            if latest is None:
+                return PlanResult(
+                    plan_steps=["Looking for recent project"],
+                    results=[],
+                    outcome="failure",
+                    summary="No recent projects found. Start a project first.",
+                    error="No sessions in memory",
+                )
+            session = latest
+        else:
+            session = self.memory.get_session(project_name)
+            if session is None:
+                # Try fuzzy match against available sessions
+                all_sessions = self.memory.list_sessions()
+                for s in all_sessions:
+                    if project_name.lower() in s.project_name.lower():
+                        session = s
+                        break
+
+            if session is None:
+                all_sessions = self.memory.list_sessions()
+                if all_sessions:
+                    names = [f"  📁 {s.project_name}" for s in all_sessions[:8]]
+                    return PlanResult(
+                        plan_steps=["Searching for project"],
+                        results=[],
+                        outcome="failure",
+                        summary="Projeto não encontrado.\n\nProjetos disponíveis:\n"
+                                + "\n".join(names),
+                        error="Project not found in sessions",
+                    )
+                return PlanResult(
+                    plan_steps=["Searching for project"],
+                    results=[],
+                    outcome="failure",
+                    summary="Projeto não encontrado. Nenhum projeto salvo.",
+                    error="No sessions in memory",
+                )
+
+        plan_steps = [f"Restoring project: {session.project_name}"]
+
+        # Check if project path still exists
+        if not os.path.exists(session.project_path):
+            all_sessions = self.memory.list_sessions()
+            suggestions = [
+                f"  📁 {s.project_name}"
+                for s in all_sessions
+                if s.project_name != session.project_name and os.path.exists(s.project_path)
+            ]
+            msg = "Projeto não encontrado — o diretório foi removido."
+            if suggestions:
+                msg += "\n\nProjetos disponíveis:\n" + "\n".join(suggestions[:8])
+            return PlanResult(
+                plan_steps=plan_steps,
+                results=[],
+                outcome="failure",
+                summary=msg,
+                error="Project path does not exist",
+            )
+
+        # Check if server is still running
+        server_running = (
+            session.server_port > 0 and _is_port_in_use(session.server_port)
+        )
+
+        if server_running:
+            # Server still running — just open editor + browser
+            plan_steps.append(f"Server already running on port {session.server_port}")
+
+            editor_cmd = session.editor_command or _detect_editor()
+            if editor_cmd:
+                _open_editor(editor_cmd, session.project_path)
+                plan_steps.append(f"Editor opened ({editor_cmd})")
+
+            browser_url = session.browser_url or f"http://localhost:{session.server_port}"
+            _open_browser(browser_url)
+            plan_steps.append(f"Browser opened ({browser_url})")
+
+            return PlanResult(
+                plan_steps=plan_steps,
+                results=[],
+                outcome="success",
+                summary=f"Workspace restored: {session.project_name}. Server already running.",
+            )
+        else:
+            # Server not running — full Dev Start with saved project path
+            plan_steps.append("Server not running — starting full Dev Start")
+
+            project = detect_project(session.project_path)
+            dev_plan, dev_results, pid = execute_dev_start(
+                self.executor, project=project, memory=self.memory,
+            )
+            plan_steps.extend(dev_plan)
+
+            failed = [r for r in dev_results if not r.success]
+            if failed:
+                return PlanResult(
+                    plan_steps=plan_steps,
+                    results=dev_results,
+                    outcome="failure",
+                    summary=f"Failed to restart project {session.project_name}.",
+                    error=_sanitize_error(
+                        "; ".join(r.stderr[:100] for r in failed if r.stderr),
+                        "dev_start",
+                    ),
+                )
+
+            return PlanResult(
+                plan_steps=plan_steps,
+                results=dev_results,
+                outcome="success",
+                summary=f"Workspace restored: {session.project_name}. Server restarted.",
+            )
 
     def _handle_intent_media(self, intent: Intent) -> PlanResult:
         """#119: Open the right app for media consumption."""

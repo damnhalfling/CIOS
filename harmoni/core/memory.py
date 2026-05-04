@@ -21,6 +21,19 @@ class MemoryRecord:
     context: dict = field(default_factory=dict)
 
 
+@dataclass
+class SessionContext:
+    project_name: str
+    project_path: str
+    project_type: str  # "node", "python", etc.
+    editor_command: str = ""
+    server_pid: Optional[int] = None
+    server_port: int = 0
+    browser_url: str = ""
+    start_command: str = ""
+    timestamp: float = field(default_factory=time.time)
+
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS memory (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,6 +48,21 @@ CREATE TABLE IF NOT EXISTS memory (
 );
 CREATE INDEX IF NOT EXISTS idx_memory_intent ON memory(intent);
 CREATE INDEX IF NOT EXISTS idx_memory_timestamp ON memory(timestamp DESC);
+
+CREATE TABLE IF NOT EXISTS session_context (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_name TEXT NOT NULL,
+    project_path TEXT NOT NULL,
+    project_type TEXT NOT NULL,
+    editor_command TEXT DEFAULT '',
+    server_pid INTEGER,
+    server_port INTEGER DEFAULT 0,
+    browser_url TEXT DEFAULT '',
+    start_command TEXT DEFAULT '',
+    timestamp REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_session_project ON session_context(project_name);
+CREATE INDEX IF NOT EXISTS idx_session_timestamp ON session_context(timestamp DESC);
 """
 
 
@@ -103,6 +131,75 @@ class Memory:
             outcome=row["outcome"],
             error=row["error"],
             context=json.loads(row["context"]) if row["context"] else {},
+        )
+
+    # --- Session Context ---
+
+    def save_session(self, ctx: SessionContext) -> None:
+        """Persist a session context. Replaces any existing session for the same project_name."""
+        with self._lock:
+            self._conn.execute(
+                "DELETE FROM session_context WHERE project_name = ?",
+                (ctx.project_name,),
+            )
+            self._conn.execute(
+                """INSERT INTO session_context
+                   (project_name, project_path, project_type, editor_command,
+                    server_pid, server_port, browser_url, start_command, timestamp)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    ctx.project_name,
+                    ctx.project_path,
+                    ctx.project_type,
+                    ctx.editor_command,
+                    ctx.server_pid,
+                    ctx.server_port,
+                    ctx.browser_url,
+                    ctx.start_command,
+                    ctx.timestamp,
+                ),
+            )
+            self._conn.commit()
+
+    def get_session(self, project_name: str) -> Optional[SessionContext]:
+        """Retrieve the most recent session for a given project name."""
+        with self._lock:
+            row = self._conn.execute(
+                """SELECT * FROM session_context
+                   WHERE project_name = ?
+                   ORDER BY timestamp DESC LIMIT 1""",
+                (project_name,),
+            ).fetchone()
+        return self._row_to_session(row) if row else None
+
+    def get_latest_session(self) -> Optional[SessionContext]:
+        """Retrieve the session with the maximum timestamp across all projects."""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM session_context ORDER BY timestamp DESC LIMIT 1"
+            ).fetchone()
+        return self._row_to_session(row) if row else None
+
+    def list_sessions(self) -> list[SessionContext]:
+        """List all saved sessions, most recent first."""
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM session_context ORDER BY timestamp DESC"
+            ).fetchall()
+        return [self._row_to_session(r) for r in rows]
+
+    @staticmethod
+    def _row_to_session(row: sqlite3.Row) -> SessionContext:
+        return SessionContext(
+            project_name=row["project_name"],
+            project_path=row["project_path"],
+            project_type=row["project_type"],
+            editor_command=row["editor_command"] or "",
+            server_pid=row["server_pid"],
+            server_port=row["server_port"] or 0,
+            browser_url=row["browser_url"] or "",
+            start_command=row["start_command"] or "",
+            timestamp=row["timestamp"],
         )
 
     def close(self) -> None:

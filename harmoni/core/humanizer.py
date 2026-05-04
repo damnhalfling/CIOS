@@ -39,11 +39,12 @@ _LANG = _detect_language()
 _PT_MAP: dict[str, str] = {
     # Steps
     "Installing required components…": "Instalando componentes…",
-    "Freeing up connection on port": "Liberando conexão na porta",
-    "Launching your project…": "Iniciando seu projeto…",
-    "Your project is running": "Seu projeto está rodando",
+    "Freeing up port…": "Liberando porta…",
+    "Starting server…": "Iniciando servidor…",
+    "Server running.": "Servidor rodando.",
     "Something went wrong during startup": "Algo deu errado na inicialização",
     "Detected a conflict, resolving…": "Conflito detectado, resolvendo…",
+    "No project detected in this folder.": "Nenhum projeto detectado nesta pasta.",
     "No recognized project found here": "Nenhum projeto encontrado aqui",
     "Stopping the process…": "Parando o processo…",
     "is already free": "já está livre",
@@ -86,7 +87,6 @@ _PT_MAP: dict[str, str] = {
     "Unmuting…": "Ativando som…",
     "Toggling mute…": "Alternando mudo…",
     # Summaries
-    "Your project is live on port": "Seu projeto está ativo na porta",
     "Resolved the conflict — your project is running": "Conflito resolvido — seu projeto está rodando",
     "Stopped the service on port": "Serviço parado na porta",
     "is using port": "está usando a porta",
@@ -237,6 +237,11 @@ _PT_MAP: dict[str, str] = {
     "Bluetooth is turned off": "Bluetooth está desligado",
     "Bluetooth not installed": "Bluetooth não instalado",
     "Bluetooth operation failed": "Operação Bluetooth falhou",
+    # Graceful degradation messages
+    "Wi-Fi unavailable": "Wi-Fi indisponível",
+    "Audio unavailable": "Áudio indisponível",
+    "Bluetooth unavailable": "Bluetooth indisponível",
+    "Window control unavailable": "Controle de janelas indisponível",
     # Generic close-loop responses
     "Done": "Pronto",
     "OK": "Pronto",
@@ -255,6 +260,14 @@ _PT_MAP: dict[str, str] = {
     "Searching for project": "Procurando projeto",
     "Workspace ready:": "Ambiente pronto:",
     "Editor opened": "Editor aberto",
+    "Editor opened.": "Editor aberto.",
+    "Browser opened.": "Navegador aberto.",
+    "Session saved.": "Sessão salva.",
+    "Restoring project…": "Restaurando projeto…",
+    "Server already running.": "Servidor já está rodando.",
+    "Server stopped — starting…": "Servidor parado — iniciando…",
+    "Looking for recent project…": "Procurando projeto recente…",
+    "Workspace restored.": "Ambiente restaurado.",
     "Browser on localhost:": "Navegador em localhost:",
     "Available projects:": "Projetos disponíveis:",
     "not found.": "não encontrado.",
@@ -284,6 +297,26 @@ _PT_MAP: dict[str, str] = {
     "Which file should I open?": "Qual arquivo devo abrir?",
     "What file are you looking for?": "Qual arquivo você está procurando?",
     "opened": "aberto",
+    # Unknown action fallbacks
+    "I don't recognize that network action": "Não reconheço essa ação de rede",
+    "I don't recognize that audio action": "Não reconheço essa ação de áudio",
+    "I don't recognize that power action": "Não reconheço essa ação de energia",
+    "I don't recognize that package action": "Não reconheço essa ação de pacotes",
+    "I don't recognize that clipboard action": "Não reconheço essa ação de área de transferência",
+    "I don't recognize that window action": "Não reconheço essa ação de janela",
+    "I don't recognize that Bluetooth action": "Não reconheço essa ação de Bluetooth",
+    "I don't recognize that update action": "Não reconheço essa ação de atualização",
+    # Additional step translations
+    "Listing Bluetooth devices…": "Listando dispositivos Bluetooth…",
+    "Listing paired devices…": "Listando dispositivos pareados…",
+    "Getting active window…": "Obtendo janela ativa…",
+    "Checking history…": "Verificando histórico…",
+    "Checking version…": "Verificando versão…",
+    "Checking for updates…": "Verificando atualizações…",
+    "No active window found": "Nenhuma janela ativa encontrada",
+    "No previous clipboard item": "Nenhum item anterior na área de transferência",
+    "No package specified": "Nenhum pacote especificado",
+    "No search query": "Nenhuma busca especificada",
 }
 
 
@@ -301,12 +334,21 @@ def _translate_pt(text: str) -> str:
 # Maps technical patterns in plan steps to human-readable equivalents.
 _STEP_TRANSLATIONS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"Install dependencies \((.+?)\)"), "Installing required components…"),
-    (re.compile(r"Port (\d+) in use — killing process"), "Freeing up connection on port {0}…"),
-    (re.compile(r"Starting server \((.+?)\)"), "Launching your project…"),
-    (re.compile(r"Server running on port (\d+) \(PID \d+\)"), "Your project is running"),
+    (re.compile(r"Port (\d+) in use — killing process"), "Freeing up port…"),
+    (re.compile(r"Starting server \((.+?)\)"), "Starting server…"),
+    (re.compile(r"Server running on port (\d+) \(PID \d+\)"), "Server running."),
     (re.compile(r"Server exited immediately"), "Something went wrong during startup"),
     (re.compile(r"Port conflict detected — auto-recovering"), "Detected a conflict, resolving…"),
-    (re.compile(r"Could not detect project type"), "No recognized project found here"),
+    (re.compile(r"Could not detect project type"), "No project detected in this folder."),
+    # Dev Start — editor, browser, session (must precede generic "Opening" / "is running")
+    (re.compile(r"Editor opened \(.+?\)"), "Editor opened."),
+    (re.compile(r"Browser opened \(.+?\)"), "Browser opened."),
+    (re.compile(r"Session saved"), "Session saved."),
+    # Continue project
+    (re.compile(r"Restoring project: .+"), "Restoring project…"),
+    (re.compile(r"Server already running on port \d+"), "Server already running."),
+    (re.compile(r"Server not running — starting full Dev Start"), "Server stopped — starting…"),
+    (re.compile(r"Looking for recent project"), "Looking for recent project…"),
     (re.compile(r"Check port (\d+)"), "Checking port {0}…"),
     (re.compile(r"Found (.+?) \(PID (\d+)\) on port (\d+)"), "Found {0} using port {2}"),
     (re.compile(r"Killing process"), "Stopping the process…"),
@@ -388,6 +430,19 @@ _STEP_TRANSLATIONS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"Searching files"), "Searching files…"),
     (re.compile(r"Searching file contents"), "Searching file contents…"),
     (re.compile(r"No results"), "No results found"),
+    # Bluetooth
+    (re.compile(r"Listing Bluetooth devices"), "Listing Bluetooth devices…"),
+    (re.compile(r"Listing paired devices"), "Listing paired devices…"),
+    # Window
+    (re.compile(r"Getting active window"), "Getting active window…"),
+    # Clipboard
+    (re.compile(r"Checking history"), "Checking history…"),
+    # Self-update
+    (re.compile(r"Checking version"), "Checking version…"),
+    (re.compile(r"Verificando atualizações"), "Checking for updates…"),
+    # Package
+    (re.compile(r"No package specified"), "No package specified"),
+    (re.compile(r"No search query"), "No search query"),
 ]
 
 
@@ -412,8 +467,10 @@ def humanize_step(step: str) -> str:
 
 # ── Summary translations ────────────────────────────────────────────────
 _SUMMARY_TRANSLATIONS: list[tuple[re.Pattern, str]] = [
-    (re.compile(r"Server running on port (\d+) \(PID \d+\)"), "Your project is live on port {0}"),
+    (re.compile(r"Server running on port (\d+) \(PID \d+\)"), "Server running."),
     (re.compile(r"Fixed port conflict and (?:re)?started server \(PID \d+\)"), "Resolved the conflict — your project is running"),
+    (re.compile(r"Fixed port conflict and (?:re)?started server"), "Resolved the conflict — your project is running"),
+    (re.compile(r"Fixed port conflict and restarted server"), "Resolved the conflict — your project is running"),
     (re.compile(r"Killed process on port (\d+)"), "Stopped the service on port {0}"),
     (re.compile(r"Failed to kill process on port (\d+)"), "Couldn't stop the service on port {0}"),
     (re.compile(r"Port (\d+): (.+?) \(PID \d+\)"), "{1} is using port {0}"),
@@ -422,9 +479,13 @@ _SUMMARY_TRANSLATIONS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"Applied fix: (.+)"), "Fixed: {0}"),
     (re.compile(r"Attempted fix but failed\. (.+)"), "Couldn't fix automatically. {0}"),
     (re.compile(r"Reinstalled deps and restarted server \(PID \d+\)"), "Reinstalled components and restarted — running now"),
+    (re.compile(r"Reinstalled components and restarted — running now"), "Reinstalled components and restarted — running now"),
     (re.compile(r"I don't understand that request"), 'I\'m not sure what you mean. Try something like "start my backend" or "what\'s running?"'),
     (re.compile(r"What command should I run\?"), "What would you like me to do?"),
     (re.compile(r"Which port\?.*"), "Which port should I look at?"),
+    # Continue project / workspace restoration
+    (re.compile(r"Workspace restored: .+?\. Server already running\."), "Workspace restored."),
+    (re.compile(r"Workspace restored: .+?\. Server restarted\."), "Workspace restored."),
     # App launcher
     (re.compile(r"(.+) opened"), "{0} is open"),
     (re.compile(r"Failed to open (.+)"), "Couldn't open {0}"),
@@ -462,6 +523,18 @@ _SUMMARY_TRANSLATIONS: list[tuple[re.Pattern, str]] = [
     # Resilient call fallbacks
     (re.compile(r"Verificando disponibilidade"), "Checking availability…"),
     (re.compile(r"Executando"), "Working…"),
+    # Unknown action fallbacks
+    (re.compile(r"Unknown network action"), "I don't recognize that network action"),
+    (re.compile(r"Unknown audio action"), "I don't recognize that audio action"),
+    (re.compile(r"Unknown power action"), "I don't recognize that power action"),
+    (re.compile(r"Unknown package action"), "I don't recognize that package action"),
+    (re.compile(r"Unknown clipboard action"), "I don't recognize that clipboard action"),
+    (re.compile(r"Unknown window action"), "I don't recognize that window action"),
+    (re.compile(r"Unknown Bluetooth action"), "I don't recognize that Bluetooth action"),
+    (re.compile(r"Ação de atualização desconhecida"), "I don't recognize that update action"),
+    # Window/clipboard edge cases
+    (re.compile(r"No active window"), "No active window found"),
+    (re.compile(r"No previous item"), "No previous clipboard item"),
 ]
 
 # ── Error translations ──────────────────────────────────────────────────
@@ -528,9 +601,9 @@ def _humanize_status(summary: str) -> str:
     """Convert port listing to human-friendly format."""
     lines = []
     for line in summary.splitlines():
-        match = re.search(r":(\d+)\s+(\S+)\s+\(PID (\d+|None)\)", line)
+        match = re.search(r":(\d+)\s+(\S+)(?:\s+\(PID (\d+|None)\))?", line)
         if match:
-            port, name, pid = match.groups()
+            port, name = match.group(1), match.group(2)
             if name in ("python3", "unknown"):
                 lines.append(f"Port {port} — system service")
             else:

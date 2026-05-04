@@ -1,10 +1,15 @@
 """Harmoni OS — Native Desktop Interface.
 
-Production-quality 3-column layout with smooth animations,
-micro-interactions, and system-level visual polish.
+Intent-first, single-surface design:
+- Prompt always at bottom (multiline, Shift+Enter for newlines)
+- Results appear above prompt and persist until next command
+- Processing spinner (rotating arc + pulsing dot) only when thinking
+- System status panel on the right (CPU, memory, disk, network)
+- No sidebar, no menus, no page navigation
+- Last 3 activities shown below prompt
 
-Every color change is animated. Every element fades in.
-Every interaction has feedback. Nothing snaps.
+State ring communicates system status without words.
+Everything fades, nothing snaps. Conversation, not dashboard.
 """
 
 import os
@@ -16,83 +21,28 @@ from tkinter import font as tkfont
 from typing import Optional, Callable
 
 from harmoni.core.bridge import HarmoniBridge
-
-# ═══════════════════════════════════════════════════════════════════════════
-#  DESIGN TOKENS
-# ═══════════════════════════════════════════════════════════════════════════
-
-# Backgrounds (darkest → lightest)
-BG         = "#0b0f14"
-BG_PANEL   = "#0f1319"
-BG_CARD    = "#111827"
-BG_INPUT   = "#161b24"
-BG_HOVER   = "#1e2738"
-BG_PRESS   = "#252e3f"
-
-# Borders
-BORDER     = "#1f2937"
-BORDER_LT  = "#2d3748"
-
-# Foreground
-FG         = "#e5e7eb"
-FG_SEC     = "#9ca3af"
-FG_DIM     = "#6b7280"
-
-# Accent
-ACCENT     = "#7c3aed"
-ACCENT_LT  = "#a78bfa"
-ACCENT_DK  = "#6d28d9"
-
-# Semantic
-SUCCESS    = "#22c55e"
-SUCCESS_BG = "#0a1a0f"
-WARNING    = "#eab308"
-ERROR      = "#ef4444"
-CYAN       = "#06b6d4"
-
-# Spacing scale (px)
-SP_MICRO   = 4
-SP_TIGHT   = 8
-SP_COMPACT = 12
-SP_DEFAULT = 16
-SP_SECTION = 24
-SP_BLOCK   = 32
-SP_PAGE    = 40
-
-# Timing (ms)
-T_FAST     = 100
-T_NORMAL   = 180
-T_SLOW     = 300
-T_STEP     = 400
-T_DOTS     = 500
-
-# Layout
-SIDEBAR_W  = 240
-RIGHT_W    = 280
-
-# User context
-_USER  = os.environ.get("USER", "user").capitalize()
-_HOUR  = time.localtime().tm_hour
-_GREET = "Bom dia" if _HOUR < 12 else ("Boa tarde" if _HOUR < 18 else "Boa noite")
+from harmoni.ui.theme import (
+    BG, BG_PANEL, BG_CARD, BG_INPUT, BG_HOVER, BG_PRESS,
+    BORDER, BORDER_LT,
+    FG, FG_SEC, FG_DIM,
+    ACCENT, ACCENT_LT, ACCENT_DK,
+    SUCCESS, SUCCESS_BG, WARNING, ERROR, CYAN,
+    RING_IDLE, RING_PROCESSING, RING_SUCCESS, RING_ERROR,
+    SP_MICRO, SP_TIGHT, SP_COMPACT, SP_DEFAULT, SP_SECTION, SP_BLOCK, SP_PAGE,
+    T_FAST, T_NORMAL, T_SLOW, T_STEP, T_DOTS, T_RING,
+    SIDEBAR_W, RIGHT_W,
+    hex2rgb, rgb2hex, lerp,
+    USER as _USER, GREETING as _GREET,
+)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-#  COLOR UTILITIES
+#  COLOR UTILITIES (delegated to theme.py)
 # ═══════════════════════════════════════════════════════════════════════════
 
-def _hex2rgb(h: str) -> tuple[int, int, int]:
-    h = h.lstrip("#")
-    return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
-
-
-def _rgb2hex(r: int, g: int, b: int) -> str:
-    return f"#{max(0,min(255,r)):02x}{max(0,min(255,g)):02x}{max(0,min(255,b)):02x}"
-
-
-def _lerp(c1: str, c2: str, t: float) -> str:
-    r1, g1, b1 = _hex2rgb(c1)
-    r2, g2, b2 = _hex2rgb(c2)
-    return _rgb2hex(int(r1 + (r2 - r1) * t), int(g1 + (g2 - g1) * t), int(b1 + (b2 - b1) * t))
+_hex2rgb = hex2rgb
+_rgb2hex = rgb2hex
+_lerp = lerp
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -210,23 +160,12 @@ def _hoverable(anim: Animator, frame: tk.Frame, normal: str = BG_CARD,
 #  DATA
 # ═══════════════════════════════════════════════════════════════════════════
 
-QUICK_ACTIONS = [
-    ("📁", "Organizar Arquivos",  "Organizar downloads por tipo",  "organize my downloads"),
-    ("📊", "Status do Sistema",   "Verificar saúde do sistema",    "my computer is slow"),
-    ("🔌", "Finalizar Processo",  "Encerrar processos por porta",  "kill process on port 3000"),
-    ("🌐", "Serviços Ativos",     "Ver portas e serviços",         "status"),
-    ("🚀", "Iniciar Projeto",     "Detectar e iniciar servidor",   "start my backend"),
-    ("📋", "Ver Logs",            "Analisar erros recentes",       "show logs"),
-]
-
-NAV_ITEMS = [
-    ("🏠", "Início",        "home"),
-    ("📂", "Projetos",      "projects"),
-    ("📁", "Arquivos",      "files"),
-    ("⚙️",  "Sistema",       "system"),
-    ("🔌", "Serviços",      "services"),
-    ("📋", "Histórico",     "history"),
-    ("🔧", "Configurações", "settings"),
+QUICK_CHIPS = [
+    ("📁 Organizar",   "organize my downloads"),
+    ("📊 Diagnóstico", "my computer is slow"),
+    ("🚀 Projeto",     "start my backend"),
+    ("🔌 Processos",   "kill process on port 3000"),
+    ("📋 Logs",        "show logs"),
 ]
 
 
@@ -281,13 +220,123 @@ class ScrollFrame(tk.Frame):
         self._canvas.yview_moveto(0)
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+#  STATE RING — Visual heartbeat of the system
+# ═══════════════════════════════════════════════════════════════════════════
+
+class StateRing:
+    """Animated ring that communicates system state without words.
+
+    States:
+    - idle: gentle pulse (breathe) in accent color
+    - processing: rotating gradient animation
+    - success: brief green flash then back to idle
+    - error: brief red flash then back to idle
+    """
+
+    def __init__(self, parent: tk.Frame, size: int = 48) -> None:
+        self._parent = parent
+        self._size = size
+        self._canvas = tk.Canvas(
+            parent, width=size, height=size,
+            bg=BG, highlightthickness=0, bd=0)
+        self._state = "idle"
+        self._phase = 0.0
+        self._anim_id: Optional[str] = None
+        self._ring_id = None
+        self._symbol_id = None
+        self._draw()
+
+    @property
+    def widget(self) -> tk.Canvas:
+        return self._canvas
+
+    def _draw(self) -> None:
+        """Draw the ring and center symbol."""
+        s = self._size
+        pad = 4
+        # Ring (drawn as oval outline)
+        self._ring_id = self._canvas.create_oval(
+            pad, pad, s - pad, s - pad,
+            outline=RING_IDLE, width=3)
+        # Center symbol
+        self._symbol_id = self._canvas.create_text(
+            s // 2, s // 2, text="✦", fill=ACCENT_LT,
+            font=("Helvetica", s // 3))
+
+    def start(self, root: tk.Tk) -> None:
+        """Start the idle breathing animation."""
+        self._root = root
+        self._animate_idle()
+
+    def set_state(self, state: str) -> None:
+        """Change ring state: idle, processing, success, error."""
+        prev = self._state
+        self._state = state
+        self._phase = 0.0
+
+        if state == "processing":
+            self._canvas.itemconfig(self._symbol_id, text="⟳")
+            self._animate_processing()
+        elif state == "success":
+            self._canvas.itemconfig(self._ring_id, outline=RING_SUCCESS)
+            self._canvas.itemconfig(self._symbol_id, text="✓", fill=RING_SUCCESS)
+            # Return to idle after flash
+            self._root.after(1200, lambda: self._reset_to_idle())
+        elif state == "error":
+            self._canvas.itemconfig(self._ring_id, outline=RING_ERROR)
+            self._canvas.itemconfig(self._symbol_id, text="✗", fill=RING_ERROR)
+            self._root.after(1200, lambda: self._reset_to_idle())
+        elif state == "idle":
+            self._reset_to_idle()
+
+    def _reset_to_idle(self) -> None:
+        self._state = "idle"
+        self._phase = 0.0
+        self._canvas.itemconfig(self._symbol_id, text="✦", fill=ACCENT_LT)
+        self._canvas.itemconfig(self._ring_id, outline=RING_IDLE)
+        self._animate_idle()
+
+    def _animate_idle(self) -> None:
+        """Gentle breathing pulse on the ring opacity."""
+        if self._state != "idle":
+            return
+        if not self._canvas.winfo_exists():
+            return
+        import math
+        self._phase += 0.05
+        # Oscillate between dim and bright
+        t = (math.sin(self._phase) + 1) / 2  # 0..1
+        color = _lerp(ACCENT_DK, ACCENT_LT, t)
+        self._canvas.itemconfig(self._ring_id, outline=color)
+        sym_color = _lerp(FG_DIM, ACCENT_LT, t * 0.6)
+        self._canvas.itemconfig(self._symbol_id, fill=sym_color)
+        self._anim_id = self._root.after(T_RING, self._animate_idle)
+
+    def _animate_processing(self) -> None:
+        """Rotating color shift while processing."""
+        if self._state != "processing":
+            return
+        if not self._canvas.winfo_exists():
+            return
+        import math
+        self._phase += 0.12
+        t = (math.sin(self._phase) + 1) / 2
+        color = _lerp(ACCENT_DK, ACCENT_LT, t)
+        self._canvas.itemconfig(self._ring_id, outline=color, width=4)
+        # Rotate symbol color
+        sym_t = (math.sin(self._phase * 1.5) + 1) / 2
+        sym_color = _lerp(FG_DIM, ACCENT, sym_t)
+        self._canvas.itemconfig(self._symbol_id, fill=sym_color)
+        self._anim_id = self._root.after(T_RING, self._animate_processing)
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  MAIN APPLICATION
 # ═══════════════════════════════════════════════════════════════════════════
 
 class HarmoniApp:
-    """Main application — 3-column desktop interface."""
+    """Main application — intent-first, single surface."""
 
     def __init__(self) -> None:
         import time as _time
@@ -295,24 +344,22 @@ class HarmoniApp:
 
         # Boot progress → splash screen
         from harmoni.ui.splash import update_splash_progress
-        update_splash_progress("Inicializando…", 0, 8)
+        update_splash_progress("Inicializando…", 0, 14)
 
         self._bridge = HarmoniBridge(on_progress=update_splash_progress)
         self._busy = False
         self._pending: Optional[str] = None
         self._step_widgets: list[tk.Label] = []
         self._dot_id: Optional[str] = None
-        self._current_page = "home"
-        self._nav_frames: dict[str, tuple[tk.Frame, tk.Label]] = {}
-        self._pages: dict[str, tk.Frame] = {}
         self._metrics: dict = {}
         self._secondary_panels: list = []
         # Voice
-        update_splash_progress("Carregando voz…", 7, 8)
+        update_splash_progress("Carregando voz…", 10, 14)
         from harmoni.infra.voice import VoiceManager
         self._voice = VoiceManager()
 
-        update_splash_progress("Montando interface…", 8, 8)
+        self._splash_progress = update_splash_progress
+        update_splash_progress("Montando interface…", 11, 14)
         self._build()
 
         _boot_ms = (_time.monotonic() - _t0) * 1000
@@ -335,13 +382,12 @@ class HarmoniApp:
         # CRITICAL: Hide window while building to prevent raw/unfinished flash
         self.root.withdraw()
 
-        # Position below topbar (28px) — don't use fullscreen or zoomed
-        # which may ignore the topbar strut on some WMs
+        # Position below topbar (28px)
         screen_w = self.root.winfo_screenwidth()
         screen_h = self.root.winfo_screenheight()
         _TOPBAR_H = 28
         self.root.geometry(f"{screen_w}x{screen_h - _TOPBAR_H}+0+{_TOPBAR_H}")
-        self.root.overrideredirect(False)  # keep WM decorations off but allow strut
+        self.root.overrideredirect(False)
         self.root.bind("<F11>", lambda _: self.root.attributes(
             "-fullscreen", not self.root.attributes("-fullscreen")))
         self.root.bind("<Escape>", lambda _: self.root.attributes("-fullscreen", False))
@@ -353,8 +399,6 @@ class HarmoniApp:
         self._f = {
             "brand":    tkfont.Font(family="Helvetica", size=14, weight="bold"),
             "brand_s":  tkfont.Font(family="Helvetica", size=8),
-            "nav":      tkfont.Font(family="Helvetica", size=11),
-            "nav_btn":  tkfont.Font(family="Helvetica", size=11, weight="bold"),
             "greet":    tkfont.Font(family="Helvetica", size=24, weight="bold"),
             "sub":      tkfont.Font(family="Helvetica", size=13),
             "input":    tkfont.Font(family="Helvetica", size=16),
@@ -364,217 +408,133 @@ class HarmoniApp:
             "card_d":   tkfont.Font(family="Helvetica", size=9),
             "step":     tkfont.Font(family="Helvetica", size=12),
             "res_t":    tkfont.Font(family="Helvetica", size=16, weight="bold"),
-            "res_b":    tkfont.Font(family="Helvetica", size=12),
+            "res_b":    tkfont.Font(family="Helvetica", size=12, weight="normal"),
             "metric":   tkfont.Font(family="Helvetica", size=10),
             "metric_v": tkfont.Font(family="Helvetica", size=10, weight="bold"),
             "small":    tkfont.Font(family="Helvetica", size=9),
-            "page_h":   tkfont.Font(family="Helvetica", size=20, weight="bold"),
-            "page_s":   tkfont.Font(family="Helvetica", size=11),
             "list_t":   tkfont.Font(family="Helvetica", size=11, weight="bold"),
             "list_s":   tkfont.Font(family="Helvetica", size=9),
             "btn":      tkfont.Font(family="Helvetica", size=10, weight="bold"),
         }
 
-        # ── 3-column grid ──
-        self.root.columnconfigure(0, weight=0, minsize=SIDEBAR_W)
-        self.root.columnconfigure(1, weight=1)
-        self.root.columnconfigure(2, weight=0, minsize=RIGHT_W)
+        # ── 2-column grid: center (flex) + right (status) ──
+        self.root.columnconfigure(0, weight=1)
+        self.root.columnconfigure(1, weight=0, minsize=RIGHT_W)
         self.root.rowconfigure(0, weight=1)
 
-        self._build_sidebar()
         self._build_center()
+        self._splash_progress("Building center panel", 12, 14)
         self._build_right_panel()
+        self._splash_progress("Building right panel", 13, 14)
 
         self._entry.focus_set()
         self._poll_status()
         self._init_secondary_screens()
 
-        # All widgets built — show window (prevents raw/unfinished flash)
+        self._splash_progress("Finalizando…", 14, 14)
+
+        # All widgets built — show window
         self.root.deiconify()
         self.root.update_idletasks()
 
     # ═══════════════════════════════════════════════════════════════════════
-    #  SIDEBAR (LEFT)
-    # ═══════════════════════════════════════════════════════════════════════
-
-    def _build_sidebar(self) -> None:
-        sb = tk.Frame(self.root, bg=BG_PANEL, width=SIDEBAR_W)
-        sb.grid(row=0, column=0, sticky="nsew")
-        sb.grid_propagate(False)
-
-        # ── Brand ──
-        brand = tk.Frame(sb, bg=BG_PANEL)
-        brand.pack(fill="x", padx=SP_DEFAULT, pady=(SP_SECTION, 0))
-
-        # Logo image (PNG) or fallback letter
-        from harmoni.core.config import get_logo_path
-        logo_path = get_logo_path()
-        self._logo_img = None  # keep reference to prevent GC
-        if logo_path:
-            try:
-                raw = tk.PhotoImage(file=str(logo_path))
-                # Scale to ~32x32 (logo is 1024x1024, subsample by 32)
-                scale = max(1, raw.width() // 32)
-                self._logo_img = raw.subsample(scale, scale)
-                logo_lbl = tk.Label(brand, image=self._logo_img, bg=BG_PANEL)
-                logo_lbl.pack(side="left", padx=(0, SP_COMPACT))
-            except Exception:
-                self._logo_img = None
-
-        if not self._logo_img:
-            # Fallback: letter in purple square
-            logo = tk.Frame(brand, bg=ACCENT, padx=1, pady=1)
-            logo.pack(side="left", padx=(0, SP_COMPACT))
-            tk.Label(logo, text=" H ", font=self._f["brand"], fg="#fff",
-                     bg=ACCENT, padx=SP_MICRO, pady=2).pack()
-
-        brand_text = tk.Frame(brand, bg=BG_PANEL)
-        brand_text.pack(side="left")
-        tk.Label(brand_text, text="Harmoni OS", font=self._f["brand"],
-                 fg=FG, bg=BG_PANEL).pack(anchor="w")
-        tk.Label(brand_text, text="AI-first interface", font=self._f["brand_s"],
-                 fg=FG_DIM, bg=BG_PANEL).pack(anchor="w")
-
-        # Separator
-        tk.Frame(sb, bg=BORDER, height=1).pack(
-            fill="x", padx=SP_DEFAULT, pady=(20, SP_DEFAULT))
-
-        # ── User card ──
-        uf = tk.Frame(sb, bg=BG_CARD, padx=SP_COMPACT, pady=10)
-        uf.pack(fill="x", padx=SP_COMPACT, pady=(0, 10))
-
-        avatar = tk.Label(uf, text=f" {_USER[0]} ", font=self._f["nav_btn"],
-                          fg="#fff", bg=ACCENT_LT, padx=2)
-        avatar.pack(side="left", padx=(0, 10))
-
-        ui = tk.Frame(uf, bg=BG_CARD)
-        ui.pack(side="left")
-        tk.Label(ui, text=_USER, font=self._f["nav"],
-                 fg=FG, bg=BG_CARD).pack(anchor="w")
-        tk.Label(ui, text="Operador", font=self._f["small"],
-                 fg=FG_DIM, bg=BG_CARD).pack(anchor="w")
-
-        # ── Nova Intenção button ──
-        btn_outer = tk.Frame(sb, bg=ACCENT, padx=1, pady=1)
-        btn_outer.pack(fill="x", padx=SP_COMPACT, pady=(6, 18))
-        btn_label = tk.Label(btn_outer, text="✦  Nova Intenção",
-                             font=self._f["nav_btn"], fg="#fff", bg=ACCENT,
-                             pady=9, cursor="hand2")
-        btn_label.pack(fill="x")
-
-        for w in [btn_outer, btn_label]:
-            w.bind("<Enter>", lambda _: self._anim.color(
-                [btn_outer, btn_label], "bg", ACCENT_LT, T_FAST))
-            w.bind("<Leave>", lambda _: self._anim.color(
-                [btn_outer, btn_label], "bg", ACCENT, T_FAST))
-            w.bind("<Button-1>", lambda _: self._nav_to("home"))
-            w.configure(cursor="hand2")
-
-        # ── Nav items ──
-        for icon, label, page in NAV_ITEMS:
-            f, lbl = self._make_nav_item(sb, icon, label, page)
-            self._nav_frames[page] = (f, lbl)
-
-        self._set_active_nav("home")
-
-        # ── Footer ──
-        from harmoni import __version__
-        tk.Label(sb, text=f"Harmoni v{__version__}", font=self._f["small"], fg=FG_DIM,
-                 bg=BG_PANEL, justify="left").pack(
-            side="bottom", anchor="w", padx=20, pady=20)
-
-    def _make_nav_item(self, parent: tk.Frame, icon: str, label: str,
-                       page: str) -> tuple[tk.Frame, tk.Label]:
-        f = tk.Frame(parent, bg=BG_PANEL, padx=SP_COMPACT, pady=SP_TIGHT)
-        f.pack(fill="x", padx=SP_TIGHT, pady=1)
-
-        icon_lbl = tk.Label(f, text=icon, font=self._f["nav"],
-                            bg=BG_PANEL, width=2)
-        icon_lbl.pack(side="left", padx=(0, SP_TIGHT))
-
-        text_lbl = tk.Label(f, text=label, font=self._f["nav"],
-                            fg=FG_SEC, bg=BG_PANEL)
-        text_lbl.pack(side="left")
-
-        all_w = [f, icon_lbl, text_lbl]
-
-        def enter(_):
-            self._anim.color(all_w, "bg", BG_HOVER, T_FAST)
-            self._anim.color([text_lbl], "fg", FG, T_FAST)
-
-        def leave(_):
-            if page != self._current_page:
-                self._anim.color(all_w, "bg", BG_PANEL, T_FAST)
-                self._anim.color([text_lbl], "fg", FG_SEC, T_FAST)
-
-        def click(_):
-            self._nav_to(page)
-
-        for w in all_w:
-            w.bind("<Enter>", enter)
-            w.bind("<Leave>", leave)
-            w.bind("<Button-1>", click)
-            w.configure(cursor="hand2")
-
-        return f, text_lbl
-
-    def _set_active_nav(self, active: str) -> None:
-        for page, (frame, text_lbl) in self._nav_frames.items():
-            all_w = [frame] + list(frame.winfo_children())
-            if page == active:
-                self._anim.color(all_w, "bg", BG_CARD, T_NORMAL)
-                self._anim.color([text_lbl], "fg", FG, T_NORMAL)
-            else:
-                self._anim.color(all_w, "bg", BG_PANEL, T_NORMAL)
-                self._anim.color([text_lbl], "fg", FG_SEC, T_NORMAL)
-
-    # ═══════════════════════════════════════════════════════════════════════
-    #  CENTER PANEL
+    #  CENTER PANEL (the only interaction surface)
     # ═══════════════════════════════════════════════════════════════════════
 
     def _build_center(self) -> None:
         self._center = tk.Frame(self.root, bg=BG)
-        self._center.grid(row=0, column=1, sticky="nsew")
+        self._center.grid(row=0, column=0, sticky="nsew")
 
         self._build_page_home()
-        self._build_page_projects()
-        self._build_page_files()
-        self._build_page_system()
-        self._build_page_services()
-        self._build_page_history()
-        self._build_page_settings()
-        self._show_page("home")
 
-    def _make_page(self, name: str) -> tk.Frame:
-        """Create a scrollable page container."""
-        scroll = ScrollFrame(self._center, bg=BG)
-        self._pages[name] = scroll
-        # Inner content with page padding
-        inner = scroll.inner
-        inner.configure(padx=SP_PAGE, pady=SP_BLOCK)
-        return inner
-
-    def _show_page(self, name: str) -> None:
-        for f in self._pages.values():
-            f.pack_forget()
-        if name in self._pages:
-            self._pages[name].pack(fill="both", expand=True)
-            self._pages[name].scroll_to_top()
-
-    # ── HOME PAGE ────────────────────────────────────────────────────────
+    # ── HOME (the only view) ────────────────────────────────────────────
 
     def _build_page_home(self) -> None:
-        p = self._make_page("home")
+        p = tk.Frame(self._center, bg=BG)
+        p.pack(fill="both", expand=True)
 
-        # ── Greeting ──
-        tk.Label(p, text=f"{_GREET}, {_USER}.", font=self._f["greet"],
-                 fg=FG, bg=BG, anchor="w").pack(fill="x")
-        tk.Label(p, text="O que vamos construir hoje?", font=self._f["sub"],
-                 fg=FG_DIM, bg=BG, anchor="w").pack(
-            fill="x", pady=(SP_MICRO, SP_SECTION))
+        # ═══ TOP AREA: feed + results (grows upward) ═══
+        self._feed_area = tk.Frame(p, bg=BG, padx=SP_PAGE, pady=SP_BLOCK)
+        self._feed_area.pack(fill="both", expand=True)
 
-        # ── Prompt ──
-        self._prompt_glow = tk.Frame(p, bg=BORDER, padx=2, pady=2)
+        # Greeting (shown when no results yet)
+        self._greeting_frame = tk.Frame(self._feed_area, bg=BG)
+        self._greeting_frame.pack(fill="both", expand=True)
+
+        # Center greeting vertically
+        tk.Frame(self._greeting_frame, bg=BG).pack(fill="both", expand=True)
+        self._greeting_center = tk.Frame(self._greeting_frame, bg=BG)
+        self._greeting_center.pack()
+        self._greeting_lbl = tk.Label(
+            self._greeting_center, text=f"{_GREET}, {_USER}.",
+            font=self._f["greet"], fg=FG, bg=BG)
+        self._greeting_lbl.pack()
+        self._subtitle_lbl = tk.Label(
+            self._greeting_center, text="O que vamos fazer?",
+            font=self._f["sub"], fg=FG_DIM, bg=BG)
+        self._subtitle_lbl.pack(pady=(SP_MICRO, 0))
+
+        # Quick chips
+        self._chips_frame = tk.Frame(self._greeting_center, bg=BG)
+        self._chips_frame.pack(pady=(SP_SECTION, 0))
+        self._build_quick_chips()
+        tk.Frame(self._greeting_frame, bg=BG).pack(fill="both", expand=True)
+
+        # Processing spinner (hidden, shown during execution)
+        self._spinner_frame = tk.Frame(self._feed_area, bg=BG)
+        self._spinner_canvas = tk.Canvas(
+            self._spinner_frame, width=36, height=36,
+            bg=BG, highlightthickness=0, bd=0)
+        self._spinner_canvas.pack(pady=(SP_DEFAULT, SP_COMPACT))
+        self._spinner_arc = self._spinner_canvas.create_arc(
+            4, 4, 32, 32, start=0, extent=270,
+            outline=ACCENT, width=3, style="arc")
+        self._spinner_dot = self._spinner_canvas.create_oval(
+            14, 14, 22, 22, fill=ACCENT_LT, outline="")
+        self._spinner_phase = 0.0
+        self._spinner_anim_id: Optional[str] = None
+
+        # Feed (execution steps)
+        self._feed = tk.Frame(self._feed_area, bg=BG)
+
+        # Confirm dialog
+        self._confirm_frame = tk.Frame(self._feed_area, bg=BG_CARD,
+                                       padx=SP_SECTION, pady=SP_DEFAULT)
+        self._confirm_msg = tk.Label(self._confirm_frame, font=self._f["step"],
+                                     fg=FG, bg=BG_CARD, wraplength=600,
+                                     justify="left", anchor="w")
+        self._confirm_msg.pack(fill="x", pady=(0, SP_COMPACT))
+
+        btn_row = tk.Frame(self._confirm_frame, bg=BG_CARD)
+        btn_row.pack(anchor="w")
+        tk.Button(btn_row, text="Confirmar", font=self._f["btn"],
+                  bg=ACCENT, fg="#fff", activebackground=ACCENT_LT,
+                  activeforeground="#fff", relief="flat",
+                  padx=18, pady=5, command=self._on_confirm).pack(
+            side="left", padx=(0, 10))
+        tk.Button(btn_row, text="Cancelar", font=self._f["btn"],
+                  bg=BG_INPUT, fg=FG_DIM, activebackground=BG_HOVER,
+                  activeforeground=FG, relief="flat",
+                  padx=18, pady=5, command=self._on_cancel).pack(side="left")
+
+        # Result (persists until next command)
+        self._result_frame = tk.Frame(self._feed_area, bg=BG)
+        self._res_title = tk.Label(self._result_frame, font=self._f["res_t"],
+                                   bg=BG, anchor="w", justify="left")
+        self._res_body = tk.Label(self._result_frame, font=self._f["res_b"],
+                                  bg=BG, fg=FG_SEC, wraplength=600,
+                                  justify="left", anchor="w")
+
+        # Activity (recent actions)
+        self._activity_outer = tk.Frame(self._feed_area, bg=BG)
+        self._activity_frame = tk.Frame(self._activity_outer, bg=BG)
+        self._activity_frame.pack(fill="x")
+
+        # ═══ BOTTOM: prompt (always at bottom) ═══
+        self._prompt_area = tk.Frame(p, bg=BG_PANEL, padx=SP_PAGE, pady=SP_DEFAULT)
+        self._prompt_area.pack(fill="x", side="bottom")
+
+        self._prompt_glow = tk.Frame(self._prompt_area, bg=BORDER, padx=2, pady=2)
         self._prompt_glow.pack(fill="x")
 
         prompt_inner = tk.Frame(self._prompt_glow, bg=BG_INPUT)
@@ -582,14 +542,15 @@ class HarmoniApp:
 
         tk.Label(prompt_inner, text="✦", font=self._f["input"],
                  fg=FG_DIM, bg=BG_INPUT).pack(
-            side="left", padx=(SP_DEFAULT, 10))
+            side="left", padx=(SP_DEFAULT, 10), anchor="n", pady=SP_COMPACT)
 
-        self._entry = tk.Entry(
+        self._entry = tk.Text(
             prompt_inner, font=self._f["input"], bg=BG_INPUT, fg=FG,
             insertbackground=ACCENT, relief="flat", bd=0,
-            highlightthickness=0)
-        self._entry.pack(side="left", fill="x", expand=True, pady=SP_DEFAULT)
-        self._entry.bind("<Return>", self._on_enter)
+            highlightthickness=0, height=3, wrap="word")
+        self._entry.pack(side="left", fill="both", expand=True,
+                         pady=SP_COMPACT, padx=(0, SP_TIGHT))
+        self._entry.bind("<Return>", self._on_enter_key)
 
         # Focus glow
         self._entry.bind("<FocusIn>", lambda _: self._anim.color(
@@ -597,9 +558,12 @@ class HarmoniApp:
         self._entry.bind("<FocusOut>", lambda _: self._anim.color(
             [self._prompt_glow], "bg", BORDER, T_NORMAL))
 
-        # Send button
-        send_outer = tk.Frame(prompt_inner, bg=ACCENT, padx=1, pady=1)
-        send_outer.pack(side="right", padx=(SP_TIGHT, SP_COMPACT), pady=10)
+        # Buttons (stacked on right side)
+        btn_frame = tk.Frame(prompt_inner, bg=BG_INPUT)
+        btn_frame.pack(side="right", padx=(0, SP_COMPACT), pady=SP_COMPACT, anchor="s")
+
+        send_outer = tk.Frame(btn_frame, bg=ACCENT, padx=1, pady=1)
+        send_outer.pack(pady=(0, SP_TIGHT))
         self._send_btn_outer = send_outer
         send_btn = tk.Label(send_outer, text=" Enviar ", font=self._f["btn"],
                             fg="#fff", bg=ACCENT, pady=3, padx=SP_TIGHT,
@@ -615,10 +579,10 @@ class HarmoniApp:
             w.bind("<Button-1>", self._on_enter)
             w.configure(cursor="hand2")
 
-        # Cancel button (hidden by default, shown when busy)
-        cancel_outer = tk.Frame(prompt_inner, bg=ERROR, padx=1, pady=1)
+        # Cancel button (hidden by default)
+        cancel_outer = tk.Frame(btn_frame, bg=ERROR, padx=1, pady=1)
         self._cancel_btn_outer = cancel_outer
-        cancel_btn = tk.Label(cancel_outer, text=" ✕ Cancelar ", font=self._f["btn"],
+        cancel_btn = tk.Label(cancel_outer, text=" ✕ ", font=self._f["btn"],
                               fg="#fff", bg=ERROR, pady=3, padx=SP_TIGHT,
                               cursor="hand2")
         cancel_btn.pack()
@@ -632,12 +596,11 @@ class HarmoniApp:
             w.bind("<Button-1>", lambda _: self._on_cancel_intent())
             w.configure(cursor="hand2")
 
-        # Cancel state
         self._cancelled = False
 
-        # Mic button (voice input)
-        self._mic_outer = tk.Frame(prompt_inner, bg=BG_CARD, padx=1, pady=1)
-        self._mic_outer.pack(side="right", pady=10)
+        # Mic button
+        self._mic_outer = tk.Frame(btn_frame, bg=BG_CARD, padx=1, pady=1)
+        self._mic_outer.pack(pady=(SP_TIGHT, 0))
         self._mic_btn = tk.Label(self._mic_outer, text=" 🎤 ",
                                  font=self._f["btn"], fg=FG_SEC, bg=BG_CARD,
                                  pady=3, cursor="hand2")
@@ -653,434 +616,83 @@ class HarmoniApp:
 
         # Placeholder
         self._ph = True
-        self._entry.insert(0, "O que você deseja que o sistema faça?")
+        self._entry.insert("1.0", "Diga o que precisa…")
         self._entry.configure(fg=FG_DIM)
         self._entry.bind("<FocusIn>", self._ph_clear, add="+")
         self._entry.bind("<FocusOut>", self._ph_restore, add="+")
 
-        # ── Quick Actions ──
-        tk.Label(p, text="⚡ Ações Rápidas", font=self._f["sec"],
-                 fg=FG_SEC, bg=BG, anchor="w").pack(
-            fill="x", pady=(SP_SECTION, SP_COMPACT))
+        # ═══ BELOW PROMPT: last 3 recents + "ver tudo" ═══
+        self._recents_area = tk.Frame(p, bg=BG, padx=SP_PAGE)
+        self._recents_area.pack(fill="x", side="bottom")
 
-        self._cards_frame = tk.Frame(p, bg=BG)
-        self._cards_frame.pack(fill="x")
-        self._build_quick_actions()
+        recents_header = tk.Frame(self._recents_area, bg=BG)
+        recents_header.pack(fill="x", pady=(SP_TIGHT, SP_MICRO))
+        tk.Label(recents_header, text="🕐 Recentes", font=self._f["small"],
+                 fg=FG_DIM, bg=BG).pack(side="left")
+        self._show_all_btn = tk.Label(
+            recents_header, text="ver tudo", font=self._f["small"],
+            fg=ACCENT_LT, bg=BG, cursor="hand2")
+        self._show_all_btn.pack(side="right")
+        self._show_all_btn.bind("<Button-1>", lambda _: self._show_full_history())
+        self._show_all_btn.bind("<Enter>", lambda _: self._show_all_btn.configure(fg=ACCENT))
+        self._show_all_btn.bind("<Leave>", lambda _: self._show_all_btn.configure(fg=ACCENT_LT))
 
-        # ── Feed (execution steps) ──
-        self._feed = tk.Frame(p, bg=BG)
-        self._feed.pack(fill="x", pady=(SP_DEFAULT, 0))
+        self._recents_frame = tk.Frame(self._recents_area, bg=BG)
+        self._recents_frame.pack(fill="x")
+        self._load_recents()
 
-        # ── Confirm dialog ──
-        self._confirm_frame = tk.Frame(p, bg=BG_CARD,
-                                       padx=SP_SECTION, pady=SP_DEFAULT)
-        self._confirm_msg = tk.Label(self._confirm_frame, font=self._f["step"],
-                                     fg=FG, bg=BG_CARD, wraplength=480,
-                                     justify="center")
-        self._confirm_msg.pack(pady=(0, SP_COMPACT))
-
-        btn_row = tk.Frame(self._confirm_frame, bg=BG_CARD)
-        btn_row.pack()
-        tk.Button(btn_row, text="Confirmar", font=self._f["btn"],
-                  bg=ACCENT, fg="#fff", activebackground=ACCENT_LT,
-                  activeforeground="#fff", relief="flat",
-                  padx=18, pady=5, command=self._on_confirm).pack(
-            side="left", padx=(0, 10))
-        tk.Button(btn_row, text="Cancelar", font=self._f["btn"],
-                  bg=BG_INPUT, fg=FG_DIM, activebackground=BG_HOVER,
-                  activeforeground=FG, relief="flat",
-                  padx=18, pady=5, command=self._on_cancel).pack(side="left")
-
-        # ── Result ──
-        self._result_frame = tk.Frame(p, bg=BG)
-        self._result_frame.pack(fill="x", pady=(10, 0))
-        self._res_title = tk.Label(self._result_frame, font=self._f["res_t"],
-                                   bg=BG)
-        self._res_body = tk.Label(self._result_frame, font=self._f["res_b"],
-                                  bg=BG, fg=FG_SEC, wraplength=520,
-                                  justify="center")
-
-        # ── Activity ──
-        tk.Label(p, text="🕐 Atividades Recentes", font=self._f["sec"],
-                 fg=FG_SEC, bg=BG, anchor="w").pack(
-            fill="x", pady=(SP_SECTION, SP_TIGHT))
-        self._activity_frame = tk.Frame(p, bg=BG)
-        self._activity_frame.pack(fill="x")
-        self._load_activity()
-
-    def _build_quick_actions(self) -> None:
-        for i, (icon, title, desc, cmd) in enumerate(QUICK_ACTIONS):
-            row, col = divmod(i, 3)
-
-            outer = tk.Frame(self._cards_frame, bg=BORDER, padx=1, pady=1)
-            outer.grid(row=row, column=col, padx=5, pady=5, sticky="nsew")
-
-            card = tk.Frame(outer, bg=BG_CARD, padx=14, pady=14)
-            card.pack(fill="both", expand=True)
-
-            lbl_i = tk.Label(card, text=icon, font=self._f["card_i"],
-                             bg=BG_CARD)
-            lbl_i.pack(anchor="w")
-            lbl_t = tk.Label(card, text=title, font=self._f["card_t"],
-                             fg=FG, bg=BG_CARD)
-            lbl_t.pack(anchor="w", pady=(SP_TIGHT, 0))
-            lbl_d = tk.Label(card, text=desc, font=self._f["card_d"],
-                             fg=FG_DIM, bg=BG_CARD)
-            lbl_d.pack(anchor="w", pady=(3, 0))
-
-            card_widgets = [card, lbl_i, lbl_t, lbl_d]
-
-            def mk_enter(ws, border):
-                return lambda _: (
-                    self._anim.color(ws, "bg", BG_HOVER, T_FAST),
-                    self._anim.color([border], "bg", BORDER_LT, T_FAST))
-
-            def mk_leave(ws, border):
-                return lambda _: (
-                    self._anim.color(ws, "bg", BG_CARD, T_FAST),
-                    self._anim.color([border], "bg", BORDER, T_FAST))
-
-            def mk_click(command):
-                return lambda _: self._on_card(command)
-
-            for w in card_widgets + [outer]:
-                w.bind("<Enter>", mk_enter(card_widgets, outer))
-                w.bind("<Leave>", mk_leave(card_widgets, outer))
-                w.bind("<Button-1>", mk_click(cmd))
-                w.configure(cursor="hand2")
-
-        for c in range(3):
-            self._cards_frame.columnconfigure(c, weight=1)
-
-    # ── OTHER PAGES ──────────────────────────────────────────────────────
-
-    def _page_header(self, parent: tk.Frame, icon: str, title: str,
-                     subtitle: str) -> None:
-        tk.Label(parent, text=f"{icon} {title}", font=self._f["page_h"],
-                 fg=FG, bg=BG, anchor="w").pack(fill="x")
-        tk.Label(parent, text=subtitle, font=self._f["page_s"],
-                 fg=FG_DIM, bg=BG, anchor="w").pack(
-            fill="x", pady=(SP_MICRO, SP_SECTION))
-
-    def _build_page_projects(self) -> None:
-        p = self._make_page("projects")
-        self._page_header(p, "📂", "Projetos",
-                          "Projetos detectados no sistema")
-        self._projects_list = tk.Frame(p, bg=BG)
-        self._projects_list.pack(fill="x")
-
-    def _build_page_files(self) -> None:
-        p = self._make_page("files")
-        self._page_header(p, "📁", "Arquivos",
-                          "Navegação rápida de diretórios")
-
-        af = tk.Frame(p, bg=BG)
-        af.pack(fill="x")
-        for i, (icon, label, cmd) in enumerate([
-            ("📥", "Organizar Downloads", "organize my downloads"),
-            ("🖥️",  "Organizar Desktop",   "organize my desktop"),
-            ("📄", "Organizar Documentos", "organize my documents"),
-        ]):
-            outer = tk.Frame(af, bg=BORDER, padx=1, pady=1)
-            outer.grid(row=0, column=i, padx=5, pady=5, sticky="nsew")
-            c = tk.Frame(outer, bg=BG_CARD, padx=14, pady=14)
-            c.pack(fill="both", expand=True)
-            tk.Label(c, text=icon, font=self._f["card_i"],
-                     bg=BG_CARD).pack(anchor="w")
-            tk.Label(c, text=label, font=self._f["card_t"],
-                     fg=FG, bg=BG_CARD).pack(anchor="w", pady=(6, 0))
-            _hoverable(self._anim, c,
-                       on_click=lambda cm=cmd: (
-                           self._on_card(cm), self._nav_to("home")))
-        for col in range(3):
-            af.columnconfigure(col, weight=1)
-
-        tk.Label(p, text="📂 Diretórios", font=self._f["sec"],
-                 fg=FG_SEC, bg=BG, anchor="w").pack(
-            fill="x", pady=(SP_SECTION, SP_COMPACT))
-        self._files_list = tk.Frame(p, bg=BG)
-        self._files_list.pack(fill="x")
-
-    def _build_page_system(self) -> None:
-        p = self._make_page("system")
-        self._page_header(p, "⚙️", "Sistema",
-                          "Informações e saúde do sistema")
-        self._system_list = tk.Frame(p, bg=BG)
-        self._system_list.pack(fill="x")
-
-        tk.Label(p, text="🔧 Ações do Sistema", font=self._f["sec"],
-                 fg=FG_SEC, bg=BG, anchor="w").pack(
-            fill="x", pady=(SP_SECTION, SP_COMPACT))
-
-        af = tk.Frame(p, bg=BG)
-        af.pack(fill="x")
-        for i, (icon, label, cmd) in enumerate([
-            ("📊", "Diagnóstico",   "my computer is slow"),
-            ("🧹", "Limpar Sistema", "free disk space"),
-            ("📋", "Ver Logs",       "show logs"),
-        ]):
-            outer = tk.Frame(af, bg=BORDER, padx=1, pady=1)
-            outer.grid(row=0, column=i, padx=5, pady=5, sticky="nsew")
-            c = tk.Frame(outer, bg=BG_CARD, padx=14, pady=14)
-            c.pack(fill="both", expand=True)
-            tk.Label(c, text=icon, font=self._f["card_i"],
-                     bg=BG_CARD).pack(anchor="w")
-            tk.Label(c, text=label, font=self._f["card_t"],
-                     fg=FG, bg=BG_CARD).pack(anchor="w", pady=(6, 0))
-            _hoverable(self._anim, c,
-                       on_click=lambda cm=cmd: (
-                           self._on_card(cm), self._nav_to("home")))
-        for col in range(3):
-            af.columnconfigure(col, weight=1)
-
-    def _build_page_services(self) -> None:
-        p = self._make_page("services")
-        self._page_header(p, "🔌", "Serviços",
-                          "Portas e processos ativos")
-        self._services_list = tk.Frame(p, bg=BG)
-        self._services_list.pack(fill="x")
-
-        rf = tk.Frame(p, bg=ACCENT, padx=1, pady=1)
-        rf.pack(anchor="w", pady=(SP_DEFAULT, 0))
-        rb = tk.Label(rf, text=" 🔄 Atualizar ", font=self._f["btn"],
-                      fg="#fff", bg=ACCENT, pady=6, cursor="hand2")
-        rb.pack()
-        _hoverable(self._anim, rf, ACCENT, ACCENT_LT,
-                   on_click=self._load_services)
-
-    def _build_page_history(self) -> None:
-        p = self._make_page("history")
-        self._page_header(p, "📋", "Histórico",
-                          "Todas as ações executadas")
-        self._history_list = tk.Frame(p, bg=BG)
-        self._history_list.pack(fill="x")
-
-    def _build_page_settings(self) -> None:
-        p = self._make_page("settings")
-        self._page_header(p, "🔧", "Configurações",
-                          "Provedor de IA e chaves de API")
-
-        from harmoni.core import config
-
-        self._settings_entries: dict[str, tk.Entry] = {}
-        self._settings_provider = tk.StringVar(value=config.get("llm_provider"))
-
-        # ── Provider selector ──
-        tk.Label(p, text="🤖 Provedor de IA", font=self._f["sec"],
-                 fg=FG_SEC, bg=BG, anchor="w").pack(
-            fill="x", pady=(0, SP_COMPACT))
-
-        providers = [
-            ("ollama",    "Ollama (local, gratuito)"),
-            ("openai",    "OpenAI (GPT-4o)"),
-            ("anthropic", "Anthropic (Claude)"),
-            ("bedrock",   "AWS Bedrock (Claude via AWS)"),
+    def _build_quick_chips(self) -> None:
+        """Build quick actions as subtle inline chips (not big cards)."""
+        chips = [
+            ("📁 Organizar",   "organize my downloads"),
+            ("📊 Diagnóstico", "my computer is slow"),
+            ("🚀 Projeto",     "start my backend"),
+            ("🔌 Processos",   "kill process on port 3000"),
+            ("📋 Logs",        "show logs"),
         ]
+        for text, cmd in chips:
+            chip = tk.Label(
+                self._chips_frame, text=f" {text} ",
+                font=self._f["small"], fg=FG_SEC, bg=BG_CARD,
+                padx=SP_COMPACT, pady=SP_TIGHT, cursor="hand2")
+            chip.pack(side="left", padx=3)
 
-        prov_frame = tk.Frame(p, bg=BG)
-        prov_frame.pack(fill="x", pady=(0, SP_SECTION))
+            def mk_enter(w):
+                return lambda _: self._anim.color([w], "bg", BG_HOVER, T_FAST)
 
-        for i, (value, label) in enumerate(providers):
-            rb = tk.Radiobutton(
-                prov_frame, text=label, variable=self._settings_provider,
-                value=value, font=self._f["metric"], fg=FG_SEC, bg=BG,
-                selectcolor=BG_CARD, activebackground=BG,
-                activeforeground=FG, highlightthickness=0,
-                command=self._on_provider_change)
-            rb.grid(row=i // 2, column=i % 2, sticky="w",
-                    padx=(0, SP_SECTION), pady=2)
+            def mk_leave(w):
+                return lambda _: self._anim.color([w], "bg", BG_CARD, T_FAST)
 
-        # ── Config sections ──
-        self._settings_sections: dict[str, tk.Frame] = {}
+            def mk_click(c):
+                return lambda _: self._on_card(c)
 
-        # Ollama
-        self._settings_sections["ollama"] = self._settings_section(p, "Ollama", [
-            ("ollama_url",   "URL do servidor",  False),
-            ("ollama_model", "Modelo",            False),
-        ])
+            chip.bind("<Enter>", mk_enter(chip))
+            chip.bind("<Leave>", mk_leave(chip))
+            chip.bind("<Button-1>", mk_click(cmd))
 
-        # OpenAI
-        self._settings_sections["openai"] = self._settings_section(p, "OpenAI", [
-            ("openai_api_key", "API Key",  True),
-            ("openai_model",   "Modelo",   False),
-        ])
+    def _transition_to_active(self) -> None:
+        """Hide greeting, show feed area above prompt."""
+        self._greeting_frame.pack_forget()
+        # Show spinner + feed
+        self._spinner_frame.pack(fill="x")
+        self._feed.pack(fill="x")
 
-        # Anthropic
-        self._settings_sections["anthropic"] = self._settings_section(p, "Anthropic", [
-            ("anthropic_api_key", "API Key",  True),
-            ("anthropic_model",   "Modelo",   False),
-        ])
-
-        # Bedrock
-        self._settings_sections["bedrock"] = self._settings_section(p, "AWS Bedrock", [
-            ("aws_access_key_id",     "Access Key ID",     True),
-            ("aws_secret_access_key", "Secret Access Key", True),
-            ("bedrock_region",        "Região",            False),
-            ("bedrock_model_id",      "Model ID",          False),
-        ])
-
-        # Show only the active provider section
-        self._on_provider_change()
-
-        # ── Buttons ──
-        btn_frame = tk.Frame(p, bg=BG)
-        btn_frame.pack(fill="x", pady=(SP_SECTION, SP_COMPACT))
-
-        save_outer = tk.Frame(btn_frame, bg=ACCENT, padx=1, pady=1)
-        save_outer.pack(side="left", padx=(0, SP_COMPACT))
-        save_btn = tk.Label(save_outer, text=" 💾 Salvar ", font=self._f["btn"],
-                            fg="#fff", bg=ACCENT, pady=5, padx=SP_COMPACT,
-                            cursor="hand2")
-        save_btn.pack()
-        _hoverable(self._anim, save_outer, ACCENT, ACCENT_LT,
-                   on_click=self._save_settings)
-
-        test_outer = tk.Frame(btn_frame, bg=BG_CARD, padx=1, pady=1)
-        test_outer.pack(side="left")
-        test_btn = tk.Label(test_outer, text=" 🔌 Testar Conexão ",
-                            font=self._f["btn"], fg=FG_SEC, bg=BG_CARD,
-                            pady=5, padx=SP_COMPACT, cursor="hand2")
-        test_btn.pack()
-        _hoverable(self._anim, test_outer, BG_CARD, BG_HOVER,
-                   on_click=self._test_provider)
-
-        # ── Status feedback ──
-        self._settings_status = tk.Label(p, text="", font=self._f["metric"],
-                                         fg=FG_DIM, bg=BG, anchor="w")
-        self._settings_status.pack(fill="x", pady=(SP_COMPACT, 0))
-
-        # ── General settings ──
-        tk.Frame(p, bg=BORDER, height=1).pack(
-            fill="x", pady=(SP_SECTION, SP_DEFAULT))
-
-        tk.Label(p, text="⚙️ Geral", font=self._f["sec"],
-                 fg=FG_SEC, bg=BG, anchor="w").pack(
-            fill="x", pady=(0, SP_COMPACT))
-
-        general = [
-            ("Timeout de Comandos", "120s"),
-            ("Máximo de Retries",   "1"),
-            ("Diretório de Dados",  str(config.HARMONI_HOME)),
-            ("Interface",           "Tkinter (nativa)"),
-        ]
-        for label, value in general:
-            row = tk.Frame(p, bg=BG_CARD, padx=SP_DEFAULT, pady=SP_COMPACT)
-            row.pack(fill="x", pady=2)
-            tk.Label(row, text=label, font=self._f["metric"],
-                     fg=FG_SEC, bg=BG_CARD).pack(side="left")
-            tk.Label(row, text=value, font=self._f["metric_v"],
-                     fg=FG, bg=BG_CARD).pack(side="right")
-
-    def _settings_section(self, parent: tk.Frame, title: str,
-                          fields: list[tuple[str, str, bool]]) -> tk.Frame:
-        """Create a settings section with labeled entry fields.
-
-        Args:
-            fields: list of (config_key, label, is_secret)
-        """
-        from harmoni.core import config
-
-        frame = tk.Frame(parent, bg=BG)
-
-        tk.Label(frame, text=title, font=self._f["list_t"],
-                 fg=FG, bg=BG, anchor="w").pack(
-            fill="x", pady=(0, SP_TIGHT))
-
-        for key, label, is_secret in fields:
-            row = tk.Frame(frame, bg=BG_CARD, padx=SP_DEFAULT, pady=10)
-            row.pack(fill="x", pady=2)
-
-            tk.Label(row, text=label, font=self._f["metric"],
-                     fg=FG_SEC, bg=BG_CARD, width=18,
-                     anchor="w").pack(side="left")
-
-            entry = tk.Entry(row, font=self._f["metric"], bg=BG_INPUT,
-                             fg=FG, insertbackground=ACCENT, relief="flat",
-                             bd=0, highlightthickness=0)
-            if is_secret:
-                entry.configure(show="•")
-            entry.pack(side="left", fill="x", expand=True, padx=(SP_TIGHT, 0))
-
-            # Load current value
-            current = config.get(key)
-            if current:
-                entry.insert(0, str(current))
-
-            self._settings_entries[key] = entry
-
-            # Toggle visibility for secret fields
-            if is_secret:
-                vis_btn = tk.Label(row, text="👁", font=self._f["small"],
-                                   fg=FG_DIM, bg=BG_CARD, cursor="hand2")
-                vis_btn.pack(side="right", padx=(SP_TIGHT, 0))
-
-                def make_toggle(e=entry, b=vis_btn):
-                    def toggle(_=None):
-                        if e.cget("show") == "•":
-                            e.configure(show="")
-                            b.configure(text="🔒")
-                        else:
-                            e.configure(show="•")
-                            b.configure(text="👁")
-                    return toggle
-
-                vis_btn.bind("<Button-1>", make_toggle())
-
-        return frame
-
-    def _on_provider_change(self) -> None:
-        """Show/hide settings sections based on selected provider."""
-        active = self._settings_provider.get()
-        for name, frame in self._settings_sections.items():
-            if name == active:
-                frame.pack(fill="x", pady=(0, SP_COMPACT))
-            else:
-                frame.pack_forget()
-
-    def _save_settings(self) -> None:
-        """Save all settings to disk."""
-        from harmoni.core import config
-
-        config.set("llm_provider", self._settings_provider.get())
-
-        for key, entry in self._settings_entries.items():
-            value = entry.get().strip()
-            config.set(key, value)
-
-        config.save()
-        self._settings_status.configure(
-            text="✓ Configurações salvas", fg=SUCCESS)
-        self.root.after(3000, lambda: self._settings_status.configure(
-            text="", fg=FG_DIM))
-
-    def _test_provider(self) -> None:
-        """Test the selected provider connection."""
-        from harmoni.core.model_router import check_provider
-
-        provider = self._settings_provider.get()
-        self._settings_status.configure(
-            text=f"Testando {provider}...", fg=FG_SEC)
-
-        # Save current values first so the test uses them
-        self._save_settings()
-
-        def run():
-            success, msg = check_provider(provider)
-            color = SUCCESS if success else ERROR
-            self.root.after(0, lambda: self._settings_status.configure(
-                text=f"{'✓' if success else '✗'} {msg}", fg=color))
-
-        import threading
-        threading.Thread(target=run, daemon=True).start()
-
+    def _transition_to_idle(self) -> None:
+        """Show greeting again (only if no result is showing)."""
+        if not self._res_title.winfo_manager():
+            self._spinner_frame.pack_forget()
+            self._feed.pack_forget()
+            self._greeting_frame.pack(fill="both", expand=True)
+        # Refresh recents
+        threading.Thread(target=self._load_recents, daemon=True).start()
 
     # ═══════════════════════════════════════════════════════════════════════
-    #  RIGHT PANEL
+    #  RIGHT PANEL (passive system status)
     # ═══════════════════════════════════════════════════════════════════════
 
     def _build_right_panel(self) -> None:
         rp = tk.Frame(self.root, bg=BG_PANEL, width=RIGHT_W)
-        rp.grid(row=0, column=2, sticky="nsew")
+        rp.grid(row=0, column=1, sticky="nsew")
         rp.grid_propagate(False)
 
         # ── System Status ──
@@ -1151,31 +763,6 @@ class HarmoniApp:
                        on_click=lambda c=cmd: self._on_card(c))
 
     # ═══════════════════════════════════════════════════════════════════════
-    #  NAVIGATION
-    # ═══════════════════════════════════════════════════════════════════════
-
-    def _nav_to(self, page: str) -> None:
-        if page == self._current_page and page == "home":
-            self._entry.focus_set()
-            return
-        self._current_page = page
-        self._set_active_nav(page)
-        self._show_page(page)
-
-        loaders = {
-            "home":     self._load_activity,
-            "projects": self._load_projects,
-            "files":    self._load_files,
-            "system":   self._load_system,
-            "services": self._load_services,
-            "history":  self._load_history,
-        }
-        if page in loaders:
-            threading.Thread(target=loaders[page], daemon=True).start()
-        if page == "home":
-            self._entry.focus_set()
-
-    # ═══════════════════════════════════════════════════════════════════════
     #  DATA LOADERS
     # ═══════════════════════════════════════════════════════════════════════
 
@@ -1183,148 +770,52 @@ class HarmoniApp:
         for w in frame.winfo_children():
             w.destroy()
 
-    def _list_card(self, parent: tk.Frame, icon: str, title: str,
-                   sub: str, action_text: str = "",
-                   action_cmd: str = "") -> None:
-        outer = tk.Frame(parent, bg=BORDER, padx=1, pady=1)
-        outer.pack(fill="x", pady=2)
+    def _load_activity(self) -> None:
+        """Legacy — redirects to _load_recents."""
+        self._load_recents()
 
-        row = tk.Frame(outer, bg=BG_CARD, padx=14, pady=11)
-        row.pack(fill="both")
-
-        tk.Label(row, text=icon, font=self._f["card_i"],
-                 bg=BG_CARD).pack(side="left", padx=(0, SP_COMPACT))
-
-        body = tk.Frame(row, bg=BG_CARD)
-        body.pack(side="left", fill="x", expand=True)
-        tk.Label(body, text=title, font=self._f["list_t"],
-                 fg=FG, bg=BG_CARD, anchor="w").pack(fill="x")
-        if sub:
-            tk.Label(body, text=sub, font=self._f["list_s"],
-                     fg=FG_DIM, bg=BG_CARD, anchor="w").pack(fill="x")
-
-        if action_text:
-            btn_f = tk.Frame(row, bg=ACCENT, padx=1, pady=1)
-            btn_f.pack(side="right", padx=(10, 0))
-            btn = tk.Label(btn_f, text=f" {action_text} ",
-                           font=self._f["btn"], fg="#fff", bg=ACCENT,
-                           pady=2, cursor="hand2")
-            btn.pack()
-            _hoverable(self._anim, btn_f, ACCENT, ACCENT_LT,
-                       on_click=lambda c=action_cmd: (
-                           self._on_card(c), self._nav_to("home")))
-
-    def _load_projects(self) -> None:
-        from harmoni.ui.gui_web import _get_projects
-        data = _get_projects()
+    def _load_recents(self) -> None:
+        """Load last 3 activities below the prompt."""
+        data = self._bridge.get_recent_activity()[:3]
 
         def render():
-            self._clear_frame(self._projects_list)
+            self._clear_frame(self._recents_frame)
             if not data:
-                self._list_card(self._projects_list, "📭",
-                                "Nenhum projeto detectado",
-                                "Navegue até um diretório com package.json "
-                                "ou requirements.txt")
-                return
-            for proj in data:
-                icon = "🟢" if proj["type"] == "node" else "🐍"
-                self._list_card(self._projects_list, icon,
-                                proj["name"], proj["path"],
-                                "Iniciar", "start my backend")
-        self.root.after(0, render)
-
-    def _load_files(self) -> None:
-        from harmoni.ui.gui_web import _get_directories
-        data = _get_directories()
-
-        def render():
-            self._clear_frame(self._files_list)
-            for f in data:
-                self._list_card(self._files_list, f["icon"],
-                                f["name"], f"{f['count']} itens")
-        self.root.after(0, render)
-
-    def _load_system(self) -> None:
-        data = self._bridge.get_system_status()
-
-        def render():
-            self._clear_frame(self._system_list)
-            self._list_card(self._system_list, "💻", "Processador",
-                            f"{data['cpu_cores']} cores · "
-                            f"{data['cpu_percent']}% em uso")
-            self._list_card(self._system_list, "🧠", "Memória",
-                            f"{data['mem_used_gb']} / "
-                            f"{data['mem_total_gb']} GB "
-                            f"({data['mem_percent']}%)")
-            self._list_card(self._system_list, "💾", "Disco",
-                            f"{data['disk_free_gb']} GB livre de "
-                            f"{data['disk_total_gb']} GB")
-            self._list_card(self._system_list, "🌐", "Rede",
-                            f"↑ {data['net_sent_mb']} MB  "
-                            f"↓ {data['net_recv_mb']} MB")
-            self._list_card(self._system_list, "🖥️", "Host",
-                            f"{data['hostname']} · "
-                            f"Kernel {data['kernel']}")
-        self.root.after(0, render)
-
-    def _load_services(self) -> None:
-        from harmoni.ui.gui_web import _get_services
-        data = _get_services()
-
-        def render():
-            self._clear_frame(self._services_list)
-            if not data:
-                self._list_card(self._services_list, "😴",
-                                "Nenhum serviço ativo", "")
-                return
-            for s in data:
-                self._list_card(
-                    self._services_list, "🔌",
-                    f"Porta {s['port']}",
-                    f"{s['name']} · PID {s.get('pid', '?')}",
-                    "Encerrar",
-                    f"kill process on port {s['port']}")
-        self.root.after(0, render)
-
-    def _load_history(self) -> None:
-        data = self._bridge.get_recent_activity()
-
-        def render():
-            self._clear_frame(self._history_list)
-            if not data:
-                tk.Label(self._history_list,
-                         text="Nenhuma atividade registrada",
-                         font=self._f["step"], fg=FG_DIM,
-                         bg=BG).pack(anchor="w", pady=SP_TIGHT)
+                tk.Label(self._recents_frame,
+                         text="Nenhuma atividade ainda",
+                         font=self._f["small"], fg=FG_DIM,
+                         bg=BG).pack(anchor="w")
                 return
             for it in data:
                 c = (SUCCESS if it["outcome"] == "success"
                      else WARNING if it["outcome"] == "recovered"
                      else ERROR)
-                row = tk.Frame(self._history_list, bg=BG_CARD,
-                               padx=SP_COMPACT, pady=9)
-                row.pack(fill="x", pady=2)
-                tk.Label(row, text=it["icon"], font=self._f["step"],
-                         fg=c, bg=BG_CARD).pack(
-                    side="left", padx=(0, 10))
-                tk.Label(row, text=it["text"], font=self._f["list_s"],
-                         fg=FG_SEC, bg=BG_CARD).pack(
-                    side="left", fill="x", expand=True)
+                row = tk.Frame(self._recents_frame, bg=BG)
+                row.pack(fill="x", pady=1)
+                tk.Label(row, text=it["icon"], font=self._f["small"],
+                         fg=c, bg=BG).pack(side="left", padx=(0, SP_TIGHT))
+                tk.Label(row, text=it["text"], font=self._f["small"],
+                         fg=FG_DIM, bg=BG).pack(side="left")
                 tk.Label(row, text=it["time"], font=self._f["small"],
-                         fg=FG_DIM, bg=BG_CARD).pack(side="right")
+                         fg=FG_DIM, bg=BG).pack(side="right")
         self.root.after(0, render)
 
-    def _load_activity(self) -> None:
+    def _show_full_history(self) -> None:
+        """Show full history in the feed area above prompt."""
         data = self._bridge.get_recent_activity()
+        self._greeting_frame.pack_forget()
+        self._clear_result()
+        self._spinner_frame.pack_forget()
+        self._feed.pack_forget()
 
-        def render():
-            self._clear_frame(self._activity_frame)
-            if not data:
-                tk.Label(self._activity_frame,
-                         text="Nenhuma atividade ainda",
-                         font=self._f["small"], fg=FG_DIM,
-                         bg=BG).pack(anchor="w")
-                return
+        # Use activity_outer in feed_area
+        self._clear_frame(self._activity_frame)
+        if not data:
+            tk.Label(self._activity_frame,
+                     text="Nenhuma atividade registrada",
+                     font=self._f["step"], fg=FG_DIM,
+                     bg=BG).pack(anchor="w", pady=SP_TIGHT)
+        else:
             for it in data:
                 c = (SUCCESS if it["outcome"] == "success"
                      else WARNING if it["outcome"] == "recovered"
@@ -1340,7 +831,7 @@ class HarmoniApp:
                     side="left", fill="x", expand=True)
                 tk.Label(row, text=it["time"], font=self._f["small"],
                          fg=FG_DIM, bg=BG_CARD).pack(side="right")
-        self.root.after(0, render)
+        self._activity_outer.pack(fill="both", expand=True)
 
     # ═══════════════════════════════════════════════════════════════════════
     #  STATUS POLLING
@@ -1379,24 +870,69 @@ class HarmoniApp:
 
     def _ph_clear(self, _) -> None:
         if self._ph:
-            self._entry.delete(0, "end")
-            self._anim.color([self._entry], "fg", FG, T_NORMAL)
+            self._entry.delete("1.0", "end")
+            self._entry.configure(fg=FG)
             self._ph = False
 
     def _ph_restore(self, _) -> None:
-        if not self._entry.get().strip():
-            self._entry.insert(0, "O que você deseja que o sistema faça?")
-            self._anim.color([self._entry], "fg", FG_DIM, T_NORMAL)
+        if not self._entry.get("1.0", "end").strip():
+            self._entry.insert("1.0", "Diga o que precisa…")
+            self._entry.configure(fg=FG_DIM)
             self._ph = True
+
+    def _toggle_expand(self) -> None:
+        """Toggle between single-line Entry and multiline Text widget."""
+        if self._expanded:
+            # Collapse: get text from Text, switch back to Entry
+            text = self._text_entry.get("1.0", "end").strip()
+            self._text_entry.pack_forget()
+            self._entry.pack(side="left", fill="x", expand=True, pady=SP_DEFAULT)
+            self._entry.delete(0, "end")
+            if text and text != "Diga o que precisa…":
+                self._entry.insert(0, text)
+                self._entry.configure(fg=FG)
+            self._expanded = False
+            self._expand_btn.configure(text=" ⤢ ")
+            self._entry.focus_set()
+        else:
+            # Expand: get text from Entry, switch to Text
+            text = self._entry.get().strip()
+            if self._ph:
+                text = ""
+            self._entry.pack_forget()
+            # Create Text widget if not exists
+            if not hasattr(self, "_text_entry"):
+                self._text_entry = tk.Text(
+                    self._prompt_inner, font=self._f["input"],
+                    bg=BG_INPUT, fg=FG, insertbackground=ACCENT,
+                    relief="flat", bd=0, highlightthickness=0,
+                    height=4, wrap="word")
+                self._text_entry.bind("<Control-Return>", self._on_enter)
+            self._text_entry.pack(side="left", fill="both", expand=True,
+                                  pady=SP_COMPACT, padx=(0, SP_TIGHT))
+            self._text_entry.delete("1.0", "end")
+            if text:
+                self._text_entry.insert("1.0", text)
+            self._expanded = True
+            self._expand_btn.configure(text=" ⤡ ")
+            self._ph = False
+            self._text_entry.focus_set()
+
+    def _on_enter_key(self, event=None) -> None:
+        """Handle Return key in Text widget — submit on Enter, newline on Shift+Enter."""
+        # Check if Shift is held
+        if event and (event.state & 0x1):  # Shift mask
+            return  # let default behavior insert newline
+        # Otherwise submit and prevent newline
+        self._on_enter()
+        return "break"
 
     def _on_enter(self, _=None) -> None:
         if self._busy:
             return
-        text = self._entry.get().strip()
+        text = self._entry.get("1.0", "end").strip()
         if not text or self._ph:
             return
-        if self._current_page != "home":
-            self._nav_to("home")
         self._submit(text)
 
     def _on_mic(self) -> None:
@@ -1410,14 +946,11 @@ class HarmoniApp:
         self._anim.color([self._mic_outer, self._mic_btn], "bg", ACCENT, T_FAST)
         self._mic_btn.configure(text=" 🔴 ", fg="#fff")
 
-        if self._current_page != "home":
-            self._nav_to("home")
-
         # Clear and show listening state
         if self._ph:
             self._ph_clear(None)
-        self._entry.delete(0, "end")
-        self._entry.insert(0, "Escutando...")
+        self._entry.delete("1.0", "end")
+        self._entry.insert("1.0", "Escutando...")
         self._entry.configure(fg=ACCENT_LT)
 
         def on_result(text: Optional[str]):
@@ -1429,12 +962,12 @@ class HarmoniApp:
             ))
 
             if text:
-                self.root.after(0, lambda: self._entry.delete(0, "end"))
-                self.root.after(0, lambda: self._entry.insert(0, text))
+                self.root.after(0, lambda: self._entry.delete("1.0", "end"))
+                self.root.after(0, lambda: self._entry.insert("1.0", text))
                 self.root.after(0, lambda: self._entry.configure(fg=FG))
                 self.root.after(100, lambda: self._submit(text))
             else:
-                self.root.after(0, lambda: self._entry.delete(0, "end"))
+                self.root.after(0, lambda: self._entry.delete("1.0", "end"))
                 self.root.after(0, lambda: self._ph_restore(None))
 
         self._voice.listen_async(on_result, duration=5.0)
@@ -1442,12 +975,10 @@ class HarmoniApp:
     def _on_card(self, cmd: str) -> None:
         if self._busy:
             return
-        if self._current_page != "home":
-            self._nav_to("home")
         if self._ph:
             self._ph_clear(None)
-        self._entry.delete(0, "end")
-        self._entry.insert(0, cmd)
+        self._entry.delete("1.0", "end")
+        self._entry.insert("1.0", cmd)
         self._entry.configure(fg=FG)
         self._submit(cmd)
 
@@ -1457,11 +988,15 @@ class HarmoniApp:
         self._entry.configure(state="disabled")
         # Swap send → cancel button
         self._send_btn_outer.pack_forget()
-        self._cancel_btn_outer.pack(side="right", padx=(SP_TIGHT, SP_COMPACT), pady=10)
-        self._clear_feed()
+        self._cancel_btn_outer.pack(pady=(0, SP_TIGHT))
+        # Clear previous result
         self._clear_result()
         self._confirm_frame.pack_forget()
-        self._cards_frame.pack_forget()
+        # Transition to active layout
+        self._transition_to_active()
+        self._clear_feed()
+        # Start spinner animation
+        self._start_spinner()
         self._add_step("Entendendo…", thinking=True)
         threading.Thread(target=self._run, args=(text,), daemon=True).start()
 
@@ -1506,6 +1041,7 @@ class HarmoniApp:
             self.root.after_cancel(self._dot_id)
             self._dot_id = None
         self._clear_feed()
+        self._stop_spinner()
         self._show_result("Cancelado", "", "success")
         self._finish()
 
@@ -1530,6 +1066,8 @@ class HarmoniApp:
             "error": "Problema",
         }
 
+        # Stop spinner on result
+        self.root.after(delay, self._stop_spinner)
         self.root.after(delay, self._dim_steps)
         self.root.after(delay + 80, lambda: self._show_result(
             titles.get(status, "Concluído"), result_text, status))
@@ -1539,6 +1077,34 @@ class HarmoniApp:
         if result_text:
             self.root.after(delay + 200, lambda: self._voice.speak(
                 result_text, voice_mode))
+
+    # ── Spinner (only visible when processing) ─────────────────────────
+
+    def _start_spinner(self) -> None:
+        """Show and animate the processing spinner."""
+        self._spinner_phase = 0.0
+        self._animate_spinner()
+
+    def _stop_spinner(self) -> None:
+        """Hide the spinner."""
+        if self._spinner_anim_id:
+            self.root.after_cancel(self._spinner_anim_id)
+            self._spinner_anim_id = None
+
+    def _animate_spinner(self) -> None:
+        """Rotate the arc and pulse the center dot."""
+        if not self._spinner_canvas.winfo_exists():
+            return
+        import math
+        self._spinner_phase += 8  # degrees per frame
+        # Rotate the arc
+        self._spinner_canvas.itemconfig(
+            self._spinner_arc, start=self._spinner_phase % 360)
+        # Pulse the dot brightness
+        t = (math.sin(self._spinner_phase * 0.05) + 1) / 2
+        dot_color = _lerp(ACCENT_DK, ACCENT_LT, t)
+        self._spinner_canvas.itemconfig(self._spinner_dot, fill=dot_color)
+        self._spinner_anim_id = self.root.after(T_RING, self._animate_spinner)
 
     # ── Feed ─────────────────────────────────────────────────────────────
 
@@ -1580,6 +1146,7 @@ class HarmoniApp:
     def _clear_result(self) -> None:
         self._res_title.pack_forget()
         self._res_body.pack_forget()
+        self._result_frame.pack_forget()
 
     def _show_result(self, title: str, body: str, status: str) -> None:
         colors = {"success": SUCCESS, "recovered": WARNING, "error": ERROR}
@@ -1587,14 +1154,14 @@ class HarmoniApp:
         color = colors.get(status, SUCCESS)
         icon = icons.get(status, "✓")
 
-        self._res_title.configure(text=f"{icon}  {title}", fg=BG)
-        self._res_title.pack(pady=(0, SP_MICRO))
-        self._anim.color([self._res_title], "fg", color, T_SLOW)
+        self._result_frame.pack(fill="x", pady=(SP_DEFAULT, 0))
+        self._res_title.configure(text=f"{icon}  {title}", fg=color)
+        self._res_title.pack(fill="x", pady=(0, SP_TIGHT))
 
         if body:
-            self._res_body.configure(text=body, fg=BG)
-            self._res_body.pack()
-            self._anim.color([self._res_body], "fg", FG_SEC, T_SLOW)
+            # Line spacing 1.5 via padding between lines
+            self._res_body.configure(text=body, fg=FG_SEC)
+            self._res_body.pack(fill="x")
 
     def _show_confirm(self, msg: str, cmd: str) -> None:
         self._pending = cmd
@@ -1611,16 +1178,17 @@ class HarmoniApp:
         self._busy = False
         self._cancelled = False
         self._entry.configure(state="normal")
-        self._entry.delete(0, "end")
+        self._entry.delete("1.0", "end")
         self._entry.focus_set()
         # Swap cancel → send button
         self._cancel_btn_outer.pack_forget()
-        self._send_btn_outer.pack(side="right", padx=(SP_TIGHT, SP_COMPACT), pady=10)
+        self._send_btn_outer.pack(pady=(0, SP_TIGHT))
         self._ph = False
-        # Re-show cards
-        self._cards_frame.pack(fill="x", before=self._feed)
-        # Refresh activity
-        threading.Thread(target=self._load_activity, daemon=True).start()
+        # Stop spinner, keep result visible
+        self._stop_spinner()
+        self._spinner_frame.pack_forget()
+        # Refresh recents below prompt
+        threading.Thread(target=self._load_recents, daemon=True).start()
 
     # ═══════════════════════════════════════════════════════════════════════
     #  LIFECYCLE

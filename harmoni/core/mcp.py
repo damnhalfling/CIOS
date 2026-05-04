@@ -104,7 +104,10 @@ class ContextSnapshot:
 # ═══════════════════════════════════════════════════════════════════════════
 
 def _scan_wifi() -> WifiState:
-    """Get current Wi-Fi state via nmcli."""
+    """Get current Wi-Fi state via nmcli.
+
+    Returns safe default (disconnected) if nmcli is not installed.
+    """
     state = WifiState()
     try:
         result = subprocess.run(
@@ -133,6 +136,8 @@ def _scan_wifi() -> WifiState:
                         addr = line.split(":", 1)[1].strip()
                         state.ip = addr.split("/")[0] if "/" in addr else addr
                         break
+    except FileNotFoundError:
+        logger.debug("nmcli not found — Wi-Fi features unavailable")
     except Exception as e:
         logger.debug("Wi-Fi scan failed: %s", e)
     return state
@@ -246,7 +251,10 @@ def _scan_running_apps() -> list[str]:
 
 
 def _scan_known_networks() -> list[str]:
-    """Get list of saved Wi-Fi networks."""
+    """Get list of saved Wi-Fi networks.
+
+    Returns empty list if nmcli is not installed.
+    """
     networks = []
     try:
         result = subprocess.run(
@@ -258,6 +266,8 @@ def _scan_known_networks() -> list[str]:
                 parts = line.split(":")
                 if len(parts) >= 2 and "wireless" in parts[1].lower():
                     networks.append(parts[0])
+    except FileNotFoundError:
+        logger.debug("nmcli not found — known networks unavailable")
     except Exception:
         pass
     return networks

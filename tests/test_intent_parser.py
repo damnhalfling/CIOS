@@ -279,3 +279,30 @@ class TestUnknown:
         intent = parse_intent("do something creative with my files")
         assert intent.type == IntentType.UNKNOWN
         assert intent.requires_complex_reasoning is True
+
+
+class TestContinueProject:
+    """CONTINUE_PROJECT intent detection."""
+
+    @pytest.mark.parametrize("input_text,expected_project", [
+        ("continuar projeto fidelidade", "fidelidade"),
+        ("continuar no backend", "backend"),
+        ("voltar pro frontend", "frontend"),
+        ("continue project myapp", "myapp"),
+        ("resume dashboard", "dashboard"),
+    ])
+    def test_continue_project_with_name(self, input_text, expected_project):
+        intent = parse_intent(input_text)
+        assert intent.type == IntentType.CONTINUE_PROJECT
+        assert intent.params.get("project") == expected_project
+        assert intent.confidence >= 0.90
+
+    @pytest.mark.parametrize("input_text", [
+        "continuar",
+        "continue",
+    ])
+    def test_continue_project_bare(self, input_text):
+        intent = parse_intent(input_text)
+        assert intent.type == IntentType.CONTINUE_PROJECT
+        assert "project" not in intent.params
+        assert intent.confidence >= 0.90

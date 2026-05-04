@@ -88,5 +88,16 @@ Exemplos:
 
 ---
 
-*Criado em maio/2026 — v0.10.2*
-*Sem alterações pendentes. Spec está alinhada com a implementação atual.*
+## Regra de produto
+
+O usuário só percebe: "funcionou ou não funcionou?"
+
+- Se funcionou → resultado concreto + estado atual
+- Se não funcionou → o que deu errado + sugestão
+- Se precisa de input → pergunta curta + opções
+
+**Nunca** mostrar nada técnico. **Sempre** dar próximo passo.
+
+---
+
+*Atualizado: Maio 2026 — v0.12.0*

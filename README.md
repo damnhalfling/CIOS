@@ -2,16 +2,16 @@
   <img src="assets/background.png" width="600" alt="Harmoni OS" />
 </p>
 
-<h1 align="center">Harmoni OS</h1>
+<h1 align="center">Harmoni</h1>
 
 <p align="center">
-  <strong>Substituindo apps por intenção.<br>Um sistema operacional AI-first para Linux.</strong>
+  <strong>Substituindo apps por intenção.<br>Você fala. O computador faz.</strong>
 </p>
 
 <p align="center">
   <a href="https://github.com/damnhalfling/harmoni/releases"><img src="https://img.shields.io/github/v/release/damnhalfling/harmoni" alt="Release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/damnhalfling/harmoni" alt="License" /></a>
-  <img src="https://img.shields.io/badge/tests-323%20passing-brightgreen" alt="Tests" />
+  <img src="https://img.shields.io/badge/tests-468%20passing-brightgreen" alt="Tests" />
 </p>
 
 <p align="center">
@@ -125,10 +125,13 @@ Your voice stays on your machine. Always.
 ## A real system, not an app
 
 - Independent X session — replaces your desktop
-- Multi-monitor support
+- Single-surface interface: prompt at bottom, results above, system status on the right
+- No sidebar, no menus, no page navigation — just intent
 - Minimal top bar (clock, battery, wifi, volume, CPU)
+- Processing spinner appears only when the system is thinking
+- Multi-monitor support (secondary screen shows system context)
 - Global hotkey (Ctrl+Space)
-- Boot splash in <100ms
+- Boot splash with seamless transition to main interface
 - Onboarding wizard on first login
 
 **No GNOME. No KDE. Just intent.**
@@ -224,7 +227,6 @@ DISPLAY=:2 .venv/bin/harmoni
 
 ```bash
 harmoni              # GUI (default)
-harmoni --web        # Web GUI (port 7777, SSE streaming)
 harmoni --cli        # Terminal (Rich + prompt_toolkit)
 harmoni --daemon     # Background daemon (Unix socket)
 harmoni --overlay    # Hotkey overlay (Ctrl+Space)
@@ -252,7 +254,7 @@ Ollama is auto-installed during setup.
 - ✅ Multi-monitor
 - ✅ Auto-learning engine
 - ✅ .deb installable package
-- ✅ 323 tests passing
+- ✅ 468 tests passing (including 13 property-based tests)
 - ✅ Onboarding wizard
 - ✅ Conversational UX with 3-turn context
 
@@ -284,9 +286,9 @@ User Input → Intent Parser → Classifier → MCO → Planner → Executor →
 - **Intent Classifier** — SQLite-cached LLM classifications, fuzzy matching with light PT stemming, auto-learning from successful executions
 - **MCP** — Live system state with reactive watchers (nmcli monitor, pactl subscribe) + adaptive polling (1s/5s/15s)
 - **MCO** — Decision layer: resolves from MCP state instantly when possible
-- **Planner** — 17 handlers with context-aware execution and `_resilient_call()` retry
+- **Planner** — 28 handlers with context-aware execution and `_resilient_call()` retry
 - **Executor** — Safe shell execution with timeout, blocked command list, background processes
-- **Humanizer** — 185+ translations PT/EN, all technical output becomes plain language
+- **Humanizer** — 220+ translations PT/EN, all technical output becomes plain language
 - **Model Router** — Ollama (local, default) with fallback support
 - **Memory** — SQLite store of intents, commands, and outcomes
 - **Error Recovery** — 17 error types classified with actionable suggestions (PT/EN)
@@ -303,7 +305,7 @@ User Input → Intent Parser → Classifier → MCO → Planner → Executor →
 ```
 harmoni-os/
 ├── harmoni/
-│   ├── main.py                 # Entry point (7 modes)
+│   ├── main.py                 # Entry point (6 modes)
 │   ├── core/
 │   │   ├── bridge.py           # UI ↔ backend (sync + streaming + conversation)
 │   │   ├── intent_parser.py    # 148+ regex patterns PT/EN
@@ -317,7 +319,7 @@ harmoni-os/
 │   │   ├── memory.py           # SQLite history
 │   │   └── error_recovery.py   # 17 error types + actionable suggestions
 │   ├── skills/                 # 21 system skills
-│   ├── ui/                     # GUI, Web GUI, CLI, hotkey, topbar, splash
+│   ├── ui/                     # GUI, CLI, hotkey, topbar, splash, theme
 │   └── infra/                  # Daemon, voice, multi-monitor
 ├── session/                    # X session config (Openbox)
 ├── tests/                      # 323 tests
@@ -477,7 +479,6 @@ No primeiro boot, o **Onboarding Wizard** guia a configuração:
 
 ```bash
 harmoni              # GUI (padrão)
-harmoni --web        # GUI Web (porta 7777)
 harmoni --cli        # Terminal
 harmoni --daemon     # Daemon (socket Unix)
 harmoni --overlay    # Overlay (Ctrl+Space)
@@ -492,4 +493,4 @@ harmoni --setup      # Re-executar setup
 
 ---
 
-*Harmoni OS v0.12.0 — May 2026*
+*Harmoni OS v0.13.0 — May 2026*

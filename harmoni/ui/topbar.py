@@ -17,27 +17,35 @@ import threading
 import time
 from typing import Optional
 
+from harmoni.ui.theme import (
+    BG, FG, FG_SEC, FG_DIM,
+    ACCENT, ACCENT_LT, ACCENT_DK,
+    SUCCESS, WARNING, ERROR, CYAN,
+    BAR_HEIGHT, T_RING,
+    hex2rgb, rgb2hex, lerp,
+)
+
 logger = logging.getLogger(__name__)
 
 # ═══════════════════════════════════════════════════════════════════════════
-#  DESIGN TOKENS
+#  DESIGN TOKENS (topbar-specific overrides)
 # ═══════════════════════════════════════════════════════════════════════════
 
-_BAR_HEIGHT = 28
+_BAR_HEIGHT = BAR_HEIGHT
 _BG = "#0d0d14"
-_FG = "#b0b0c0"
-_FG_BRIGHT = "#e0e0ec"
-_ACCENT = "#7c6ff7"
-_ACCENT_GLOW = "#a78bfa"
-_DIM = "#5a5a6a"
-_GREEN = "#22c55e"
-_YELLOW = "#facc15"
-_RED = "#f87171"
-_CYAN = "#06b6d4"
+_FG = FG_SEC
+_FG_BRIGHT = FG
+_ACCENT = ACCENT
+_ACCENT_GLOW = ACCENT_LT
+_DIM = FG_DIM
+_GREEN = SUCCESS
+_YELLOW = WARNING
+_RED = ERROR
+_CYAN = CYAN
 
 _CLOCK_MS = 1000
 _STATUS_MS = 2000
-_GLOW_MS = 80          # processing glow animation frame rate
+_GLOW_MS = T_RING          # processing glow animation frame rate
 
 # Shared activity state file — written by bridge, read by topbar
 _ACTIVITY_FILE = os.path.expanduser("~/.harmoni/.topbar_activity")

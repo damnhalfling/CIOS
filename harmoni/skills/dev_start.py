@@ -1,12 +1,19 @@
 """Skill: dev_start — detect project type, install deps, start server."""
 
+import logging
 import os
+import shutil
+import subprocess
 import time
+import webbrowser
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 from harmoni.core.executor import Executor, ExecResult
+from harmoni.core.memory import Memory, SessionContext
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -130,14 +137,34 @@ def _detect_node_port(pkg: dict, root: str) -> int:
 
 
 def needs_install(project: ProjectInfo) -> bool:
-    """Check if dependencies need to be installed."""
+    """Check if dependencies need to be installed.
+
+    For Node projects, also detects stale installs by comparing
+    package-lock.json mtime vs node_modules mtime.
+    """
+    root = Path(project.root)
+
     if project.type == "node":
-        return not (Path(project.root) / "node_modules").exists()
+        node_modules = root / "node_modules"
+        if not node_modules.exists():
+            return True
+        # Stale dependency detection: if lock file is newer than node_modules,
+        # dependencies have changed and need reinstalling.
+        lock_file = root / "package-lock.json"
+        if lock_file.exists() and node_modules.exists():
+            try:
+                lock_mtime = lock_file.stat().st_mtime
+                nm_mtime = node_modules.stat().st_mtime
+                if lock_mtime > nm_mtime:
+                    return True
+            except OSError:
+                pass
+        return False
+
     if project.type == "python":
         # Rough heuristic: check if venv exists
-        return not (Path(project.root) / ".venv").exists() and not (
-            Path(project.root) / "venv"
-        ).exists()
+        return not (root / ".venv").exists() and not (root / "venv").exists()
+
     return False
 
 
@@ -149,14 +176,66 @@ def _is_port_in_use(port: int) -> bool:
         return s.connect_ex(("127.0.0.1", port)) == 0
 
 
+def _wait_for_port_free(port: int, timeout: float = 3.0, interval: float = 0.2) -> bool:
+    """Poll until the port is free, up to *timeout* seconds.
+
+    Returns True if the port became free, False if still in use after timeout.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if not _is_port_in_use(port):
+            return True
+        time.sleep(interval)
+    return not _is_port_in_use(port)
+
+
+def _detect_editor() -> Optional[str]:
+    """Detect the best available code editor.
+
+    Checks for ``code`` (VS Code), ``codium`` (VS Codium), then falls back
+    to the ``VISUAL`` or ``EDITOR`` environment variables.
+    Returns the command name or ``None`` if nothing is found.
+    """
+    for candidate in ("code", "codium"):
+        if shutil.which(candidate):
+            return candidate
+    # Fallback to environment variables
+    for var in ("VISUAL", "EDITOR"):
+        editor = os.environ.get(var)
+        if editor and shutil.which(editor):
+            return editor
+    return None
+
+
+def _open_editor(editor_cmd: str, project_root: str) -> None:
+    """Open the editor at *project_root* in a non-blocking subprocess."""
+    try:
+        subprocess.Popen(
+            [editor_cmd, project_root],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        logger.warning("Failed to open editor '%s' at '%s'", editor_cmd, project_root)
+
+
+def _open_browser(url: str) -> None:
+    """Open *url* in the default browser."""
+    try:
+        webbrowser.open(url)
+    except Exception:
+        logger.warning("Failed to open browser at '%s'", url)
+
+
 def execute_dev_start(
     executor: Executor,
     project: Optional[ProjectInfo] = None,
     directory: str = ".",
     _retry: bool = False,
+    memory: Optional[Memory] = None,
 ) -> tuple[list[str], list[ExecResult], Optional[int]]:
     """
-    Full dev_start flow: detect → install → clear port → start.
+    Full dev_start flow: detect → install → clear port → start → editor → browser → persist.
     Returns (plan_steps, results, server_pid).
     If the server fails due to a port conflict, auto-retries once.
     """
@@ -186,12 +265,11 @@ def execute_dev_start(
         plan.append(f"Port {project.port} in use — killing process")
         kill_result = executor.kill_by_port(project.port)
         results.append(kill_result)
-        time.sleep(2)  # Let the port release
-        # Double-check
-        if _is_port_in_use(project.port):
+        # Poll until port is free instead of fixed sleep
+        if not _wait_for_port_free(project.port, timeout=3.0, interval=0.2):
             # Try harder with a direct kill
             executor.run(f"kill -9 $(lsof -ti:{project.port}) 2>/dev/null || true")
-            time.sleep(1)
+            _wait_for_port_free(project.port, timeout=1.0, interval=0.2)
 
     # Step 3: Start server
     plan.append(f"Starting server ({project.start_command})")
@@ -218,9 +296,9 @@ def execute_dev_start(
             plan.append("Port conflict detected — auto-recovering")
             executor.kill_by_port(project.port)
             executor.run(f"kill -9 $(lsof -ti:{project.port}) 2>/dev/null || true")
-            time.sleep(2)
+            _wait_for_port_free(project.port, timeout=2.0, interval=0.2)
             retry_plan, retry_results, retry_pid = execute_dev_start(
-                executor, project=project, _retry=True
+                executor, project=project, _retry=True, memory=memory,
             )
             return plan + retry_plan, results + retry_results, retry_pid
 
@@ -237,4 +315,37 @@ def execute_dev_start(
         return plan, results, None
 
     plan.append(f"Server running on port {project.port} (PID {proc.pid})")
+
+    # Step 5: Open editor
+    editor_cmd = _detect_editor()
+    if editor_cmd:
+        _open_editor(editor_cmd, project.root)
+        plan.append(f"Editor opened ({editor_cmd})")
+    else:
+        editor_cmd = ""
+
+    # Step 6: Open browser
+    browser_url = f"http://localhost:{project.port}"
+    _open_browser(browser_url)
+    plan.append(f"Browser opened ({browser_url})")
+
+    # Step 7: Persist SessionContext to Memory
+    if memory is not None:
+        project_name = os.path.basename(project.root)
+        ctx = SessionContext(
+            project_name=project_name,
+            project_path=project.root,
+            project_type=project.type,
+            editor_command=editor_cmd or "",
+            server_pid=proc.pid,
+            server_port=project.port,
+            browser_url=browser_url,
+            start_command=project.start_command,
+        )
+        try:
+            memory.save_session(ctx)
+            plan.append("Session saved")
+        except Exception:
+            logger.warning("Failed to persist session context for '%s'", project_name)
+
     return plan, results, proc.pid

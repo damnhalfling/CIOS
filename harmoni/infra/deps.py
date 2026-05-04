@@ -8,46 +8,161 @@ sudo if available, or logs a clear warning.
 
 This is a safety net — the .deb Depends field should handle most cases,
 but upgrades from older versions or manual installs may miss new deps.
+
+Graceful degradation: when a tool cannot be installed, the corresponding
+feature is disabled with a human-readable message instead of crashing.
 """
 
 import logging
+import os
 import shutil
 import subprocess
+from dataclasses import dataclass
 from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# Tools required for full functionality
-# (binary_name, apt_package, critical)
-# critical=True means core features break without it
-_REQUIRED_TOOLS = [
-    ("wmctrl",   "wmctrl",               True),
-    ("xdotool",  "xdotool",              True),
-    ("xrandr",   "x11-xserver-utils",    True),
-    ("xprop",    "x11-utils",            False),
-    ("xset",     "x11-xserver-utils",    False),
-    ("i3lock",   "i3lock",               False),
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  DEPENDENCY REGISTRY
+# ═══════════════════════════════════════════════════════════════════════════
+
+@dataclass
+class DepInfo:
+    """Metadata for a system dependency."""
+    binary: str          # Binary name to check via shutil.which
+    apt_package: str     # Package to install via apt-get
+    feature: str         # Human-readable feature name (PT-BR)
+    degraded_msg: str    # Message shown when feature is unavailable
+    critical: bool       # If True, core features break without it
+
+
+# Mapping of tool → package → feature → degradation message
+DEPENDENCY_REGISTRY: list[DepInfo] = [
+    DepInfo(
+        binary="nmcli",
+        apt_package="network-manager",
+        feature="Wi-Fi",
+        degraded_msg="Wi-Fi indisponível",
+        critical=False,
+    ),
+    DepInfo(
+        binary="pactl",
+        apt_package="pulseaudio-utils",
+        feature="Áudio (PulseAudio)",
+        degraded_msg="Áudio indisponível",
+        critical=False,
+    ),
+    DepInfo(
+        binary="wpctl",
+        apt_package="wireplumber",
+        feature="Áudio (PipeWire)",
+        degraded_msg="Áudio indisponível",
+        critical=False,
+    ),
+    DepInfo(
+        binary="bluetoothctl",
+        apt_package="bluez",
+        feature="Bluetooth",
+        degraded_msg="Bluetooth indisponível",
+        critical=False,
+    ),
+    DepInfo(
+        binary="xdotool",
+        apt_package="xdotool",
+        feature="Controle de janelas",
+        degraded_msg="Controle de janelas indisponível",
+        critical=True,
+    ),
+    DepInfo(
+        binary="wmctrl",
+        apt_package="wmctrl",
+        feature="Controle de janelas",
+        degraded_msg="Controle de janelas indisponível",
+        critical=True,
+    ),
+    # Legacy deps (kept for backward compat)
+    DepInfo(
+        binary="xrandr",
+        apt_package="x11-xserver-utils",
+        feature="Display",
+        degraded_msg="Controle de display indisponível",
+        critical=True,
+    ),
+    DepInfo(
+        binary="xprop",
+        apt_package="x11-utils",
+        feature="Propriedades de janela",
+        degraded_msg="Propriedades de janela indisponíveis",
+        critical=False,
+    ),
+    DepInfo(
+        binary="xset",
+        apt_package="x11-xserver-utils",
+        feature="Configurações X11",
+        degraded_msg="Configurações X11 indisponíveis",
+        critical=False,
+    ),
+    DepInfo(
+        binary="i3lock",
+        apt_package="i3lock",
+        feature="Bloqueio de tela",
+        degraded_msg="Bloqueio de tela indisponível",
+        critical=False,
+    ),
 ]
 
+# Module-level state: tracks which tools are missing after check
+_missing_tools: set[str] = set()
+_degraded_features: dict[str, str] = {}  # binary → degraded_msg
+
+
+def get_missing_tools() -> set[str]:
+    """Return the set of tool binaries that are currently missing."""
+    return set(_missing_tools)
+
+
+def get_degraded_features() -> dict[str, str]:
+    """Return mapping of missing binary → human degradation message."""
+    return dict(_degraded_features)
+
+
+def is_tool_available(binary: str) -> bool:
+    """Check if a specific tool is available (not in missing set)."""
+    return binary not in _missing_tools
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  MAIN CHECK
+# ═══════════════════════════════════════════════════════════════════════════
 
 def check_and_install_deps() -> list[str]:
     """Check for missing system tools and attempt to install them.
 
-    Returns list of tools that are still missing after attempted install.
+    Returns list of tool binaries that are still missing after attempted install.
     Called once during boot (from bridge or session script).
-    """
-    missing: list[tuple[str, str, bool]] = []
 
-    for binary, package, critical in _REQUIRED_TOOLS:
-        if not shutil.which(binary):
-            missing.append((binary, package, critical))
+    For each missing tool:
+    1. Log which feature is affected
+    2. Attempt auto-install via apt-get (if sudo available)
+    3. If install fails → log warning with humanized message, track as degraded
+    """
+    global _missing_tools, _degraded_features
+
+    missing: list[DepInfo] = []
+
+    for dep in DEPENDENCY_REGISTRY:
+        if not shutil.which(dep.binary):
+            missing.append(dep)
 
     if not missing:
+        _missing_tools = set()
+        _degraded_features = {}
         return []
 
-    # Deduplicate packages
-    packages_to_install = list(dict.fromkeys(pkg for _, pkg, _ in missing))
-    missing_names = [b for b, _, _ in missing]
+    # Deduplicate packages to install
+    packages_to_install = list(dict.fromkeys(dep.apt_package for dep in missing))
+    missing_names = [dep.binary for dep in missing]
 
     logger.warning(
         "Missing system tools: %s (packages: %s)",
@@ -60,38 +175,61 @@ def check_and_install_deps() -> list[str]:
 
     if installed:
         logger.info("Auto-installed missing packages: %s", ", ".join(packages_to_install))
-        # Re-check what's still missing
-        still_missing = [b for b, _, _ in missing if not shutil.which(b)]
-        if still_missing:
-            logger.warning("Still missing after install: %s", ", ".join(still_missing))
-        return still_missing
 
-    # Install failed — log clearly
-    critical_missing = [b for b, _, c in missing if c]
-    if critical_missing:
-        logger.error(
-            "Critical tools missing and could not auto-install: %s. "
-            "Some features will be limited. "
-            "Fix with: sudo apt install %s",
-            ", ".join(critical_missing),
-            " ".join(packages_to_install),
-        )
+    # Re-check what's still missing after install attempt
+    still_missing: list[DepInfo] = []
+    for dep in missing:
+        if not shutil.which(dep.binary):
+            still_missing.append(dep)
 
-    return missing_names
+    # Update module-level state for degraded features
+    _missing_tools = {dep.binary for dep in still_missing}
+    _degraded_features = {dep.binary: dep.degraded_msg for dep in still_missing}
 
+    # Log humanized warnings for each degraded feature
+    for dep in still_missing:
+        if dep.critical:
+            logger.error(
+                "Recurso degradado: %s — %s (instale com: sudo apt install %s)",
+                dep.feature, dep.degraded_msg, dep.apt_package,
+            )
+        else:
+            logger.warning(
+                "Recurso degradado: %s — %s (instale com: sudo apt install %s)",
+                dep.feature, dep.degraded_msg, dep.apt_package,
+            )
+
+    still_missing_names = [dep.binary for dep in still_missing]
+
+    if still_missing_names:
+        critical_missing = [dep.binary for dep in still_missing if dep.critical]
+        if critical_missing:
+            logger.error(
+                "Critical tools missing and could not auto-install: %s. "
+                "Some features will be limited. "
+                "Fix with: sudo apt install %s",
+                ", ".join(critical_missing),
+                " ".join(packages_to_install),
+            )
+
+    return still_missing_names
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  INSTALL STRATEGIES
+# ═══════════════════════════════════════════════════════════════════════════
 
 def _try_install(packages: list[str]) -> bool:
     """Attempt to install packages via apt.
 
     Tries multiple strategies:
-    1. Direct apt (works if running as root or in postinst)
+    1. Direct apt (works if running as root)
     2. Passwordless sudo (works if NOPASSWD configured)
     3. pkexec (works in graphical session with polkit)
     """
     pkg_str = " ".join(packages)
 
     # Strategy 1: direct apt (if we're root)
-    import os
     if os.geteuid() == 0:
         return _run_apt(f"apt-get install -y -qq {pkg_str}")
 

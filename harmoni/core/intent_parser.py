@@ -32,6 +32,7 @@ class IntentType(Enum):
     SELF_UPDATE = "self_update"
     EXPLORE_SYSTEM = "explore_system"
     LIST_APPS = "list_apps"
+    CONTINUE_PROJECT = "continue_project"
     WORKFLOW_START = "workflow_start"
     INTENT_MEDIA = "intent_media"
     INTENT_BROWSE = "intent_browse"
@@ -349,6 +350,71 @@ _RULES: list[tuple[re.Pattern, IntentType, Optional[callable], float]] = [
         ),
         IntentType.LIST_APPS,
         None,
+        0.90,
+    ),
+    # --- continue project (PT + EN) — MUST be before workflow_start and app_launch ---
+    (
+        re.compile(
+            r"(?:continuar?)\s+(?:o\s+)?projeto\s+(.+)",
+            re.IGNORECASE,
+        ),
+        IntentType.CONTINUE_PROJECT,
+        lambda m: {"project": m.group(1).strip()},
+        0.95,
+    ),
+    (
+        re.compile(
+            r"(?:continuar?)\s+(?:no|na)\s+(.+)",
+            re.IGNORECASE,
+        ),
+        IntentType.CONTINUE_PROJECT,
+        lambda m: {"project": m.group(1).strip()},
+        0.95,
+    ),
+    (
+        re.compile(
+            r"(?:voltar?)\s+(?:pro?|para?\s+o?)\s+(.+)",
+            re.IGNORECASE,
+        ),
+        IntentType.CONTINUE_PROJECT,
+        lambda m: {"project": m.group(1).strip()},
+        0.95,
+    ),
+    (
+        re.compile(
+            r"(?:continue)\s+project\s+(.+)",
+            re.IGNORECASE,
+        ),
+        IntentType.CONTINUE_PROJECT,
+        lambda m: {"project": m.group(1).strip()},
+        0.95,
+    ),
+    (
+        re.compile(
+            r"(?:resume)\s+(.+)",
+            re.IGNORECASE,
+        ),
+        IntentType.CONTINUE_PROJECT,
+        lambda m: {"project": m.group(1).strip()},
+        0.90,
+    ),
+    # Bare "continuar" / "continue" — no project param
+    (
+        re.compile(
+            r"^continuar?$",
+            re.IGNORECASE,
+        ),
+        IntentType.CONTINUE_PROJECT,
+        lambda m: {},
+        0.90,
+    ),
+    (
+        re.compile(
+            r"^continue$",
+            re.IGNORECASE,
+        ),
+        IntentType.CONTINUE_PROJECT,
+        lambda m: {},
         0.90,
     ),
     # --- workflow start (PT + EN) — MUST be before app_launch and dev_start ---

@@ -1,75 +1,124 @@
-# Harmoni OS — Avaliação Estratégica
+# Harmoni — Avaliação Estratégica
 
-> Análise de posicionamento e estado atual do projeto.
 > Atualizado: Maio 2026 — v0.12.0
 
 ---
 
-## 1. Contexto de Mercado
+## Posicionamento
 
-A tendência de mercado aponta para interfaces AI-first que substituem apps tradicionais. Grandes players estão investindo em hardware dedicado para IA, com produção prevista para 2028.
+**Harmoni** — Substituindo apps por intenção.
 
-**Vantagem do Harmoni OS:** Faz o mesmo em software, rodando em qualquer Linux hoje. Sem necessidade de hardware novo.
+Não é "um sistema melhor". É um novo modelo de interação.
 
----
+Não estamos contra distros Linux. Estamos contra Windows, macOS, Android — como próxima evolução.
 
-## 2. Estado Atual (v0.12.0)
-
-### O que funciona (131 itens concluídos)
-
-| Componente | Status |
-|-----------|--------|
-| Sessão X (Openbox + autostart + splash) | ✅ |
-| App Launcher (30+ aliases, .desktop scanner) | ✅ |
-| Session Control (shutdown/reboot/suspend/hibernate/lock/logout) | ✅ |
-| Wi-Fi (nmcli, auto-connect, retry + fallback) | ✅ |
-| Volume/Áudio (pactl, retry + fallback) | ✅ |
-| Bateria/Brilho (psutil + brightnessctl) | ✅ |
-| MCP (estado vivo, warmup paralelo, watchers reativos) | ✅ |
-| MCO (decisão contextual antes de cada handler) | ✅ |
-| Disk Analysis + Limpeza | ✅ |
-| System Health inteligente | ✅ |
-| Multi-monitor | ✅ |
-| Voice STT/TTS (whisper.cpp + piper, offline) | ✅ |
-| Ollama (local, gratuito, privado) | ✅ |
-| Fallback LLM (retry + circuit breaker) | ✅ |
-| .deb com 2 modos + Ollama auto-install | ✅ |
-| Humanizer PT-BR (185+ traduções) | ✅ |
-| Voice Spec (tom, estrutura, vocabulário) | ✅ |
-| Intent Parser (148+ patterns PT/EN) | ✅ |
-| Memory (SQLite) | ✅ |
-| GUI Tkinter + GUI Web (SSE streaming) | ✅ |
-| Auto-Learning Engine | ✅ |
-| Package Management (apt) | ✅ |
-| Bluetooth | ✅ |
-| File Search + File Organize | ✅ |
-| Dev Start (workflow de desenvolvimento) | ✅ |
-| Explore System | ✅ |
-| Self-Update | ✅ |
-| Error Recovery (19 tipos) | ✅ |
-| Bridge (3-turn context, clarification, pronoun resolution) | ✅ |
-| Onboarding Wizard | ✅ |
-| 323 testes passando | ✅ |
+**Se precisa explicar → está errado. Se a pessoa entende em 2 segundos → acertou.**
 
 ---
 
-## 3. Diferencial
+## Onde estamos
 
-| Aspecto | Concorrentes | Harmoni OS |
-|---------|-------------|-----------|
-| Hardware | Precisam de hardware novo | Roda em qualquer Linux |
-| Disponibilidade | 2028+ | Hoje |
-| Privacidade | Cloud-first | Local-first (Ollama) |
+| Etapa | Status |
+|-------|--------|
+| Ideia | ✅ |
+| Protótipo | ✅ |
+| Sistema funcional | ✅ |
+| **Polimento + narrativa + impacto** | **← AQUI** |
+| Produto percebido | ⏳ |
+
+Esse é o momento onde projetos morrem ou viram algo grande.
+
+---
+
+## O que já funciona (131 itens)
+
+- 21 skills de sistema (wifi, áudio, arquivos, pacotes, janelas, clipboard, bateria, brilho, bluetooth, dev start, file search, etc.)
+- 148+ patterns de intenção (PT/EN)
+- Hybrid classifier (regex → cache → Ollama)
+- Voz offline (whisper.cpp + piper)
+- Desktop completo (sessão X, topbar, hotkey, multi-monitor)
+- UX conversacional (3 turnos, clarificação, pronomes)
+- Error recovery (19 tipos com sugestões)
+- Auto-learning engine
+- 323 testes passando
+- .deb instalável
+
+---
+
+## Killer Workflow
+
+O momento que quebra a cabeça:
+
+```
+"quero trabalhar no projeto fidelidade"
+→ abre editor → sobe backend → inicia frontend → abre browser
+"Projeto aberto. Ambiente pronto."
+```
+
+**Por que esse ganha de todos:**
+- Resolve dor real (todo dev, criador, power user)
+- Demonstra orquestração, não só comando
+- Parece "inteligência de verdade"
+- Fácil de demonstrar em vídeo
+- Não depende de cloud → zero fricção
+
+**Nível absurdo (próximo passo):**
+```
+"continuar projeto fidelidade"
+→ reabre exatamente como estava
+"Continuando de onde você parou."
+```
+
+---
+
+## Diferencial
+
+| Aspecto | Concorrentes | Harmoni |
+|---------|-------------|---------|
+| Hardware | Precisam de hardware novo (2028+) | Roda em qualquer Linux hoje |
+| Modelo | Cloud-first | Local-first |
 | Custo | Hardware + assinatura | Grátis (open source) |
-| Ecossistema | Fechado | Aberto (Debian-based) |
+| Ecossistema | Fechado | Aberto |
+| Interação | Apps + menus | Intenção |
 
 ---
 
-## 4. Próximos Marcos
+## Regras de produto
 
-1. **Harmoni Intelligence** — integração opcional com IA cloud para tarefas avançadas
-2. **Demo 100% voz** — demonstração matadora do conceito
-3. **Distro própria** — ISO Debian customizada com Harmoni OS pré-instalado
+### Escopo travado
+NÃO adicionar features. Fechar o loop.
+
+### Confiabilidade > Inteligência
+- Se não for 100% confiável → fluxo guiado
+- Se for confiável → automático
+
+### Polimento invisível
+- Transição suave (fade real)
+- Zero flicker
+- Zero tela técnica
+- Feedback em <50ms
+
+### Demo > Código
+- Vídeo que prove: zero mouse, zero menu, só intenção
+- Se o vídeo não for absurdo → ninguém instala
+
+---
+
+## Próximos marcos
+
+1. **Killer workflow perfeito** — "quero trabalhar no projeto X" sem falha
+2. **Confiabilidade 100%** — fluxos core nunca falham
+3. **Polimento invisível** — sensação de OS novo, não Linux custom
+4. **Demo** — vídeo que prove o conceito
+5. **Distribuição** — não esperar perfeição, esperar impacto
+
+---
+
+## ⚠️ Riscos
+
+1. **Over-engineering** — já tem arquitetura demais. Agora é UX e percepção.
+2. **Feature creep** — gosta de construir. Precisa parar de adicionar.
+3. **Foco em dev** — continuar atento ao usuário comum.
 
 ---
 

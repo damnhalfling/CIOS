@@ -1,47 +1,90 @@
-# Harmoni OS — Roadmap de Desenvolvimento
+# Harmoni OS — Roadmap
 
-> De app standalone a distro Linux AI-First
-> Atualizado: Maio 2026 — v0.12.0
+> Substituindo apps por intenção.
+> Atualizado: Maio 2026 — v0.13.0
 
 ---
 
-## Visão Geral
+## Onde estamos
 
-**Posicionamento:** "Substituindo apps por intenção." — rumo a distro própria base Debian.
+Protótipo → sistema funcional → **polimento + narrativa + impacto**.
 
-O MVP é: **`dpkg -i harmoni.deb` → reboot → tela de login bonita → Harmoni fullscreen → funciona.**
+Escopo TRAVADO. NÃO adicionar features. Fechar o loop.
 
-Zero configuração manual. Tudo vem pronto no pacote. Testado em hardware real (máquina 2014).
+---
+
+## Fases concluídas
 
 | Fase | Objetivo | Status |
 |------|----------|--------|
-| **1** | Sessão X funcional + skills core | ✅ Concluído |
-| **2** | Pacote .deb + login customizado | ✅ Concluído |
-| **3** | Camada cognitiva (MCP/MCO) + desktop completo | ✅ Concluído |
-| **4** | Desktop features (daemon, topbar, hotkey, EWMH, clipboard) | ✅ Concluído |
-| **5** | Polimento: boot, latência, confiabilidade, UX conversacional | ✅ Concluído |
-| **5.5** | Intenção > App: intent abstrato, workflow, file search, explore | ✅ Concluído |
-| **5.6** | Intent híbrido: regex + cache LLM + stemming + aprendizado | ✅ Concluído |
-| **6** | Harmoni Intelligence integration (optional cloud AI) | 🟡 Pendente |
-| **7** | Demo 100% voz + script matador | 🟡 Pendente |
-| **8** | Distribuição: 1-liner, AppImage, distro própria | 🟡 Pendente |
+| 1 | Sessão X funcional + skills core | ✅ |
+| 2 | Pacote .deb + login customizado | ✅ |
+| 3 | Camada cognitiva (MCP/MCO) + desktop completo | ✅ |
+| 4 | Desktop features (daemon, topbar, hotkey, EWMH, clipboard) | ✅ |
+| 5 | Polimento: boot, latência, confiabilidade, UX conversacional | ✅ |
+| 5.5 | Intenção > App: intent abstrato, workflow, file search, explore | ✅ |
+| 5.6 | Intent híbrido: regex + cache LLM + stemming + aprendizado | ✅ |
+| 5.7 | UI intent-first: prompt bottom, resultado acima, sem sidebar/menus | ✅ |
 
 ---
 
-## Números do projeto (v0.12.0)
+## Fase atual: Produto percebido ✅
+
+### P0 — Killer workflow perfeito ✅
+O momento wow: **"quero trabalhar no projeto X"** → ambiente completo pronto.
+
+- ✅ Dev Start 100% confiável (stale deps detection, polling port wait, editor+browser launch)
+- ✅ Memória contextual ("continuar projeto X" → reabre como estava via SessionContext)
+- ✅ Feedback perfeito (<3s, streaming progress, humanizer completo)
+
+### P1 — Confiabilidade core ✅
+Se não for 100% confiável → fluxo guiado. Se for confiável → automático.
+
+- ✅ Test matrix real (Ubuntu clean, Debian clean, VM sem GPU)
+- ✅ Fluxos guiados multi-step (GuidedFlowStep + GuidedFlow)
+- ✅ Degradação graciosa de dependências (nmcli, pactl, bluetoothctl, etc.)
+
+### P2 — Polimento invisível ✅
+"Ok" não compete com macOS. Precisa de sensação de "OS novo".
+
+- ✅ Boot: fade transition (300ms alpha animation)
+- ✅ Feedback visual consistente (audit 21 handlers, zero leak técnico)
+- ✅ Zero tela técnica visível ao usuário (output audit test)
+- ✅ UI intent-first: prompt fixo no bottom, resultado persiste acima
+- ✅ Removida sidebar/navegação por páginas — superfície única
+- ✅ Removida GUI Web — produto é desktop nativo
+- ✅ Design tokens centralizados (theme.py)
+- ✅ Spinner animado (arco girando + dot pulsante) só quando processa
+- ✅ Hotkey overlay com mesma identidade visual
+- ✅ Splash com transição contínua para GUI
+
+### P3 — Demo
+- ⏳ Gravação manual em máquina real (celular)
+
+---
+
+## Fases futuras
+
+| Fase | Objetivo | Quando |
+|------|----------|--------|
+| Harmoni Intelligence | IA cloud opcional (news, explain, write, translate) | Após P0-P3 |
+| Demo voz | Wake word, confirmação por voz, 3 fluxos matadores | Após Intelligence |
+| Distribuição | 1-liner, AppImage, distro própria | Quando tiver impacto |
+
+---
+
+## Números (v0.13.0)
 
 | Métrica | Valor |
 |---------|-------|
-| Versão | v0.12.0 |
-| Arquivos fonte | 42+ (.py) |
 | Skills | 21 |
-| Intent patterns | 148+ (PT/EN) |
-| Traduções humanizer | 185+ (PT/EN) |
-| Tipos de erro classificados | 19 |
-| Testes | 323 (9 arquivos) |
+| Intent patterns | 155+ (PT/EN) |
+| Traduções humanizer | 220+ (PT/EN) |
+| Tipos de erro | 19 |
+| Testes | 468+ |
+| Property tests (Hypothesis) | 13 |
 | Modos de execução | 6 |
-| LLM provider | Ollama (local, padrão) |
-| Itens concluídos | 131 |
+| Itens concluídos | 145 |
 
 ---
 
@@ -49,41 +92,12 @@ Zero configuração manual. Tudo vem pronto no pacote. Testado em hardware real 
 
 > Se Wi-Fi falhar 1x, volume não responder instantâneo, ou o sistema "pensar demais" → usuário volta pro GNOME em 2 minutos.
 
-**Execução determinística para skills de sistema:**
-- Wi-Fi → nmcli direto (sem LLM)
-- Volume → pactl direto (sem LLM)
-- Apps → .desktop direto (sem LLM)
-- Sessão → systemctl direto (sem LLM)
-- Pacotes → apt direto (sem LLM)
-- Janelas → wmctrl direto (sem LLM)
-- Clipboard → xclip direto (sem LLM)
-- Bateria/Brilho → psutil/brightnessctl direto (sem LLM)
+Skills de sistema = execução direta, sem LLM:
+- Wi-Fi → nmcli · Volume → pactl · Apps → .desktop · Sessão → systemctl
+- Pacotes → apt · Janelas → wmctrl · Clipboard → xclip · Bateria → psutil
 
 LLM só para intents desconhecidos. Pattern matching resolve 80%+.
-Modelo híbrido: regex → cache com stemming → LLM classificador → LLM completo.
 
 ---
 
-## Próximos passos
-
-### Fase 6 — Harmoni Intelligence (opcional)
-- Token Optimizer (Ollama comprime input antes de enviar ao cloud)
-- Intelligence Client (cliente HTTP para API cloud)
-- Intents Intelligence no parser (NEWS, EXPLAIN, WRITE, SUMMARIZE, TRANSLATE)
-- UX de ativação ("Posso resolver com Harmoni Intelligence. [Ativar]")
-- Auth flow (Google OAuth → JWT)
-
-### Fase 7 — Demo Voz
-- Wake word / push-to-talk contínuo
-- Confirmação por voz — "sim"/"não"/"cancela"
-- Navegação por voz — "configurações"/"volta"
-- 3 fluxos matadores + momento mágico + roteiro 60s
-
-### Fase 8 — Distribuição
-- Install script 1-liner (detecta distro)
-- AppImage portable
-- Distro própria base Debian (ISO) — Harmoni OS
-
----
-
-*Atualizado: Maio 2026 — v0.12.0*
+*Atualizado: Maio 2026 — v0.13.0*

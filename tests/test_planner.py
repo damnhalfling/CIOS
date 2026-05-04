@@ -209,3 +209,209 @@ class TestPlannerMemoryIntegration:
         recent = planner.memory.recent(1)
         assert len(recent) == 1
         assert recent[0].outcome == "failure"
+
+
+class TestContinueProjectHandler:
+    """Unit tests for _handle_continue_project handler.
+
+    Validates: Requirements 2.2, 2.4, 2.5
+    """
+
+    def test_bare_continuar_resolves_to_most_recent_project(self, planner):
+        """Bare 'continuar' with no project param uses the most recent session.
+
+        Validates: Requirements 2.4
+        """
+        from harmoni.core.memory import SessionContext
+
+        # Save two sessions with different timestamps — "beta" is more recent
+        planner.memory.save_session(SessionContext(
+            project_name="alpha",
+            project_path="/tmp/alpha",
+            project_type="node",
+            editor_command="code",
+            server_pid=1000,
+            server_port=3000,
+            browser_url="http://localhost:3000",
+            start_command="npm run dev",
+            timestamp=100.0,
+        ))
+        planner.memory.save_session(SessionContext(
+            project_name="beta",
+            project_path="/tmp/beta",
+            project_type="node",
+            editor_command="code",
+            server_pid=2000,
+            server_port=4000,
+            browser_url="http://localhost:4000",
+            start_command="npm run dev",
+            timestamp=200.0,
+        ))
+
+        intent = Intent(
+            type=IntentType.CONTINUE_PROJECT,
+            confidence=0.9,
+            params={},
+            raw_input="continuar",
+        )
+
+        with patch("harmoni.core.planner._is_port_in_use", return_value=True), \
+             patch("harmoni.core.planner._detect_editor", return_value="code"), \
+             patch("harmoni.core.planner._open_editor") as mock_editor, \
+             patch("harmoni.core.planner._open_browser") as mock_browser, \
+             patch("os.path.exists", return_value=True):
+
+            result = planner._handle_continue_project(intent)
+
+        assert result.outcome == "success"
+        # Should restore "beta" (most recent, timestamp=200)
+        assert "beta" in result.summary.lower() or "beta" in " ".join(result.plan_steps).lower()
+        mock_editor.assert_called_once_with("code", "/tmp/beta")
+        mock_browser.assert_called_once()
+
+    def test_continuar_projeto_x_with_existing_session(self, planner):
+        """'continuar projeto fidelidade' restores the named session.
+
+        Validates: Requirements 2.2
+        """
+        from harmoni.core.memory import SessionContext
+
+        planner.memory.save_session(SessionContext(
+            project_name="fidelidade",
+            project_path="/tmp/fidelidade",
+            project_type="node",
+            editor_command="code",
+            server_pid=5000,
+            server_port=3001,
+            browser_url="http://localhost:3001",
+            start_command="npm run dev",
+            timestamp=300.0,
+        ))
+
+        intent = Intent(
+            type=IntentType.CONTINUE_PROJECT,
+            confidence=0.95,
+            params={"project": "fidelidade"},
+            raw_input="continuar projeto fidelidade",
+        )
+
+        with patch("harmoni.core.planner._is_port_in_use", return_value=True), \
+             patch("harmoni.core.planner._detect_editor", return_value="code"), \
+             patch("harmoni.core.planner._open_editor") as mock_editor, \
+             patch("harmoni.core.planner._open_browser") as mock_browser, \
+             patch("os.path.exists", return_value=True):
+
+            result = planner._handle_continue_project(intent)
+
+        assert result.outcome == "success"
+        assert "fidelidade" in result.summary.lower()
+        mock_editor.assert_called_once_with("code", "/tmp/fidelidade")
+        mock_browser.assert_called_once()
+
+    def test_deleted_project_path_returns_error_with_suggestions(self, planner):
+        """When the saved project path no longer exists, return error + available projects.
+
+        Validates: Requirements 2.5
+        """
+        from harmoni.core.memory import SessionContext
+
+        planner.memory.save_session(SessionContext(
+            project_name="deleted-app",
+            project_path="/tmp/deleted-app",
+            project_type="node",
+            editor_command="code",
+            server_port=3000,
+            browser_url="http://localhost:3000",
+            start_command="npm run dev",
+            timestamp=100.0,
+        ))
+        planner.memory.save_session(SessionContext(
+            project_name="other-project",
+            project_path="/tmp/other-project",
+            project_type="python",
+            editor_command="code",
+            server_port=8000,
+            browser_url="http://localhost:8000",
+            start_command="python manage.py runserver",
+            timestamp=200.0,
+        ))
+
+        intent = Intent(
+            type=IntentType.CONTINUE_PROJECT,
+            confidence=0.95,
+            params={"project": "deleted-app"},
+            raw_input="continuar projeto deleted-app",
+        )
+
+        def fake_exists(path):
+            # deleted-app path doesn't exist, other-project does
+            if "deleted-app" in str(path):
+                return False
+            return True
+
+        with patch("os.path.exists", side_effect=fake_exists):
+            result = planner._handle_continue_project(intent)
+
+        assert result.outcome == "failure"
+        assert "não encontrado" in result.summary.lower() or "removido" in result.summary.lower()
+        # Should suggest available projects
+        assert "other-project" in result.summary
+
+    def test_no_sessions_at_all_returns_failure(self, planner):
+        """Bare 'continuar' with empty memory returns failure.
+
+        Validates: Requirements 2.4
+        """
+        intent = Intent(
+            type=IntentType.CONTINUE_PROJECT,
+            confidence=0.9,
+            params={},
+            raw_input="continuar",
+        )
+
+        result = planner._handle_continue_project(intent)
+
+        assert result.outcome == "failure"
+        assert "no recent projects" in result.summary.lower()
+
+    def test_project_not_found_but_others_exist(self, planner):
+        """Named project not in sessions, but other sessions exist → failure + suggestions.
+
+        Validates: Requirements 2.5
+        """
+        from harmoni.core.memory import SessionContext
+
+        planner.memory.save_session(SessionContext(
+            project_name="webapp",
+            project_path="/tmp/webapp",
+            project_type="node",
+            editor_command="code",
+            server_port=3000,
+            browser_url="http://localhost:3000",
+            start_command="npm run dev",
+            timestamp=100.0,
+        ))
+        planner.memory.save_session(SessionContext(
+            project_name="api-service",
+            project_path="/tmp/api-service",
+            project_type="python",
+            editor_command="code",
+            server_port=8000,
+            browser_url="http://localhost:8000",
+            start_command="python manage.py runserver",
+            timestamp=200.0,
+        ))
+
+        intent = Intent(
+            type=IntentType.CONTINUE_PROJECT,
+            confidence=0.95,
+            params={"project": "nonexistent"},
+            raw_input="continuar projeto nonexistent",
+        )
+
+        result = planner._handle_continue_project(intent)
+
+        assert result.outcome == "failure"
+        assert "não encontrado" in result.summary.lower()
+        # Should list available projects as suggestions
+        assert "webapp" in result.summary or "api-service" in result.summary

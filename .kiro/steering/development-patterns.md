@@ -43,16 +43,17 @@ symbiont/
 │   │   ├── window_control.py    # EWMH (wmctrl)
 │   │   └── auto_learn.py        # Auto-learning engine
 │   │
-│   ├── ui/                      # Interfaces (GUI, Web, CLI, overlay)
+│   ├── ui/                      # Interfaces (GUI, CLI, overlay)
 │   │   ├── __init__.py
-│   │   ├── gui.py               # Tkinter nativo
-│   │   ├── gui_web.py           # Web (HTTP + SSE)
+│   │   ├── theme.py             # Design tokens (single source of truth)
+│   │   ├── gui.py               # Tkinter nativo (intent-first layout)
 │   │   ├── gui_secondary.py     # Painel multi-monitor
 │   │   ├── cli.py               # Terminal (Rich)
 │   │   ├── topbar.py            # Barra de status
 │   │   ├── hotkey.py            # Ctrl+Space overlay
 │   │   ├── splash.py            # Splash screen
-│   │   └── onboarding.py        # Wizard first-run
+│   │   ├── onboarding.py        # Wizard first-run
+│   │   └── helpers.py           # Data loaders (projects, files, services)
 │   │
 │   ├── infra/                   # Infraestrutura (daemon, voice, monitors)
 │   │   ├── __init__.py

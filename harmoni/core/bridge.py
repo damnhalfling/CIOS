@@ -59,12 +59,33 @@ class ConversationTurn:
 
 
 @dataclass
+class GuidedFlowStep:
+    """A single step in a multi-step guided flow."""
+    question: str              # Human-readable question
+    question_type: str         # "choice", "text", "password"
+    options: list[str] = field(default_factory=list)  # Available choices (for "choice" type)
+    param_key: str = ""        # Which intent param this fills
+
+
+@dataclass
+class GuidedFlow:
+    """State for a multi-step guided conversation flow."""
+    intent: Intent             # The original intent being built
+    steps: list[GuidedFlowStep] = field(default_factory=list)  # All steps
+    current_step: int = 0      # Index of current step
+    collected: dict = field(default_factory=dict)  # Params collected so far
+
+
+@dataclass
 class PendingQuestion:
     """A question waiting for user's answer."""
     intent: Intent
     question_type: str  # "ssid", "password", "target", "app", "port", "confirm_action"
     options: list[str] = field(default_factory=list)  # available choices
     timestamp: float = 0.0
+    # Multi-step guided flow support
+    flow_steps: Optional[list[GuidedFlowStep]] = None
+    flow_collected: dict = field(default_factory=dict)
 
 
 # Pronouns that reference previous context
@@ -99,7 +120,7 @@ class HarmoniBridge:
         # Check and auto-install missing system dependencies
         _t_deps = time.monotonic()
         if on_progress:
-            on_progress("Verificando dependências…", 1, 5)
+            on_progress("Verificando dependências…", 1, 14)
         try:
             from harmoni.infra.deps import check_and_install_deps
             missing = check_and_install_deps()
@@ -112,7 +133,7 @@ class HarmoniBridge:
         # Start MCP (system context polling + watchers) with progress
         _t1 = time.monotonic()
         if on_progress:
-            on_progress("Detectando sistema…", 2, 5)
+            on_progress("Detectando sistema…", 2, 14)
         from harmoni.core.mcp import context
         context.start(on_progress=self._mcp_progress_adapter(on_progress))
         self._boot_times["mcp_start"] = (time.monotonic() - _t1) * 1000
@@ -134,8 +155,8 @@ class HarmoniBridge:
         if not on_progress:
             return None
         def adapter(stage: str, current: int, total: int) -> None:
-            # MCP stages are 1-6, splash total is ~8 (MCP + GUI)
-            on_progress(stage, 1 + current, 2 + total)
+            # MCP stages are 0-7 (7 scanners), mapped to splash positions 2-9 out of 14
+            on_progress(stage, 2 + current, 14)
         return adapter
 
     @property
@@ -261,7 +282,13 @@ class HarmoniBridge:
         confirmed: bool,
         on_step: Optional[Callable[[str, int, int], None]],
     ) -> dict:
-        """Process with real-time step callbacks."""
+        """Process with real-time step callbacks.
+
+        Ensures topbar transitions: "Entendendo…" → "Executando…" → idle.
+        Streams each humanized plan step via on_step as it's produced.
+        Always calls signal_topbar_idle() before returning, even on
+        early-exit paths (unknown intent, clarification, confirmation).
+        """
         from harmoni.core.mcp import context
         from harmoni.ui.topbar import signal_topbar_processing, signal_topbar_idle
 
@@ -271,6 +298,7 @@ class HarmoniBridge:
 
         # (#75) If there's a pending question, treat input as answer
         if self._pending_question:
+            signal_topbar_idle()
             return self._handle_answer(user_input, confirmed)
 
         # (#76) Resolve pronouns
@@ -295,24 +323,29 @@ class HarmoniBridge:
                 if resolved:
                     intent = resolved
                 else:
+                    signal_topbar_idle()
                     return self._unknown_intent_response()
             else:
+                signal_topbar_idle()
                 return self._unknown_intent_response()
 
         # (#75) Clarification
         clarification = self._needs_clarification(intent)
         if clarification:
+            signal_topbar_idle()
             return clarification
 
         # Confirmation
         if not confirmed:
             confirm_msg = self._needs_confirmation(intent)
             if confirm_msg:
+                signal_topbar_idle()
                 return self._confirm_response(confirm_msg)
 
         # Sudo password check (after confirmation, before execution)
         sudo_check = self._needs_sudo_password(intent)
         if sudo_check:
+            signal_topbar_idle()
             return sudo_check
 
         if on_step:
@@ -329,10 +362,11 @@ class HarmoniBridge:
 
         steps, summary, outcome, voice_mode = humanize_result(plan_result)
 
-        # Stream steps
+        # Stream each humanized step to the UI as it's produced
         if on_step and steps:
+            total = len(steps)
             for i, step in enumerate(steps):
-                on_step(step, i, len(steps))
+                on_step(step, i + 1, total)
 
         status = "error" if outcome == "failure" else outcome
         if status == "error" and summary:
@@ -408,7 +442,13 @@ class HarmoniBridge:
     # ═══════════════════════════════════════════════════════════════════
 
     def _needs_clarification(self, intent: Intent) -> Optional[dict]:
-        """Check if intent is missing required info and ask for it."""
+        """Check if intent is missing required info and ask for it.
+
+        For multi-step scenarios (e.g. network connect without SSID and
+        no known networks), builds a GuidedFlow with all steps upfront
+        and stores them in PendingQuestion.flow_steps so _handle_answer
+        can advance through them one at a time.
+        """
 
         # NETWORK: connect without SSID
         if intent.type == IntentType.NETWORK:
@@ -424,15 +464,35 @@ class HarmoniBridge:
                 if networks:
                     options = [n.ssid for n in networks[:8]]
                     lines = [f"  {n.ssid} — {n.signal}%" for n in networks[:8]]
+                    known = [n.lower() for n in mcp.known_networks]
+
+                    # Build guided flow: step 1 = pick SSID, step 2 = password (if needed)
+                    flow_steps = [
+                        GuidedFlowStep(
+                            question="Qual rede?\n" + "\n".join(lines),
+                            question_type="choice",
+                            options=options,
+                            param_key="ssid",
+                        ),
+                        GuidedFlowStep(
+                            question="Senha para {ssid}?",
+                            question_type="password",
+                            options=[],
+                            param_key="password",
+                        ),
+                    ]
+
                     self._pending_question = PendingQuestion(
                         intent=intent,
                         question_type="ssid",
                         options=options,
                         timestamp=time.time(),
+                        flow_steps=flow_steps,
+                        flow_collected={},
                     )
                     return {
                         "steps": ["Scanning networks"],
-                        "result": "Qual rede?\n" + "\n".join(lines),
+                        "result": flow_steps[0].question,
                         "status": "success",
                         "confirm": None,
                         "voice_mode": "full",
@@ -503,7 +563,13 @@ class HarmoniBridge:
         return None
 
     def _handle_answer(self, answer: str, confirmed: bool) -> dict:
-        """Process user's answer to a pending question."""
+        """Process user's answer to a pending question.
+
+        When the pending question has flow_steps, advances through the
+        guided flow one step at a time, collecting params into
+        flow_collected.  Once all steps are consumed (or a step is
+        skipped because it's not needed), executes the completed intent.
+        """
         from harmoni.core.mcp import context
 
         question = self._pending_question
@@ -520,6 +586,11 @@ class HarmoniBridge:
         intent = question.intent
         answer_clean = answer.strip()
 
+        # --- Multi-step guided flow path ---
+        if question.flow_steps is not None:
+            return self._advance_guided_flow(question, answer_clean, confirmed)
+
+        # --- Legacy single-question path (backward compatible) ---
         # Inject answer into intent params based on question type
         if question.question_type == "sudo_password":
             intent.params["sudo_password"] = answer_clean
@@ -588,8 +659,107 @@ class HarmoniBridge:
 
         # Execute with the completed intent
         result = self._execute_intent(intent, context)
+        self._record_turn(answer_clean, intent, result)
+        return result
+
+    def _advance_guided_flow(
+        self, question: PendingQuestion, answer: str, confirmed: bool,
+    ) -> dict:
+        """Advance through a multi-step guided flow, collecting one param per step.
+
+        After collecting the current step's answer:
+        1. Store the param in flow_collected
+        2. Check if the next step should be skipped (e.g. known network → skip password)
+        3. If more steps remain, set a new PendingQuestion for the next step
+        4. If all steps are done, inject collected params and execute
+        """
+        from harmoni.core.mcp import context
+
+        intent = question.intent
+        flow_steps = question.flow_steps
+        collected = dict(question.flow_collected)
+        current_idx = 0
+
+        # Determine which step we're answering
+        # The current step is the first step whose param_key is not yet collected
+        for i, step in enumerate(flow_steps):
+            if step.param_key not in collected:
+                current_idx = i
+                break
+
+        current_step = flow_steps[current_idx]
+
+        # Collect the answer for the current step
+        if current_step.question_type == "choice":
+            # Support numeric index or fuzzy match
+            if answer.isdigit() and current_step.options:
+                idx = int(answer) - 1
+                if 0 <= idx < len(current_step.options):
+                    collected[current_step.param_key] = current_step.options[idx]
+                else:
+                    collected[current_step.param_key] = answer
+            else:
+                matched = self._fuzzy_match_option(answer, current_step.options)
+                collected[current_step.param_key] = matched or answer
+        elif current_step.question_type == "password":
+            collected[current_step.param_key] = answer
+        elif current_step.question_type == "text":
+            collected[current_step.param_key] = answer
+
+        # Check remaining steps — skip steps that are no longer needed
+        next_idx = current_idx + 1
+        while next_idx < len(flow_steps):
+            next_step = flow_steps[next_idx]
+            if self._should_skip_flow_step(next_step, intent, collected):
+                next_idx += 1
+                continue
+            break
+
+        # If there are more steps, present the next question
+        if next_idx < len(flow_steps):
+            next_step = flow_steps[next_idx]
+            # Interpolate collected values into the question text
+            question_text = next_step.question.format(**collected)
+            self._pending_question = PendingQuestion(
+                intent=intent,
+                question_type=next_step.param_key,
+                options=next_step.options,
+                timestamp=time.time(),
+                flow_steps=flow_steps,
+                flow_collected=collected,
+            )
+            return {
+                "steps": [],
+                "result": question_text,
+                "status": "success",
+                "confirm": None,
+                "voice_mode": "full",
+            }
+
+        # All steps done — inject collected params into intent and execute
+        for key, value in collected.items():
+            intent.params[key] = value
+
+        result = self._execute_intent(intent, context)
         self._record_turn(answer, intent, result)
         return result
+
+    def _should_skip_flow_step(
+        self, step: GuidedFlowStep, intent: Intent, collected: dict,
+    ) -> bool:
+        """Determine if a guided flow step should be skipped.
+
+        For example, skip the password step if the selected network is
+        a known/saved network (no password needed).
+        """
+        if step.param_key == "password" and intent.type == IntentType.NETWORK:
+            ssid = collected.get("ssid", "")
+            if ssid:
+                from harmoni.core.mcp import context as mcp
+                known = [n.lower() for n in mcp.known_networks]
+                if ssid.lower() in known:
+                    return True  # Known network — skip password
+        return False
 
     # ═══════════════════════════════════════════════════════════════════
     #  SUDO PASSWORD (#sudo)

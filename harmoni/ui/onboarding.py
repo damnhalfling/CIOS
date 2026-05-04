@@ -112,31 +112,55 @@ class OnboardingWizard:
     # ── Steps ──
 
     def _step_welcome(self) -> None:
-        """Welcome screen."""
+        """Welcome screen with state ring."""
         import tkinter as tk
+        from harmoni.ui.theme import BG, ACCENT, ACCENT_LT, ACCENT_DK, FG, FG_DIM, lerp
 
-        tk.Label(
-            self._container, text="✦", font=("Inter", 48),
-            fg="#7c6ff7", bg="#0a0a0f",
-        ).pack(pady=(20, 10))
+        # State ring (same visual language as splash and main GUI)
+        ring_size = 64
+        ring_canvas = tk.Canvas(
+            self._container, width=ring_size, height=ring_size,
+            bg="#0a0a0f", highlightthickness=0, bd=0)
+        ring_canvas.pack(pady=(20, 10))
+        ring_id = ring_canvas.create_oval(
+            5, 5, ring_size - 5, ring_size - 5,
+            outline=ACCENT_LT, width=3)
+        ring_canvas.create_text(
+            ring_size // 2, ring_size // 2,
+            text="✦", font=("Helvetica", 20), fill=ACCENT_LT)
+
+        # Breathing animation
+        import math
+        phase = {"val": 0.0}
+
+        def breathe():
+            if not ring_canvas.winfo_exists():
+                return
+            phase["val"] += 0.05
+            t = (math.sin(phase["val"]) + 1) / 2
+            color = lerp(ACCENT_DK, ACCENT_LT, t)
+            ring_canvas.itemconfig(ring_id, outline=color)
+            self._root.after(60, breathe)
+
+        breathe()
 
         tk.Label(
             self._container, text="Bem-vindo ao Harmoni",
-            font=("Inter", 20, "bold"), fg="#e2e2e8", bg="#0a0a0f",
+            font=("Helvetica", 20, "bold"), fg=FG, bg="#0a0a0f",
         ).pack(pady=(0, 8))
 
         tk.Label(
             self._container,
-            text="Seu sistema operacional cognitivo.\nVamos configurar tudo em menos de 1 minuto.",
-            font=("Inter", 12), fg="#8a8a9a", bg="#0a0a0f", justify=tk.CENTER,
+            text="Seu sistema operacional por intenção.\nVamos configurar tudo em menos de 1 minuto.",
+            font=("Helvetica", 12), fg=FG_DIM, bg="#0a0a0f", justify=tk.CENTER,
         ).pack(pady=(0, 30))
 
         btn = tk.Button(
             self._container, text="Começar →",
-            font=("Inter", 12, "bold"), fg="#fff", bg="#7c6ff7",
+            font=("Helvetica", 12, "bold"), fg="#fff", bg=ACCENT,
             relief=tk.FLAT, padx=30, pady=10,
             command=self._next_step,
-            activebackground="#6b5ce7", activeforeground="#fff",
+            activebackground=ACCENT_LT, activeforeground="#fff",
         )
         btn.pack()
 
