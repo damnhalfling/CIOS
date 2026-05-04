@@ -144,13 +144,15 @@ def _handle_intent_name(self, intent: Intent) -> PlanResult:
 - UI não tem testes unitários (testada manualmente)
 - `pytest tests/ -q` deve passar sempre antes de commit
 
-### 7. Commits
+### 7. Commits e Releases
 - `feat:` — nova funcionalidade
 - `fix:` — correção de bug
 - `refactor:` — reorganização sem mudar comportamento
 - `docs:` — documentação
 - `test:` — testes
-- Tag = release (`v0.9.0`)
+- Tag = release (`v0.13.0`)
+- **NUNCA usar `gh` CLI para criar releases** — o GitHub Actions workflow cria a release automaticamente a partir da tag
+- Para release: `git tag -a vX.Y.Z -m "mensagem"` → `git push origin main --tags` → pronto
 
 ### 8. Nunca
 - ❌ Traceback na UI (sempre `_graceful_error`)
