@@ -39,7 +39,8 @@ Section: x11
 Priority: optional
 Architecture: amd64
 Depends: python3 (>= 3.10), python3-pip, python3-venv, python3-tk, openbox, wmctrl, xdotool, x11-xserver-utils, curl
-Recommends: lightdm, slick-greeter, pipewire-pulse | pulseaudio-utils, network-manager, i3lock
+Recommends: pipewire-pulse | pulseaudio-utils, network-manager, i3lock
+Suggests: lightdm, slick-greeter
 Maintainer: damnhalfling <damnhalfling@github.com>
 Description: Harmoni OS — AI-first desktop interface
  A AI-first layer that replaces apps with intent-driven
@@ -87,9 +88,30 @@ fi
 echo "[Harmoni] Checking dependencies..."
 
 if ! fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; then
+    # Prevent any display manager restart during dependency installation
+    # This avoids logout if lightdm gets pulled as a transitive dependency
+    if [ -f /usr/bin/deb-systemd-invoke ]; then
+        cp /usr/bin/deb-systemd-invoke /usr/bin/deb-systemd-invoke.bak.harmoni
+        cat > /usr/bin/deb-systemd-invoke << 'NOOP'
+#!/bin/sh
+# Temporarily disabled by Harmoni installer to prevent DM restart
+# Filters out display-manager restarts, allows everything else
+case "$*" in
+    *display-manager*|*lightdm*|*gdm*|*sddm*) exit 0 ;;
+    *) exec /usr/bin/deb-systemd-invoke.bak.harmoni "$@" ;;
+esac
+NOOP
+        chmod 755 /usr/bin/deb-systemd-invoke
+    fi
+
     apt-get update -qq 2>/dev/null || true
     apt-get install -y -qq python3 python3-pip python3-venv python3-tk \
         openbox wmctrl xdotool x11-xserver-utils curl 2>/dev/null || true
+
+    # Restore original deb-systemd-invoke
+    if [ -f /usr/bin/deb-systemd-invoke.bak.harmoni ]; then
+        mv /usr/bin/deb-systemd-invoke.bak.harmoni /usr/bin/deb-systemd-invoke
+    fi
 fi
 
 exit 0
@@ -266,9 +288,27 @@ if [ "$INSTALL_MODE" = "2" ] || [ "$INSTALL_MODE" = "3" ]; then
     else
         echo "[Harmoni] Waiting for package manager..."
         if _wait_dpkg_lock; then
+            # Prevent lightdm's own postinst from restarting the display manager
+            if [ -f /usr/bin/deb-systemd-invoke ]; then
+                cp /usr/bin/deb-systemd-invoke /usr/bin/deb-systemd-invoke.bak.harmoni
+                cat > /usr/bin/deb-systemd-invoke << 'NOOP'
+#!/bin/sh
+case "$*" in
+    *display-manager*|*lightdm*|*gdm*|*sddm*) exit 0 ;;
+    *) exec /usr/bin/deb-systemd-invoke.bak.harmoni "$@" ;;
+esac
+NOOP
+                chmod 755 /usr/bin/deb-systemd-invoke
+            fi
+
             apt-get update -qq 2>/dev/null || true
             if apt-get install -y -qq lightdm slick-greeter 2>/dev/null; then
                 LIGHTDM_OK=true
+            fi
+
+            # Restore
+            if [ -f /usr/bin/deb-systemd-invoke.bak.harmoni ]; then
+                mv /usr/bin/deb-systemd-invoke.bak.harmoni /usr/bin/deb-systemd-invoke
             fi
         fi
     fi
