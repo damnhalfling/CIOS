@@ -62,15 +62,15 @@ if dpkg -s harmoni >/dev/null 2>&1; then
     echo "[Harmoni] Previous version detected: ${PREV_VER}"
     echo "[Harmoni] Cleaning up before upgrade..."
 
-    # Stop daemon if running
+    # Stop daemon if running (socket only, not the session)
     if [ -f /tmp/harmoni.sock ]; then
         echo '{"command":"shutdown"}' | socat - UNIX-CONNECT:/tmp/harmoni.sock 2>/dev/null || true
         sleep 0.5
     fi
 
-    # Kill any running Harmoni processes (but not this installer)
-    pkill -f "python.*harmoni\.main" 2>/dev/null || true
-    pkill -f "harmoni-session" 2>/dev/null || true
+    # NOTE: Do NOT kill harmoni-session or harmoni.main here!
+    # The user might be running dpkg -i from within the Harmoni session itself.
+    # Killing those processes would terminate the X session and log out the user.
 
     # Remove old venv (will be recreated by postinst)
     if [ -d /usr/share/harmoni/.venv ]; then
@@ -91,51 +91,22 @@ chmod 755 "${PKG_DIR}/DEBIAN/preinst"
 # ── DEBIAN/postinst ──
 cat > "${PKG_DIR}/DEBIAN/postinst" << 'POSTINST'
 #!/bin/bash
-set -e
+# Harmoni postinst — MUST NOT restart any services or ask questions.
+# dpkg -i must complete without side effects on the running session.
+# All interactive setup (Ollama, LightDM mode) happens via: harmoni --setup
 export PATH="$PATH:/usr/local/sbin:/usr/sbin:/sbin"
-export DEBIAN_FRONTEND=noninteractive
-
-# ── Block display manager restarts during our postinst ──
-_POLICY_CREATED=false
-if [ ! -f /usr/sbin/policy-rc.d ]; then
-    cat > /usr/sbin/policy-rc.d << 'POLICY'
-#!/bin/sh
-case "$1" in
-    lightdm|gdm|gdm3|sddm|display-manager) exit 101 ;;
-    *) exit 0 ;;
-esac
-POLICY
-    chmod 755 /usr/sbin/policy-rc.d
-    _POLICY_CREATED=true
-fi
-
-# Wait for dpkg lock to be released (we're called from dpkg itself)
-_wait_dpkg_lock() {
-    local max_wait=60
-    local waited=0
-    while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
-        if [ $waited -ge $max_wait ]; then
-            echo "[Harmoni] ⚠ dpkg lock timeout — skipping package install"
-            return 1
-        fi
-        sleep 2
-        waited=$((waited + 2))
-    done
-    return 0
-}
 
 echo ""
 echo "╔═══════════════════════════════════════════╗"
-echo "║       Harmoni OS — Configuration         ║"
+echo "║       Harmoni OS — Installed             ║"
 echo "╚═══════════════════════════════════════════╝"
 echo ""
 
-# ── Install Python deps ──
-echo "[Harmoni] Installing Python dependencies..."
+# ── Create Python venv + install deps ──
+echo "[Harmoni] Setting up Python environment..."
 if [ ! -d /usr/share/harmoni/.venv ]; then
     python3 -m venv /usr/share/harmoni/.venv 2>/dev/null || {
-        echo "[Harmoni] ⚠ Could not create venv. Trying with system Python..."
-        # Fallback: install directly to system (less clean but works)
+        echo "[Harmoni] ⚠ Could not create venv. Will use system Python."
         pip3 install --quiet --break-system-packages \
             boto3==1.35.86 prompt_toolkit==3.0.48 rich==13.9.4 psutil==6.1.1 2>/dev/null || true
     }
@@ -146,318 +117,26 @@ if [ -d /usr/share/harmoni/.venv ]; then
         boto3==1.35.86 \
         prompt_toolkit==3.0.48 \
         rich==13.9.4 \
-        psutil==6.1.1 2>/dev/null || {
-        echo "[Harmoni] ⚠ Some Python deps failed to install (non-critical)"
-    }
+        psutil==6.1.1 2>/dev/null || true
 
-    /usr/share/harmoni/.venv/bin/pip install --quiet -e /usr/share/harmoni 2>/dev/null || {
-        echo "[Harmoni] ⚠ Package install failed (non-critical)"
-    }
+    /usr/share/harmoni/.venv/bin/pip install --quiet -e /usr/share/harmoni 2>/dev/null || true
 fi
 
 chmod +x /usr/local/bin/harmoni-session 2>/dev/null || true
 
-# ── Install Ollama (local LLM) ──
-if command -v ollama &>/dev/null; then
-    echo "[Harmoni] Ollama already installed ✓"
-else
-    echo ""
-    echo "[Harmoni] Ollama (local AI) not found."
-    echo "  Ollama enables offline AI reasoning (free, private, no API key needed)."
-    echo "  Without it, Harmoni still works for 80%+ of commands via pattern matching."
-    echo ""
-
-    INSTALL_OLLAMA="n"
-    if [ -t 0 ]; then
-        read -p "  Install Ollama now? [Y/n] " -n 1 -r OLLAMA_CHOICE
-        echo ""
-        if [[ ! "$OLLAMA_CHOICE" =~ ^[Nn]$ ]]; then
-            INSTALL_OLLAMA="y"
-        fi
-    fi
-
-    if [ "$INSTALL_OLLAMA" = "y" ]; then
-        echo "[Harmoni] Installing Ollama..."
-        curl -fsSL https://ollama.ai/install.sh | sh 2>/dev/null || {
-            echo "[Harmoni] ⚠ Ollama install failed (non-critical). You can install later:"
-            echo "  curl -fsSL https://ollama.ai/install.sh | sh"
-            echo "  ollama pull mistral"
-        }
-
-        # Pull default model if Ollama installed successfully
-        if command -v ollama &>/dev/null; then
-            echo "[Harmoni] Downloading AI model (mistral, ~4GB)..."
-            echo "  This may take a few minutes on first install."
-            ollama pull mistral 2>/dev/null || {
-                echo "[Harmoni] ⚠ Model download failed. Run later: ollama pull mistral"
-            }
-            echo "[Harmoni] Ollama ready ✓"
-        fi
-    else
-        echo "[Harmoni] Skipping Ollama. Install later if needed:"
-        echo "  curl -fsSL https://ollama.ai/install.sh | sh && ollama pull mistral"
-    fi
-fi
-
-# ── Session is always registered ──
-# The .desktop file in /usr/share/xsessions/ makes Harmoni
-# available as a session option in ANY display manager (GDM, LightDM, SDDM).
-
-# ── Apply Harmoni branding to LightDM greeter (all modes) ──
-if command -v lightdm &>/dev/null || [ -d /etc/lightdm ]; then
-    mkdir -p /etc/lightdm
-    # slick-greeter
-    if [ -f /usr/share/harmoni/config/slick-greeter.conf ]; then
-        if [ -f /etc/lightdm/slick-greeter.conf ] && [ ! -f /etc/lightdm/slick-greeter.conf.bak.harmoni ]; then
-            cp /etc/lightdm/slick-greeter.conf /etc/lightdm/slick-greeter.conf.bak.harmoni
-        fi
-        cp /usr/share/harmoni/config/slick-greeter.conf /etc/lightdm/slick-greeter.conf
-        echo "[Harmoni] LightDM greeter configured (slick-greeter)"
-    fi
-    # lightdm-gtk-greeter (Debian default)
-    if command -v lightdm-gtk-greeter &>/dev/null || [ -f /etc/lightdm/lightdm-gtk-greeter.conf ]; then
-        if [ ! -f /etc/lightdm/lightdm-gtk-greeter.conf.bak.harmoni ] && [ -f /etc/lightdm/lightdm-gtk-greeter.conf ]; then
-            cp /etc/lightdm/lightdm-gtk-greeter.conf /etc/lightdm/lightdm-gtk-greeter.conf.bak.harmoni
-        fi
-        cat > /etc/lightdm/lightdm-gtk-greeter.conf << 'GTKGREETER'
-[greeter]
-background=/usr/share/backgrounds/harmoni.png
-theme-name=Adwaita-dark
-icon-theme-name=Adwaita
-default-user-image=/usr/share/pixmaps/harmoni-logo.png
-GTKGREETER
-        echo "[Harmoni] LightDM greeter configured (gtk-greeter)"
-    fi
-fi
-
-echo ""
-echo "[Harmoni] Harmoni session registered."
-echo ""
-echo "  Choose installation mode:"
-echo ""
-echo "  1) Session only (recommended)"
-echo "     Adds 'Harmoni OS' as an option in your login screen."
-echo "     Your current desktop (GNOME/KDE) stays untouched."
-echo ""
-echo "  2) Full replacement"
-echo "     Switches to LightDM with custom Harmoni theme."
-echo "     Harmoni becomes the default session."
-echo "     GNOME/KDE stays installed as fallback."
-echo ""
-echo "  3) Clean install (advanced)"
-echo "     Removes GNOME/KDE completely. Only Harmoni remains."
-echo "     ⚠ Cannot be undone easily. Make sure Harmoni works first."
-echo ""
-
-# Default to mode 1 if non-interactive (CI, piped input, etc.)
-INSTALL_MODE="1"
-if [ -t 0 ]; then
-    read -p "  Choose [1/2/3] (default: 1): " -n 1 -r USER_CHOICE
-    echo ""
-    case "$USER_CHOICE" in
-        2) INSTALL_MODE="2" ;;
-        3) INSTALL_MODE="3" ;;
-        *) INSTALL_MODE="1" ;;
-    esac
-fi
-
-# ── Mode 2 & 3: Configure LightDM ──
-if [ "$INSTALL_MODE" = "2" ] || [ "$INSTALL_MODE" = "3" ]; then
-    echo ""
-    echo "[Harmoni] Configuring LightDM as display manager..."
-
-    # Install LightDM + greeter if not present
-    LIGHTDM_OK=false
-    if command -v lightdm &>/dev/null; then
-        LIGHTDM_OK=true
-    else
-        echo "[Harmoni] Waiting for package manager..."
-        if _wait_dpkg_lock; then
-            # Prevent lightdm's own postinst from restarting the display manager
-            if [ -f /usr/bin/deb-systemd-invoke ]; then
-                cp /usr/bin/deb-systemd-invoke /usr/bin/deb-systemd-invoke.bak.harmoni
-                cat > /usr/bin/deb-systemd-invoke << 'NOOP'
-#!/bin/sh
-case "$*" in
-    *display-manager*|*lightdm*|*gdm*|*sddm*) exit 0 ;;
-    *) exec /usr/bin/deb-systemd-invoke.bak.harmoni "$@" ;;
-esac
-NOOP
-                chmod 755 /usr/bin/deb-systemd-invoke
-            fi
-
-            apt-get update -qq 2>/dev/null || true
-            if apt-get install -y -qq lightdm slick-greeter 2>/dev/null; then
-                LIGHTDM_OK=true
-            fi
-
-            # Restore
-            if [ -f /usr/bin/deb-systemd-invoke.bak.harmoni ]; then
-                mv /usr/bin/deb-systemd-invoke.bak.harmoni /usr/bin/deb-systemd-invoke
-            fi
-        fi
-    fi
-
-    if [ "$LIGHTDM_OK" = true ]; then
-        # Backup current display manager config
-        if [ -f /etc/X11/default-display-manager ]; then
-            cp /etc/X11/default-display-manager /etc/X11/default-display-manager.bak.harmoni
-            echo "[Harmoni] Backed up current display manager to .bak.harmoni"
-        fi
-
-        # Apply Harmoni LightDM configs (files only — no service restart)
-        mkdir -p /etc/lightdm
-        if [ -f /etc/lightdm/lightdm.conf ]; then
-            cp /etc/lightdm/lightdm.conf /etc/lightdm/lightdm.conf.bak.harmoni
-        fi
-        if [ -f /etc/lightdm/slick-greeter.conf ]; then
-            cp /etc/lightdm/slick-greeter.conf /etc/lightdm/slick-greeter.conf.bak.harmoni
-        fi
-        cp /usr/share/harmoni/config/lightdm.conf /etc/lightdm/lightdm.conf
-        cp /usr/share/harmoni/config/slick-greeter.conf /etc/lightdm/slick-greeter.conf
-
-        # Set LightDM as default — takes effect on next boot (no restart now)
-        mkdir -p /etc/X11
-        echo "/usr/sbin/lightdm" > /etc/X11/default-display-manager
-
-        # Schedule dpkg-reconfigure for next boot instead of running now
-        # Running it now kills the current display manager session (logout mid-install)
-        cat > /etc/harmoni-postboot.sh << 'POSTBOOT'
-#!/bin/bash
-# One-shot: finalize display manager switch on first boot after install
-dpkg-reconfigure -f noninteractive lightdm 2>/dev/null || true
-rm -f /etc/harmoni-postboot.sh
-rm -f /etc/systemd/system/harmoni-postboot.service
-systemctl daemon-reload 2>/dev/null || true
-POSTBOOT
-        chmod 755 /etc/harmoni-postboot.sh
-
-        cat > /etc/systemd/system/harmoni-postboot.service << 'SVCUNIT'
-[Unit]
-Description=Harmoni — finalize display manager configuration
-After=multi-user.target
-ConditionPathExists=/etc/harmoni-postboot.sh
-
-[Service]
-Type=oneshot
-ExecStart=/etc/harmoni-postboot.sh
-RemainAfterExit=no
-
-[Install]
-WantedBy=multi-user.target
-SVCUNIT
-        systemctl daemon-reload 2>/dev/null || true
-        systemctl enable harmoni-postboot.service 2>/dev/null || true
-
-        echo "[Harmoni] LightDM configured. Will activate on next boot."
-    else
-        echo "[Harmoni] ⚠ Could not install LightDM now."
-        echo "  After install completes, run:"
-        echo "    sudo apt-get install lightdm slick-greeter"
-        echo "    sudo dpkg-reconfigure harmoni"
-    fi
-fi
-
-# ── Mode 3: Remove GNOME/KDE ──
-if [ "$INSTALL_MODE" = "3" ]; then
-    echo ""
-    echo "[Harmoni] Clean install — desktop removal scheduled for next boot."
-    echo "[Harmoni] ⚠ Removing the active desktop NOW would kill your session."
-    echo "[Harmoni] After reboot into Harmoni, run: sudo harmoni-clean-desktops"
-
-    # Create a script to remove other desktops safely (run manually after reboot)
-    cat > /usr/local/bin/harmoni-clean-desktops << 'CLEANSCRIPT'
-#!/bin/bash
-# Harmoni — Remove other desktop environments
-# Run this AFTER rebooting into Harmoni session
-set -e
-
-if [ "$(id -u)" -ne 0 ]; then
-    echo "Run with sudo: sudo harmoni-clean-desktops"
-    exit 1
-fi
-
-echo "[Harmoni] Removing other desktop environments..."
-_REMOVED=""
-
-# GNOME
-if dpkg -l | grep -q "gnome-shell"; then
-    echo "[Harmoni] Removing GNOME..."
-    apt-get remove -y --purge gnome-shell gnome-session gnome-control-center \
-        gnome-terminal nautilus gdm3 2>/dev/null || true
-    apt-get remove -y --purge 'gnome-*' 2>/dev/null || true
-    _REMOVED="${_REMOVED} GNOME"
-fi
-
-# KDE/Plasma
-if dpkg -l | grep -q "plasma-desktop"; then
-    echo "[Harmoni] Removing KDE Plasma..."
-    apt-get remove -y --purge plasma-desktop plasma-workspace sddm \
-        kde-standard 2>/dev/null || true
-    apt-get remove -y --purge 'kde-*' 'plasma-*' 2>/dev/null || true
-    _REMOVED="${_REMOVED} KDE"
-fi
-
-# XFCE
-if dpkg -l | grep -q "xfce4-session"; then
-    echo "[Harmoni] Removing XFCE..."
-    apt-get remove -y --purge xfce4-session xfce4-panel xfdesktop4 \
-        xfwm4 2>/dev/null || true
-    apt-get remove -y --purge 'xfce4-*' 2>/dev/null || true
-    _REMOVED="${_REMOVED} XFCE"
-fi
-
-# MATE
-if dpkg -l | grep -q "mate-session-manager"; then
-    echo "[Harmoni] Removing MATE..."
-    apt-get remove -y --purge mate-session-manager mate-panel \
-        mate-desktop 2>/dev/null || true
-    apt-get remove -y --purge 'mate-*' 2>/dev/null || true
-    _REMOVED="${_REMOVED} MATE"
-fi
-
-# Cinnamon
-if dpkg -l | grep -q "cinnamon-session"; then
-    echo "[Harmoni] Removing Cinnamon..."
-    apt-get remove -y --purge cinnamon-session cinnamon-desktop \
-        nemo 2>/dev/null || true
-    apt-get remove -y --purge 'cinnamon-*' 2>/dev/null || true
-    _REMOVED="${_REMOVED} Cinnamon"
-fi
-
-# Clean up
-echo "[Harmoni] Cleaning up orphaned packages..."
-apt-get autoremove -y --purge 2>/dev/null || true
-apt-get clean 2>/dev/null || true
-
-if [ -n "$_REMOVED" ]; then
-    echo "[Harmoni] ✓ Removed:${_REMOVED}"
-else
-    echo "[Harmoni] No other desktop environments found."
-fi
-CLEANSCRIPT
-    chmod 755 /usr/local/bin/harmoni-clean-desktops
-fi
-
-# ── Mode 1: Session only ──
-if [ "$INSTALL_MODE" = "1" ]; then
-    echo ""
-    echo "[Harmoni] Session-only mode — no display manager changes."
-    echo "[Harmoni] Select 'Harmoni OS' from your login screen session menu."
-fi
-
+echo "[Harmoni] ✓ Python environment ready"
 echo ""
 echo "═══════════════════════════════════════════"
-echo "  Installation complete. Reboot to start."
+echo "  Installation complete!"
+echo ""
+echo "  → Select 'Harmoni OS' at your login screen."
+echo "  → Or run: harmoni --setup (for LightDM/Ollama config)"
+echo ""
+echo "  Reboot to start: sudo reboot"
 echo "═══════════════════════════════════════════"
 echo ""
 
-# ── Cleanup: remove DM restart block ──
-if [ "$_POLICY_CREATED" = true ]; then
-    rm -f /usr/sbin/policy-rc.d
-fi
-
-# Never fail the postinst — all optional steps are non-critical
+# Never fail
 exit 0
 POSTINST
 chmod 755 "${PKG_DIR}/DEBIAN/postinst"
