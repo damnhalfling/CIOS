@@ -51,7 +51,7 @@ Description: Harmoni OS — AI-first desktop interface
 Homepage: https://github.com/damnhalfling/harmoni
 EOF
 
-# ── DEBIAN/preinst (clean previous version + install deps) ──
+# ── DEBIAN/preinst (clean previous version) ──
 cat > "${PKG_DIR}/DEBIAN/preinst" << 'PREINST'
 #!/bin/bash
 export PATH="$PATH:/usr/local/sbin:/usr/sbin:/sbin"
@@ -81,37 +81,7 @@ if dpkg -s harmoni >/dev/null 2>&1; then
     # Remove old .pyc caches
     find /usr/share/harmoni -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 
-    echo "[Harmoni] Cleanup complete. Installing ${PREV_VER} → new version..."
-fi
-
-# ── Install system dependencies ──
-echo "[Harmoni] Checking dependencies..."
-
-if ! fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; then
-    # Prevent any display manager restart during dependency installation
-    # This avoids logout if lightdm gets pulled as a transitive dependency
-    if [ -f /usr/bin/deb-systemd-invoke ]; then
-        cp /usr/bin/deb-systemd-invoke /usr/bin/deb-systemd-invoke.bak.harmoni
-        cat > /usr/bin/deb-systemd-invoke << 'NOOP'
-#!/bin/sh
-# Temporarily disabled by Harmoni installer to prevent DM restart
-# Filters out display-manager restarts, allows everything else
-case "$*" in
-    *display-manager*|*lightdm*|*gdm*|*sddm*) exit 0 ;;
-    *) exec /usr/bin/deb-systemd-invoke.bak.harmoni "$@" ;;
-esac
-NOOP
-        chmod 755 /usr/bin/deb-systemd-invoke
-    fi
-
-    apt-get update -qq 2>/dev/null || true
-    apt-get install -y -qq python3 python3-pip python3-venv python3-tk \
-        openbox wmctrl xdotool x11-xserver-utils curl 2>/dev/null || true
-
-    # Restore original deb-systemd-invoke
-    if [ -f /usr/bin/deb-systemd-invoke.bak.harmoni ]; then
-        mv /usr/bin/deb-systemd-invoke.bak.harmoni /usr/bin/deb-systemd-invoke
-    fi
+    echo "[Harmoni] Cleanup complete."
 fi
 
 exit 0
@@ -123,6 +93,21 @@ cat > "${PKG_DIR}/DEBIAN/postinst" << 'POSTINST'
 #!/bin/bash
 set -e
 export PATH="$PATH:/usr/local/sbin:/usr/sbin:/sbin"
+export DEBIAN_FRONTEND=noninteractive
+
+# ── Block display manager restarts during our postinst ──
+_POLICY_CREATED=false
+if [ ! -f /usr/sbin/policy-rc.d ]; then
+    cat > /usr/sbin/policy-rc.d << 'POLICY'
+#!/bin/sh
+case "$1" in
+    lightdm|gdm|gdm3|sddm|display-manager) exit 101 ;;
+    *) exit 0 ;;
+esac
+POLICY
+    chmod 755 /usr/sbin/policy-rc.d
+    _POLICY_CREATED=true
+fi
 
 # Wait for dpkg lock to be released (we're called from dpkg itself)
 _wait_dpkg_lock() {
@@ -466,6 +451,11 @@ echo "════════════════════════�
 echo "  Installation complete. Reboot to start."
 echo "═══════════════════════════════════════════"
 echo ""
+
+# ── Cleanup: remove DM restart block ──
+if [ "$_POLICY_CREATED" = true ]; then
+    rm -f /usr/sbin/policy-rc.d
+fi
 
 # Never fail the postinst — all optional steps are non-critical
 exit 0

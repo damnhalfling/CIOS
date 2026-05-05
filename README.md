@@ -201,8 +201,8 @@ curl -sL https://raw.githubusercontent.com/damnhalfling/harmoni/main/install-har
 ```
 
 ```bash
-# Or manual
-sudo apt install ./harmoni_0.12.0_amd64.deb
+# Or manual (IMPORTANT: use install script to prevent session logout)
+sudo bash install-harmoni.sh ./harmoni_0.13.2_amd64.deb
 sudo reboot
 ```
 
@@ -461,8 +461,8 @@ curl -sL https://raw.githubusercontent.com/damnhalfling/harmoni/main/install-har
 ```
 
 ```bash
-# Ou manual
-sudo apt install ./harmoni_0.12.0_amd64.deb
+# Ou manual (IMPORTANTE: use o install script para evitar logout durante instalação)
+sudo bash install-harmoni.sh ./harmoni_0.13.2_amd64.deb
 sudo reboot
 ```
 
