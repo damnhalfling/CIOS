@@ -78,7 +78,7 @@ class TestRetryCall:
         with patch("harmoni.core.model_router.time.sleep"):
             result = _retry_call(fn, "prompt", "system", "test")
         assert result is None
-        assert fn.call_count == 3  # initial + 2 retries
+        assert fn.call_count == 2  # initial + 1 retry
 
     def test_returns_none_when_fn_returns_none(self):
         fn = MagicMock(return_value=None)

@@ -165,9 +165,105 @@ def search_packages(query: str, limit: int = 10) -> PackageResult:
         return PackageResult(steps, False, _humanize_apt_error(str(e), "search", query))
 
 
+# Well-known packages that aren't in apt repos and need special installation
+_SPECIAL_PACKAGES: dict[str, dict] = {
+    "chrome": {
+        "name": "google-chrome-stable",
+        "check": "google-chrome-stable",
+        "url": "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb",
+    },
+    "google-chrome": {
+        "name": "google-chrome-stable",
+        "check": "google-chrome-stable",
+        "url": "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb",
+    },
+    "google chrome": {
+        "name": "google-chrome-stable",
+        "check": "google-chrome-stable",
+        "url": "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb",
+    },
+    "vscode": {
+        "name": "code",
+        "check": "code",
+        "url": "https://update.code.visualstudio.com/latest/linux-deb-x64/stable",
+    },
+    "code": {
+        "name": "code",
+        "check": "code",
+        "url": "https://update.code.visualstudio.com/latest/linux-deb-x64/stable",
+    },
+    "discord": {
+        "name": "discord",
+        "check": "discord",
+        "url": "https://discord.com/api/download?platform=linux&format=deb",
+    },
+}
+
+
+def _install_special(spec: dict, password: str = "") -> PackageResult:
+    """Install a package by downloading its .deb from a known URL."""
+    name = spec["name"]
+    check = spec["check"]
+    url = spec["url"]
+    steps = [f"Installing {name}"]
+
+    if is_installed(check):
+        return PackageResult(steps, True, f"{name} já está instalado")
+
+    # Download .deb
+    deb_path = f"/tmp/{name}.deb"
+    steps.append(f"Downloading {name}...")
+    try:
+        result = subprocess.run(
+            ["curl", "-fsSL", "-o", deb_path, url],
+            capture_output=True, text=True, timeout=120,
+        )
+        if result.returncode != 0:
+            return PackageResult(steps, False, f"Não consegui baixar {name}. Verifique sua conexão.")
+    except subprocess.TimeoutExpired:
+        return PackageResult(steps, False, f"Download de {name} demorou demais.")
+    except Exception as e:
+        return PackageResult(steps, False, f"Erro ao baixar {name}: {e}")
+
+    # Install .deb
+    steps.append(f"Installing {name}...")
+    try:
+        result = _run_privileged(
+            ["dpkg", "-i", deb_path],
+            password=password, timeout=_INSTALL_TIMEOUT,
+        )
+        # Fix missing dependencies
+        if result.returncode != 0:
+            _run_privileged(
+                ["apt-get", "install", "-f", "-y"],
+                password=password, timeout=_INSTALL_TIMEOUT,
+            )
+
+        # Verify installation
+        if is_installed(check):
+            steps.append(f"{name} installed successfully")
+            # Cleanup
+            try:
+                os.remove(deb_path)
+            except OSError:
+                pass
+            return PackageResult(steps, True, f"{name} instalado com sucesso")
+        else:
+            return PackageResult(steps, False, f"Instalação de {name} falhou. Tente manualmente.")
+    except subprocess.TimeoutExpired:
+        return PackageResult(steps, False, f"Instalação de {name} demorou demais.")
+    except Exception as e:
+        return PackageResult(steps, False, f"Erro ao instalar {name}: {e}")
+
+
 def install_package(package: str, password: str = "") -> PackageResult:
-    """Install a package via apt. Requires sudo."""
+    """Install a package via apt or special handler. Requires sudo."""
     steps = [f"Installing {package}"]
+
+    # Check for well-known packages that need special installation
+    special = _SPECIAL_PACKAGES.get(package.lower())
+    if special:
+        return _install_special(special, password)
 
     # Validate package name
     if not re.match(r'^[a-z0-9][a-z0-9.+\-]+$', package):

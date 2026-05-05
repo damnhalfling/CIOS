@@ -1037,6 +1037,8 @@ class HarmoniApp:
     def _on_cancel_intent(self) -> None:
         """Cancel a running intent execution."""
         self._cancelled = True
+        # Signal the bridge to abort (interrupts LLM waits)
+        self._bridge.cancel()
         if self._dot_id:
             self.root.after_cancel(self._dot_id)
             self._dot_id = None

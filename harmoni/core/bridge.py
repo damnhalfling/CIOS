@@ -32,6 +32,11 @@ from harmoni.core.planner import Planner, PlanResult
 
 logger = logging.getLogger(__name__)
 
+
+class _CancelledError(Exception):
+    """Raised when user cancels the current operation."""
+    pass
+
 # Intents that change system state (need post-action validation)
 _STATE_CHANGING_INTENTS = frozenset([
     IntentType.NETWORK,
@@ -114,6 +119,8 @@ class HarmoniBridge:
         # Conversation state
         self._conversation: list[ConversationTurn] = []
         self._pending_question: Optional[PendingQuestion] = None
+        # Cancellation flag — checked by long-running operations
+        self._cancelled = False
 
         self._boot_times["init_core"] = (time.monotonic() - _t0) * 1000
 
@@ -178,11 +185,18 @@ class HarmoniBridge:
         if not command:
             return self._empty_response()
 
+        self._cancelled = False
         try:
             return self._process(command, confirmed)
+        except _CancelledError:
+            return {"steps": [], "result": "Cancelado", "status": "success", "confirm": None, "voice_mode": "full"}
         except Exception as e:
             logger.exception("Unhandled error in execute_command")
             return self._graceful_error(e)
+
+    def cancel(self) -> None:
+        """Cancel the current execution. Thread-safe."""
+        self._cancelled = True
 
     def execute_streaming(
         self,
@@ -223,6 +237,8 @@ class HarmoniBridge:
         # 1. Try lightweight classifier (cache + LLM classification)
         # 2. Fall back to full resolve_unknown_intent only if classifier fails
         if intent.type == IntentType.UNKNOWN:
+            if self._cancelled:
+                raise _CancelledError()
             from harmoni.core.model_router import is_any_provider_available
 
             # Try classifier first (cache hit is instant, LLM call is lightweight)
@@ -231,9 +247,13 @@ class HarmoniBridge:
             if classified:
                 intent = classified
             elif is_any_provider_available():
+                if self._cancelled:
+                    raise _CancelledError()
                 # Full LLM fallback as last resort
                 signal_topbar_processing("Consultando IA…")
                 resolved = resolve_unknown_intent(resolved_input)
+                if self._cancelled:
+                    raise _CancelledError()
                 if resolved:
                     intent = resolved
                 else:

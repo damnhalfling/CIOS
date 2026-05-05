@@ -28,13 +28,13 @@ logger = logging.getLogger(__name__)
 #  RETRY / TIMEOUT CONFIG
 # ═══════════════════════════════════════════════════════════════════════════
 
-_MAX_RETRIES = 2
-_RETRY_BACKOFF = [0.5, 1.5]  # seconds between retries
+_MAX_RETRIES = 1
+_RETRY_BACKOFF = [0.5]  # seconds between retries
 _PROVIDER_TIMEOUTS = {
-    "ollama": 30,
-    "openai": 20,
-    "anthropic": 20,
-    "bedrock": 25,
+    "ollama": 15,
+    "openai": 15,
+    "anthropic": 15,
+    "bedrock": 15,
 }
 
 # Transient errors worth retrying

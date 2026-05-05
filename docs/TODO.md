@@ -55,6 +55,7 @@ Só APÓS P0-P3 estarem fechados.
 
 | Bloco | Quando |
 |-------|--------|
+| Installer modes (full replacement, clean install) | Próxima release |
 | Demo voz (wake word, confirmação, 3 fluxos) | Após Intelligence |
 | Distribuição (1-liner, AppImage, ISO) | Quando tiver impacto |
 
