@@ -56,6 +56,8 @@ Só APÓS P0-P3 estarem fechados.
 | Bloco | Quando |
 |-------|--------|
 | Installer modes (full replacement, clean install) | Próxima release |
+| Logo Harmoni na tela de login do LightDM | Próxima release |
+| Integração com Maestro API (login Google OAuth + Intelligence) | Após P3 |
 | Demo voz (wake word, confirmação, 3 fluxos) | Após Intelligence |
 | Distribuição (1-liner, AppImage, ISO) | Quando tiver impacto |
 

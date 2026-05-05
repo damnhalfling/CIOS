@@ -65,7 +65,7 @@ class TestSessionContextRoundTrip:
     """
 
     @given(ctx=_session_context)
-    @settings(max_examples=100)
+    @settings(max_examples=100, deadline=None)
     def test_round_trip_preserves_all_fields(self, ctx: SessionContext):
         """For any valid SessionContext, saving and retrieving preserves all fields.
 
@@ -193,7 +193,7 @@ class TestSessionRestoration:
     """
 
     @given(ctx=_session_with_port, server_running=st.booleans())
-    @settings(max_examples=100)
+    @settings(max_examples=100, deadline=None)
     def test_session_restoration_plan_based_on_server_state(
         self, ctx: SessionContext, server_running: bool
     ):

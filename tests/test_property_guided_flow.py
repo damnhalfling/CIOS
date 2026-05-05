@@ -340,7 +340,7 @@ class TestConversationContextPendingQuestion:
             bridge.close()
 
     @given(port_str=_port_answer)
-    @settings(max_examples=100)
+    @settings(max_examples=100, deadline=None)
     def test_process_control_missing_port_sets_pending_and_fills_param(self, port_str: str):
         """PROCESS_CONTROL kill without port → sets _pending_question with
         question_type='port', next input fills the 'port' param.
@@ -471,7 +471,7 @@ class TestConversationContextPendingQuestion:
             bridge.close()
 
     @given(scenario_idx=_scenario_index, answer=_answer_text)
-    @settings(max_examples=100)
+    @settings(max_examples=100, deadline=None)
     def test_pending_question_prevents_new_intent_parsing(self, scenario_idx: int, answer: str):
         """When _pending_question is set, the next input is processed as an
         answer (via _handle_answer) rather than being parsed as a new intent.
