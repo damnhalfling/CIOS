@@ -104,17 +104,21 @@
   </mouse>
 
   <applications>
-    <!-- Harmoni sempre fullscreen, sem decoração -->
+    <!-- Harmoni main window: no decoration, NOT fullscreen (respects topbar) -->
     <application class="Harmoni" type="normal">
       <decor>no</decor>
-      <fullscreen>yes</fullscreen>
       <layer>normal</layer>
       <focus>yes</focus>
     </application>
     <!-- Tkinter windows (classe Tk) -->
     <application class="Tk" type="normal">
       <decor>no</decor>
-      <fullscreen>yes</fullscreen>
+      <layer>normal</layer>
+      <focus>yes</focus>
+    </application>
+    <!-- All Toplevel windows from Harmoni: no decoration -->
+    <application title="Harmoni*">
+      <decor>no</decor>
       <layer>normal</layer>
       <focus>yes</focus>
     </application>

@@ -176,12 +176,15 @@ Everything local stays local. Intelligence is opt-in.
 | `connect to wifi` | Scans networks, auto-connects to known |
 | `turn up the volume` | Increases volume by 10% |
 | `mute` | Mutes audio |
+| `firefox` | Launches Firefox (bare app names work) |
 | `open chrome` | Launches Google Chrome |
 | `my computer is slow` | Diagnoses CPU, memory, disk — suggests actions |
 | `free space` | Finds space hogs, suggests cleanup |
 | `organize my downloads` | Sorts files by type into folders |
-| `install htop` | Installs via apt (asks confirmation) |
+| `install htop` | Installs via apt (masked password + confirmation) |
 | `start my backend` | Detects project, installs deps, starts server |
+| `search for squirrels` | Opens browser with Google search |
+| `pesquise sobre esquilos` | Abre browser com busca no Google |
 | `tile window left` | Tiles active window to left half |
 | `clipboard history` | Shows clipboard history with smart detection |
 | `shutdown` | Shuts down (asks confirmation) |
@@ -202,7 +205,7 @@ curl -sL https://raw.githubusercontent.com/damnhalfling/harmoni/main/install-har
 
 ```bash
 # Or manual (IMPORTANT: use install script to prevent session logout)
-sudo bash install-harmoni.sh ./harmoni_0.13.2_amd64.deb
+sudo bash install-harmoni.sh ./harmoni_0.14.0_amd64.deb
 sudo reboot
 ```
 
@@ -210,7 +213,7 @@ Select **Harmoni OS** at the login screen. That's it.
 
 The installer offers two modes:
 1. **Session only** — adds Harmoni alongside GNOME/KDE
-2. **Full replacement** — switches to LightDM with Harmoni theme
+2. **Full replacement** — switches to LightDM with Harmoni theme + Plymouth boot splash (logo on boot, no text)
 
 After install, say **"update harmoni"** anytime to get the latest version automatically.
 
@@ -251,12 +254,14 @@ Ollama is auto-installed during setup.
 - ✅ 21 skills — Wi-Fi, audio, files, packages, windows, clipboard, dev environments, self-update, file search, workflow start
 - ✅ Hybrid intent classifier — regex + LLM cache with stemming + auto-learning
 - ✅ Voice offline — STT + TTS, fully local
-- ✅ Multi-monitor
+- ✅ Multi-monitor — secondary screen as full interaction surface
 - ✅ Auto-learning engine
-- ✅ .deb installable package
+- ✅ .deb installable package (session-only or full replacement mode)
+- ✅ Plymouth boot splash (logo on boot, no text)
 - ✅ 468 tests passing (including 13 property-based tests)
 - ✅ Onboarding wizard
 - ✅ Conversational UX with 3-turn context
+- ✅ Project auto-creation ("work on project X" creates it if not found)
 
 **This is not a prototype. It runs.**
 
@@ -428,11 +433,13 @@ Tudo local permanece local. Intelligence é opt-in.
 | `conectar no wifi` | Escaneia redes, conecta na conhecida |
 | `aumentar volume` | Aumenta volume em 10% |
 | `silenciar` | Muta o áudio |
+| `firefox` | Abre o Firefox (nome do app direto funciona) |
 | `abre o chrome` | Abre o Google Chrome |
 | `meu computador tá lento` | Diagnóstico com sugestões |
 | `libera espaço` | Encontra o que ocupa espaço |
 | `organizar meus downloads` | Organiza arquivos por tipo |
-| `instalar htop` | Instala pacote via apt (pede confirmação) |
+| `instalar htop` | Instala via apt (senha mascarada + confirmação) |
+| `pesquise sobre esquilos` | Abre browser com busca no Google |
 | `desligar` | Desliga (pede confirmação) |
 | `quanta bateria` | Mostra status da bateria |
 | `aumentar brilho` | Aumenta brilho da tela |
@@ -462,7 +469,7 @@ curl -sL https://raw.githubusercontent.com/damnhalfling/harmoni/main/install-har
 
 ```bash
 # Ou manual (IMPORTANTE: use o install script para evitar logout durante instalação)
-sudo bash install-harmoni.sh ./harmoni_0.13.2_amd64.deb
+sudo bash install-harmoni.sh ./harmoni_0.14.0_amd64.deb
 sudo reboot
 ```
 
@@ -493,4 +500,4 @@ harmoni --setup      # Re-executar setup
 
 ---
 
-*Harmoni OS v0.13.0 — May 2026*
+*Harmoni OS v0.14.3 — May 2026*

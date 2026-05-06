@@ -225,7 +225,7 @@ def _try_install(packages: list[str]) -> bool:
     Tries multiple strategies:
     1. Direct apt (works if running as root)
     2. Passwordless sudo (works if NOPASSWD configured)
-    3. pkexec (works in graphical session with polkit)
+    Skips pkexec — it blocks the boot waiting for graphical auth.
     """
     pkg_str = " ".join(packages)
 
@@ -237,18 +237,9 @@ def _try_install(packages: list[str]) -> bool:
     if _has_passwordless_sudo():
         return _run_apt(f"sudo apt-get install -y -qq {pkg_str}")
 
-    # Strategy 3: pkexec (graphical sudo prompt)
-    if shutil.which("pkexec"):
-        try:
-            result = subprocess.run(
-                ["pkexec", "apt-get", "install", "-y", "-qq"] + packages,
-                capture_output=True, text=True, timeout=120,
-            )
-            return result.returncode == 0
-        except Exception as e:
-            logger.debug("pkexec install failed: %s", e)
-
-    logger.info("Cannot auto-install packages (no root access)")
+    # Don't try pkexec during boot — it blocks waiting for graphical auth
+    # and the session isn't fully up yet. User can install manually later.
+    logger.info("Cannot auto-install packages (no root access, skipping pkexec during boot)")
     return False
 
 
@@ -257,7 +248,7 @@ def _run_apt(command: str) -> bool:
     try:
         result = subprocess.run(
             command, shell=True,
-            capture_output=True, text=True, timeout=120,
+            capture_output=True, text=True, timeout=30,
         )
         return result.returncode == 0
     except Exception as e:

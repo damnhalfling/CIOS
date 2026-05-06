@@ -485,6 +485,35 @@ _RULES: list[tuple[re.Pattern, IntentType, Optional[callable], float]] = [
         0.95,
     ),
     # --- intent browse (PT + EN) — MUST be before app_launch ---
+    # With search query (excludes "pacote/package/arquivo/file" which are other intents)
+    (
+        re.compile(
+            r"(?:pesquis[ae]r?|googl[ae]r?)\s+(?:sobre\s+|por\s+|a?\s*)?(.+)",
+            re.IGNORECASE,
+        ),
+        IntentType.INTENT_BROWSE,
+        lambda m: {"query": m.group(1).strip()},
+        0.92,
+    ),
+    (
+        re.compile(
+            r"(?:buscar?|procurar?)\s+(?:sobre\s+|por\s+|na\s+(?:internet|web|net)\s+)?(?!pacote\b|package\b|arquivo\b|file\b)(.+)",
+            re.IGNORECASE,
+        ),
+        IntentType.INTENT_BROWSE,
+        lambda m: {"query": m.group(1).strip()},
+        0.88,
+    ),
+    (
+        re.compile(
+            r"(?:search|google|look\s+up)\s+(?:for\s+|about\s+)?(?!package\b|file\b)(.+)",
+            re.IGNORECASE,
+        ),
+        IntentType.INTENT_BROWSE,
+        lambda m: {"query": m.group(1).strip()},
+        0.92,
+    ),
+    # Generic (no query)
     (
         re.compile(
             r"(?:quero|vou|preciso)\s+(?:pesquisar|buscar|procurar|navegar|search|browse)\s+(?:algo|na\s+internet|online|something)",
@@ -981,6 +1010,20 @@ _RULES: list[tuple[re.Pattern, IntentType, Optional[callable], float]] = [
         IntentType.APP_LAUNCH,
         lambda m: {"app": m.group(1).strip()},
         0.85,
+    ),
+    # --- bare app name (common apps without verb) ---
+    (
+        re.compile(
+            r"^(firefox|chrome|google-chrome|chromium|code|vscode|terminal|nautilus|"
+            r"files|spotify|vlc|gimp|inkscape|libreoffice|thunderbird|"
+            r"telegram|discord|slack|steam|obs|blender|audacity|"
+            r"calculator|calculadora|gedit|kate|vim|emacs|htop|"
+            r"brave|edge|opera|vivaldi|filezilla|postman|insomnia)$",
+            re.IGNORECASE,
+        ),
+        IntentType.APP_LAUNCH,
+        lambda m: {"app": m.group(1).strip()},
+        0.75,
     ),
     # --- package management (PT + EN) ---
     (

@@ -269,18 +269,20 @@ class HarmoniBridge:
             signal_topbar_idle()
             return clarification
 
-        # Confirmation check for destructive actions
+        # Sudo password check BEFORE confirmation — entering the password
+        # already serves as implicit confirmation (no need to ask twice)
+        sudo_check = self._needs_sudo_password(intent)
+        if sudo_check:
+            signal_topbar_idle()
+            return sudo_check
+
+        # Confirmation check for destructive actions (skipped if sudo
+        # password was already provided — that counts as confirmation)
         if not confirmed:
             confirm_msg = self._needs_confirmation(intent)
             if confirm_msg:
                 signal_topbar_idle()
                 return self._confirm_response(confirm_msg)
-
-        # Sudo password check (after confirmation, before execution)
-        sudo_check = self._needs_sudo_password(intent)
-        if sudo_check:
-            signal_topbar_idle()
-            return sudo_check
 
         # Execute
         signal_topbar_processing("Executando…")
@@ -355,18 +357,19 @@ class HarmoniBridge:
             signal_topbar_idle()
             return clarification
 
-        # Confirmation
+        # Sudo password check BEFORE confirmation — entering the password
+        # already serves as implicit confirmation (no need to ask twice)
+        sudo_check = self._needs_sudo_password(intent)
+        if sudo_check:
+            signal_topbar_idle()
+            return sudo_check
+
+        # Confirmation (skipped if sudo password was already provided)
         if not confirmed:
             confirm_msg = self._needs_confirmation(intent)
             if confirm_msg:
                 signal_topbar_idle()
                 return self._confirm_response(confirm_msg)
-
-        # Sudo password check (after confirmation, before execution)
-        sudo_check = self._needs_sudo_password(intent)
-        if sudo_check:
-            signal_topbar_idle()
-            return sudo_check
 
         if on_step:
             on_step("Executando…", 1, 0)
@@ -788,7 +791,8 @@ class HarmoniBridge:
     def _needs_sudo_password(self, intent: Intent) -> Optional[dict]:
         """Check if intent needs sudo and password isn't provided yet.
 
-        Called AFTER confirmation, BEFORE execution.
+        Called BEFORE confirmation. Entering the password serves as
+        implicit confirmation for the action.
         Returns a password prompt response, or None to proceed.
         """
         if intent.params.get("sudo_password"):
@@ -807,6 +811,20 @@ class HarmoniBridge:
         if not needs_sudo_password():
             return None  # NOPASSWD configured, no need to ask
 
+        # Build a contextual message so the user knows what the password is for
+        action_desc = ""
+        if intent.type == IntentType.PACKAGE:
+            action = intent.params.get("action", "")
+            package = intent.params.get("package", "")
+            if action == "install":
+                action_desc = f"Para instalar '{package}', "
+            elif action == "remove":
+                action_desc = f"Para remover '{package}', "
+            elif action in ("update", "upgrade"):
+                action_desc = "Para atualizar os pacotes, "
+        elif intent.type == IntentType.SELF_UPDATE:
+            action_desc = "Para atualizar o Harmoni, "
+
         self._pending_question = PendingQuestion(
             intent=intent,
             question_type="sudo_password",
@@ -814,10 +832,11 @@ class HarmoniBridge:
         )
         return {
             "steps": [],
-            "result": "Senha de administrador:",
+            "result": f"{action_desc}digite a senha de administrador:",
             "status": "success",
             "confirm": None,
             "voice_mode": "full",
+            "password_prompt": True,
         }
 
     def _fuzzy_match_option(self, answer: str, options: list[str]) -> Optional[str]:

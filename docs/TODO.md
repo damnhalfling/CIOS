@@ -1,7 +1,7 @@
 # Harmoni OS — TODO
 
 > Escopo TRAVADO. NÃO adicionar features. Fechar o loop.
-> Atualizado: Maio 2026 — v0.13.0
+> Atualizado: Maio 2026 — v0.14.0
 
 ---
 
@@ -55,11 +55,41 @@ Só APÓS P0-P3 estarem fechados.
 
 | Bloco | Quando |
 |-------|--------|
-| Installer modes (full replacement, clean install) | Próxima release |
-| Logo Harmoni na tela de login do LightDM | Próxima release |
+| Media player inline (fotos, vídeo, áudio) — sem abrir app externo | Próxima fase |
+| Installer modes (full replacement, clean install) | ✅ v0.14.1 |
+| Logo Harmoni na tela de login do LightDM | ✅ v0.14.2 |
 | Integração com Maestro API (login Google OAuth + Intelligence) | Após P3 |
 | Demo voz (wake word, confirmação, 3 fluxos) | Após Intelligence |
 | Distribuição (1-liner, AppImage, ISO) | Quando tiver impacto |
+
+---
+
+## 🟢 PRÓXIMO — Media Player Inline (~3-5 dias)
+
+Galeria de fotos + player de vídeo/áudio embutido no Harmoni. Sem abrir VLC ou outro software.
+
+| # | Task | Esforço |
+|---|------|---------|
+| 200 | Galeria de fotos (Tkinter + Pillow): scan, thumbnails, ampliar, voltar | 1.5 dia |
+| 201 | Detecção de pendrives/mídias montadas | 0.5 dia |
+| 202 | Player de vídeo inline (python-mpv embedded no Tk) | 1.5 dia |
+| 203 | Extração de thumbnails de vídeo (ffmpeg) | 0.5 dia |
+| 204 | Player de áudio (play/pause, barra de progresso) | 0.5 dia |
+| 205 | Intents: "mostre fotos", "mostre vídeos", "toque música" | 0.5 dia |
+| 206 | Fluxo guiado: "encontrei em X e Y, qual?" | 0.5 dia |
+
+**Deps .deb:** ffmpeg, mpv, python3-pil, python3-pil.imagetk, gstreamer1.0-libav, gstreamer1.0-plugins-good/ugly
+**Deps pip:** Pillow, python-mpv
+
+**UX:**
+```
+"mostre as fotos do pendrive"
+→ Grid de thumbnails → clique amplia → Esc volta
+
+"mostre meus vídeos"
+→ "Encontrei vídeos em ~/Vídeos e no pendrive Kingston. Qual?"
+→ Grid de thumbnails → clique reproduz inline → Esc volta
+```
 
 ---
 

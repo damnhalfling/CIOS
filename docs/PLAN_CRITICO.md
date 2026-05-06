@@ -1,7 +1,7 @@
 # Harmoni OS — Plano Técnico (Itens Críticos)
 
 > De projeto para produto percebido.
-> Atualizado: Maio 2026 — v0.13.0
+> Atualizado: Maio 2026 — v0.14.0
 
 ---
 

@@ -375,18 +375,30 @@ class HarmoniApp:
     # ═══════════════════════════════════════════════════════════════════════
 
     def _build(self) -> None:
-        self.root = tk.Tk()
+        self.root = tk.Tk(className="Harmoni")
         self.root.title("Harmoni OS")
         self.root.configure(bg=BG)
 
         # CRITICAL: Hide window while building to prevent raw/unfinished flash
         self.root.withdraw()
 
-        # Position below topbar (28px)
-        screen_w = self.root.winfo_screenwidth()
-        screen_h = self.root.winfo_screenheight()
+        # Position below topbar on primary monitor only
+        from harmoni.infra.monitors import get_primary_monitor
+        _primary = get_primary_monitor()
+        if _primary:
+            screen_w = _primary.width
+            screen_h = _primary.height
+            _primary_x = _primary.x
+            _primary_y = _primary.y
+        else:
+            screen_w = self.root.winfo_screenwidth()
+            screen_h = self.root.winfo_screenheight()
+            _primary_x = 0
+            _primary_y = 0
         _TOPBAR_H = 28
-        self.root.geometry(f"{screen_w}x{screen_h - _TOPBAR_H}+0+{_TOPBAR_H}")
+        self.root.geometry(
+            f"{screen_w}x{screen_h - _TOPBAR_H}"
+            f"+{_primary_x}+{_primary_y + _TOPBAR_H}")
         self.root.overrideredirect(False)
         self.root.bind("<F11>", lambda _: self.root.attributes(
             "-fullscreen", not self.root.attributes("-fullscreen")))
@@ -507,11 +519,12 @@ class HarmoniApp:
 
         btn_row = tk.Frame(self._confirm_frame, bg=BG_CARD)
         btn_row.pack(anchor="w")
-        tk.Button(btn_row, text="Confirmar", font=self._f["btn"],
+        self._confirm_btn = tk.Button(btn_row, text="Confirmar", font=self._f["btn"],
                   bg=ACCENT, fg="#fff", activebackground=ACCENT_LT,
                   activeforeground="#fff", relief="flat",
-                  padx=18, pady=5, command=self._on_confirm).pack(
-            side="left", padx=(0, 10))
+                  padx=18, pady=5, command=self._on_confirm)
+        self._confirm_btn.pack(side="left", padx=(0, 10))
+        self._confirm_btn.bind("<Return>", lambda e: self._on_confirm())
         tk.Button(btn_row, text="Cancelar", font=self._f["btn"],
                   bg=BG_INPUT, fg=FG_DIM, activebackground=BG_HOVER,
                   activeforeground=FG, relief="flat",
@@ -1006,6 +1019,10 @@ class HarmoniApp:
             self.root.after(0, lambda: self._show_confirm(
                 data["confirm"], text))
             return
+        if data.get("password_prompt"):
+            self.root.after(0, lambda: self._show_password_dialog(
+                data["result"], text))
+            return
         self._display(data)
 
     def _on_confirm(self) -> None:
@@ -1031,6 +1048,89 @@ class HarmoniApp:
     def _on_cancel(self) -> None:
         self._pending = None
         self._confirm_frame.pack_forget()
+        self._show_result("Cancelado", "Nenhuma alteração feita", "success")
+        self._finish()
+
+    # ── Password dialog ──
+
+    def _show_password_dialog(self, msg: str, cmd: str) -> None:
+        """Show a modal with masked password field + confirm/cancel buttons."""
+        self._pending = cmd
+        self._clear_feed()
+        self._stop_spinner()
+        self._busy = False
+        self._entry.configure(state="disabled")
+
+        # Build password frame
+        self._pwd_frame = tk.Frame(self._feed_area, bg=BG_CARD,
+                                   padx=SP_SECTION, pady=SP_DEFAULT)
+        self._pwd_frame.pack(fill="x", pady=(SP_DEFAULT, 0))
+
+        tk.Label(self._pwd_frame, text=msg, font=self._f["step"],
+                 fg=FG, bg=BG_CARD, wraplength=600,
+                 justify="left", anchor="w").pack(fill="x", pady=(0, SP_COMPACT))
+
+        # Masked entry
+        pwd_row = tk.Frame(self._pwd_frame, bg=BG_CARD)
+        pwd_row.pack(fill="x", pady=(0, SP_COMPACT))
+
+        self._pwd_entry = tk.Entry(
+            pwd_row, font=self._f["input"], bg=BG_INPUT, fg=FG,
+            insertbackground=ACCENT, relief="flat", show="●",
+            highlightthickness=1, highlightcolor=ACCENT, highlightbackground=BORDER)
+        self._pwd_entry.pack(fill="x", ipady=6)
+        self._pwd_entry.bind("<Return>", lambda e: self._on_pwd_confirm())
+        self._pwd_entry.bind("<Escape>", lambda e: self._on_pwd_cancel())
+
+        # Buttons
+        btn_row = tk.Frame(self._pwd_frame, bg=BG_CARD)
+        btn_row.pack(anchor="w", pady=(SP_COMPACT, 0))
+
+        confirm_btn = tk.Button(btn_row, text="Confirmar", font=self._f["btn"],
+                                bg=ACCENT, fg="#fff", activebackground=ACCENT_LT,
+                                activeforeground="#fff", relief="flat",
+                                padx=18, pady=5, command=self._on_pwd_confirm)
+        confirm_btn.pack(side="left", padx=(0, 10))
+
+        tk.Button(btn_row, text="Cancelar", font=self._f["btn"],
+                  bg=BG_INPUT, fg=FG_DIM, activebackground=BG_HOVER,
+                  activeforeground=FG, relief="flat",
+                  padx=18, pady=5, command=self._on_pwd_cancel).pack(side="left")
+
+        # Focus the password field
+        self._pwd_entry.focus_set()
+
+    def _on_pwd_confirm(self) -> None:
+        """Submit the password and execute the command."""
+        password = self._pwd_entry.get()
+        self._pwd_frame.pack_forget()
+        if not password or not self._pending:
+            self._on_pwd_cancel()
+            return
+        cmd = self._pending
+        self._pending = None
+        self._busy = True
+        self._cancelled = False
+        self._entry.configure(state="disabled")
+        self._send_btn_outer.pack_forget()
+        self._cancel_btn_outer.pack(side="right", padx=(SP_TIGHT, SP_COMPACT), pady=10)
+        self._clear_feed()
+        self._clear_result()
+        self._start_spinner()
+        self._add_step("Executando…", thinking=True)
+        # Send password as the answer to the pending question
+        threading.Thread(
+            target=lambda: self._display(
+                self._bridge.execute_command(password)),
+            daemon=True).start()
+
+    def _on_pwd_cancel(self) -> None:
+        """Cancel the password prompt."""
+        self._pending = None
+        if hasattr(self, '_pwd_frame'):
+            self._pwd_frame.pack_forget()
+        # Clear the pending question in bridge
+        self._bridge._pending_question = None
         self._show_result("Cancelado", "Nenhuma alteração feita", "success")
         self._finish()
 
@@ -1174,7 +1274,9 @@ class HarmoniApp:
             self._dot_id = None
         self._clear_feed()
         self._busy = False
-        self._entry.configure(state="normal")
+        self._entry.configure(state="disabled")
+        # Focus the confirm button so Enter triggers confirmation, not re-submit
+        self._confirm_btn.focus_set()
 
     def _finish(self) -> None:
         self._busy = False
@@ -1204,7 +1306,7 @@ class HarmoniApp:
         self.root.destroy()
 
     def _init_secondary_screens(self) -> None:
-        """Detect secondary monitors and spawn context panels."""
+        """Detect secondary monitors and spawn interaction panels."""
         import logging as _log
         _logger = _log.getLogger(__name__)
         try:
@@ -1216,7 +1318,7 @@ class HarmoniApp:
                 _logger.info("Found %d secondary monitor(s)", len(secondaries))
             for monitor in secondaries:
                 try:
-                    panel = SecondaryPanel(self.root, monitor)
+                    panel = SecondaryPanel(self.root, monitor, bridge=self._bridge)
                     self._secondary_panels.append(panel)
                     _logger.info("Secondary panel on %s (%dx%d+%d+%d)",
                                  monitor.name, monitor.width, monitor.height,

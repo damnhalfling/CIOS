@@ -138,7 +138,7 @@ class TestGuidedFlowNetworkOptions:
             bridge.close()
 
     @given(networks=_wifi_network_list)
-    @settings(max_examples=100)
+    @settings(max_examples=100, deadline=2000)
     def test_unknown_network_triggers_password_prompt(self, networks: list[WifiNetwork]):
         """For any non-empty list of WiFi networks, selecting an unknown
         network (not in known_networks) should trigger a password prompt

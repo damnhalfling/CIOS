@@ -54,9 +54,20 @@ def show_splash() -> None:
 
     root = tk.Tk()
     root.title("Harmoni")
-    root.attributes("-fullscreen", True)
     root.configure(bg=BG)
     root.overrideredirect(True)
+
+    # Fullscreen on primary monitor
+    try:
+        from harmoni.infra.monitors import get_primary_monitor
+        primary = get_primary_monitor()
+        if primary:
+            root.geometry(
+                f"{primary.width}x{primary.height}+{primary.x}+{primary.y}")
+        else:
+            root.attributes("-fullscreen", True)
+    except Exception:
+        root.attributes("-fullscreen", True)
 
     # Center content
     frame = tk.Frame(root, bg=BG)

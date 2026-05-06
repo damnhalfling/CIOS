@@ -5,6 +5,8 @@ Every skill call goes through _resilient_call() for retry + human error messages
 """
 
 import os
+import shutil
+import subprocess
 import time
 import logging
 from dataclasses import dataclass, field
@@ -1381,18 +1383,67 @@ class Planner:
         match = _find_project(project_query, project_dirs)
 
         if not match:
-            if project_dirs:
-                names = [os.path.basename(d) for d in project_dirs[:8]]
-                lines = [f"  📁 {n}" for n in names]
+            # Project not found — create it and open in editor
+            plan_steps.append(f"Creating project '{project_query}'")
+
+            # Determine base directory for new projects
+            home = os.path.expanduser("~")
+            # Use first existing project root, or ~/projetos as default
+            base_candidates = [
+                os.path.join(home, "projetos"),
+                os.path.join(home, "projects"),
+                os.path.join(home, "dev"),
+            ]
+            base_dir = next(
+                (d for d in base_candidates if os.path.isdir(d)),
+                os.path.join(home, "projetos"),
+            )
+
+            # Sanitize project name for directory
+            safe_name = project_query.lower().replace(" ", "-")
+            project_path = os.path.join(base_dir, safe_name)
+
+            # Create directory structure
+            try:
+                os.makedirs(project_path, exist_ok=True)
+            except OSError:
                 return PlanResult(
                     plan_steps=plan_steps, results=[],
                     outcome="failure",
-                    summary=f"Project '{project_query}' not found.\n\nAvailable projects:\n"
-                            + "\n".join(lines))
+                    summary=f"Não consegui criar o projeto '{project_query}'")
+
+            # Initialize with a README
+            readme_path = os.path.join(project_path, "README.md")
+            if not os.path.exists(readme_path):
+                try:
+                    with open(readme_path, "w") as f:
+                        f.write(f"# {project_query.title()}\n\n")
+                except OSError:
+                    pass
+
+            # Initialize git
+            if shutil.which("git") and not os.path.exists(os.path.join(project_path, ".git")):
+                try:
+                    subprocess.run(
+                        ["git", "init"],
+                        cwd=project_path,
+                        capture_output=True, timeout=10,
+                    )
+                    plan_steps.append("Git initialized")
+                except Exception:
+                    pass
+
+            # Open in editor
+            from harmoni.skills.dev_start import _detect_editor, _open_editor
+            editor_cmd = _detect_editor()
+            if editor_cmd:
+                plan_steps.append(f"Opening in {editor_cmd}")
+                _open_editor(editor_cmd, project_path)
+
             return PlanResult(
                 plan_steps=plan_steps, results=[],
-                outcome="failure",
-                summary=f"Project '{project_query}' not found. No project directories found.")
+                outcome="success",
+                summary=f"Projeto '{project_query}' criado e aberto no editor")
 
         plan_steps.append(f"Found: {os.path.basename(match)}")
 
@@ -1620,7 +1671,9 @@ class Planner:
             error=err)
 
     def _handle_intent_browse(self, intent: Intent) -> PlanResult:
-        """#120: Open browser for web browsing."""
+        """#120: Open browser for web browsing or search."""
+        query = intent.params.get("query", "")
+
         app = (find_app("browser") or find_app("chrome") or
                find_app("firefox") or find_app("chromium"))
 
@@ -1633,12 +1686,34 @@ class Planner:
                 plan_steps=["Looking for browser"], results=[],
                 outcome="failure", summary=msg)
 
+        # If there's a search query, open browser with Google search
+        if query:
+            from urllib.parse import quote_plus
+            url = f"https://www.google.com/search?q={quote_plus(query)}"
+            plan_steps = [f"Searching: {query}"]
+            try:
+                subprocess.Popen(
+                    [app.exec_command.split()[0], url],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    start_new_session=True,
+                )
+                return PlanResult(
+                    plan_steps=plan_steps, results=[],
+                    outcome="success",
+                    summary=f"Busca aberta no browser")
+            except Exception:
+                return PlanResult(
+                    plan_steps=plan_steps, results=[],
+                    outcome="failure",
+                    summary=f"Não consegui abrir o browser")
+
+        # No query — just open browser
         steps, ok, err = _resilient_call(
             launch_app, app, skill="app_launch", retryable=False)
         return PlanResult(
             plan_steps=steps, results=[],
             outcome="success" if ok else "failure",
-            summary=f"{app.name} opened" if ok else f"Couldn't open {app.name}",
+            summary=f"{app.name} aberto" if ok else f"Não consegui abrir {app.name}",
             error=err)
 
     def _handle_intent_write(self, intent: Intent) -> PlanResult:

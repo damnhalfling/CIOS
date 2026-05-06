@@ -1,6 +1,6 @@
 [project]
 name = "harmoni-os"
-version = "0.13.6"
+version = "0.14.15"
 description = "Harmoni OS — AI-first system interface that replaces apps with intent-driven execution on Linux"
 requires-python = ">=3.10"
 dependencies = [

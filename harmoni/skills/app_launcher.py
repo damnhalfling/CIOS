@@ -32,6 +32,8 @@ _cache_loaded: bool = False
 # Aliases comuns: o que o usuário diz → nome real do .desktop
 _ALIASES: dict[str, list[str]] = {
     "chrome": ["google-chrome", "google-chrome-stable", "chromium", "chromium-browser"],
+    "google-chrome": ["google-chrome", "google-chrome-stable"],
+    "google chrome": ["google-chrome", "google-chrome-stable"],
     "navegador": ["google-chrome", "firefox", "chromium"],
     "browser": ["google-chrome", "firefox", "chromium"],
     "firefox": ["firefox", "firefox-esr"],
@@ -218,6 +220,12 @@ def find_app(query: str) -> Optional[AppInfo]:
     for app in apps:
         exec_base = os.path.basename(app.exec_command.split()[0]).lower() if app.exec_command else ""
         if exec_base == q:
+            return app
+
+    # 3b. Desktop file stem match (e.g. "google-chrome" matches google-chrome.desktop)
+    for app in apps:
+        desktop_stem = Path(app.desktop_file).stem.lower()
+        if desktop_stem == q:
             return app
 
     # 4. Name starts with query

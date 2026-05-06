@@ -397,7 +397,7 @@ class SystemContext:
             name = futures[future]
             t0 = time.monotonic()
             try:
-                results[name] = future.result(timeout=8)
+                results[name] = future.result(timeout=5)
             except Exception as e:
                 logger.warning("MCP warmup scan '%s' failed: %s", name, e)
                 results[name] = None

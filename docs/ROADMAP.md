@@ -1,7 +1,7 @@
 # Harmoni OS — Roadmap
 
 > Substituindo apps por intenção.
-> Atualizado: Maio 2026 — v0.13.0
+> Atualizado: Maio 2026 — v0.14.0
 
 ---
 
@@ -36,6 +36,7 @@ O momento wow: **"quero trabalhar no projeto X"** → ambiente completo pronto.
 - ✅ Dev Start 100% confiável (stale deps detection, polling port wait, editor+browser launch)
 - ✅ Memória contextual ("continuar projeto X" → reabre como estava via SessionContext)
 - ✅ Feedback perfeito (<3s, streaming progress, humanizer completo)
+- ✅ Projeto não encontrado → cria automaticamente e abre no editor
 
 ### P1 — Confiabilidade core ✅
 Se não for 100% confiável → fluxo guiado. Se for confiável → automático.
@@ -43,6 +44,7 @@ Se não for 100% confiável → fluxo guiado. Se for confiável → automático.
 - ✅ Test matrix real (Ubuntu clean, Debian clean, VM sem GPU)
 - ✅ Fluxos guiados multi-step (GuidedFlowStep + GuidedFlow)
 - ✅ Degradação graciosa de dependências (nmcli, pactl, bluetoothctl, etc.)
+- ✅ Confirmação com senha integrada (sudo antes de confirmar, não depois)
 
 ### P2 — Polimento invisível ✅
 "Ok" não compete com macOS. Precisa de sensação de "OS novo".
@@ -57,6 +59,10 @@ Se não for 100% confiável → fluxo guiado. Se for confiável → automático.
 - ✅ Spinner animado (arco girando + dot pulsante) só quando processa
 - ✅ Hotkey overlay com mesma identidade visual
 - ✅ Splash com transição contínua para GUI
+- ✅ Multi-monitor: janela principal no primário, tela secundária interativa
+- ✅ Plymouth boot splash (logo Harmoni, sem texto de boot)
+- ✅ Installer com opção de substituição completa (LightDM + Plymouth)
+- ✅ Modal de confirmação com focus correto (Enter confirma, não reenvia)
 
 ### P3 — Demo
 - ⏳ Gravação manual em máquina real (celular)
@@ -99,7 +105,7 @@ Se não for 100% confiável → fluxo guiado. Se for confiável → automático.
 
 ---
 
-## Números (v0.13.0)
+## Números (v0.14.0)
 
 | Métrica | Valor |
 |---------|-------|
@@ -110,7 +116,7 @@ Se não for 100% confiável → fluxo guiado. Se for confiável → automático.
 | Testes | 468+ |
 | Property tests (Hypothesis) | 13 |
 | Modos de execução | 6 |
-| Itens concluídos | 145 |
+| Itens concluídos | 150+ |
 
 ---
 

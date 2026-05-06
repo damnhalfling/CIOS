@@ -78,8 +78,18 @@ class TopBar:
         self._root.overrideredirect(True)
         self._root.attributes("-topmost", True)
 
-        screen_w = self._root.winfo_screenwidth()
-        self._root.geometry(f"{screen_w}x{_BAR_HEIGHT}+0+0")
+        # Position topbar on primary monitor
+        from harmoni.infra.monitors import get_primary_monitor
+        _primary = get_primary_monitor()
+        if _primary:
+            screen_w = _primary.width
+            bar_x = _primary.x
+            bar_y = _primary.y
+        else:
+            screen_w = self._root.winfo_screenwidth()
+            bar_x = 0
+            bar_y = 0
+        self._root.geometry(f"{screen_w}x{_BAR_HEIGHT}+{bar_x}+{bar_y}")
         self._root.configure(bg=_BG)
 
         self._set_strut(screen_w)

@@ -28,6 +28,7 @@ mkdir -p "${PKG_DIR}${INSTALL_DIR}/assets"
 mkdir -p "${PKG_DIR}${INSTALL_DIR}/config"
 mkdir -p "${PKG_DIR}/usr/local/bin"
 mkdir -p "${PKG_DIR}/usr/share/xsessions"
+mkdir -p "${PKG_DIR}/usr/share/plymouth/themes/harmoni"
 mkdir -p "${PKG_DIR}/usr/share/backgrounds"
 mkdir -p "${PKG_DIR}/etc/xdg/openbox-harmoni"
 
@@ -38,9 +39,9 @@ Version: ${VERSION}
 Section: x11
 Priority: optional
 Architecture: amd64
-Depends: python3 (>= 3.10), python3-pip, python3-venv, python3-tk, openbox, wmctrl, xdotool, x11-xserver-utils, curl
-Recommends: pipewire-pulse | pulseaudio-utils, network-manager, i3lock
-Suggests: lightdm, slick-greeter
+Depends: python3 (>= 3.10), python3-pip, python3-venv, python3-tk, xorg, lightdm, lightdm-gtk-greeter, openbox, wmctrl, xdotool, x11-xserver-utils, curl
+Recommends: pipewire-pulse | pulseaudio-utils, network-manager, i3lock, plymouth
+Suggests: slick-greeter, plymouth-themes
 Maintainer: damnhalfling <damnhalfling@github.com>
 Description: Harmoni OS — AI-first desktop interface
  A AI-first layer that replaces apps with intent-driven
@@ -55,6 +56,9 @@ EOF
 cat > "${PKG_DIR}/DEBIAN/preinst" << 'PREINST'
 #!/bin/bash
 export PATH="$PATH:/usr/local/sbin:/usr/sbin:/sbin"
+
+# Always clean pycache (prevents stale bytecode on upgrades)
+find /usr/share/harmoni -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 
 # ── Remove previous version if installed ──
 if dpkg -s harmoni >/dev/null 2>&1; then
@@ -78,9 +82,6 @@ if dpkg -s harmoni >/dev/null 2>&1; then
         rm -rf /usr/share/harmoni/.venv
     fi
 
-    # Remove old .pyc caches
-    find /usr/share/harmoni -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-
     echo "[Harmoni] Cleanup complete."
 fi
 
@@ -91,14 +92,14 @@ chmod 755 "${PKG_DIR}/DEBIAN/preinst"
 # ── DEBIAN/postinst ──
 cat > "${PKG_DIR}/DEBIAN/postinst" << 'POSTINST'
 #!/bin/bash
-# Harmoni postinst — MUST NOT restart any services or ask questions.
-# dpkg -i must complete without side effects on the running session.
-# All interactive setup (Ollama, LightDM mode) happens via: harmoni --setup
+# Harmoni postinst — interactive installation with mode selection.
+# Handles everything: venv, deps, LightDM, Plymouth, GRUB.
 export PATH="$PATH:/usr/local/sbin:/usr/sbin:/sbin"
+export DEBIAN_FRONTEND=noninteractive
 
 echo ""
 echo "╔═══════════════════════════════════════════╗"
-echo "║       Harmoni OS — Installed             ║"
+echo "║       Harmoni OS — Installer             ║"
 echo "╚═══════════════════════════════════════════╝"
 echo ""
 
@@ -123,18 +124,199 @@ if [ -d /usr/share/harmoni/.venv ]; then
 fi
 
 chmod +x /usr/local/bin/harmoni-session 2>/dev/null || true
-
 echo "[Harmoni] ✓ Python environment ready"
+
+# ── Apply LightDM branding if LightDM is installed (both modes) ──
+if [ -d /etc/lightdm ] && command -v lightdm &>/dev/null; then
+    HARMONI_CONF="/usr/share/harmoni/config"
+    if [ -f "$HARMONI_CONF/slick-greeter.conf" ] && [ -f /usr/share/pixmaps/harmoni-logo.png ]; then
+        if [ ! -f /etc/lightdm/slick-greeter.conf.bak.harmoni ]; then
+            cp /etc/lightdm/slick-greeter.conf /etc/lightdm/slick-greeter.conf.bak.harmoni 2>/dev/null || true
+        fi
+        cp "$HARMONI_CONF/slick-greeter.conf" /etc/lightdm/slick-greeter.conf
+        echo "[Harmoni] ✓ LightDM branding applied (logo + background)"
+    fi
+fi
+
 echo ""
-echo "═══════════════════════════════════════════"
-echo "  Installation complete!"
+
+# ── Installation mode ──
+# Auto-detect: if no display manager is running/installed, go full replacement
+# If a DM exists (GDM, SDDM), ask the user
+EXISTING_DM=""
+for dm in gdm gdm3 sddm; do
+    if command -v "$dm" &>/dev/null || systemctl is-active "$dm" &>/dev/null 2>&1; then
+        EXISTING_DM="$dm"
+        break
+    fi
+done
+
+if [ -z "$EXISTING_DM" ]; then
+    # No existing desktop — full replacement automatically
+    echo "[Harmoni] Nenhum desktop detectado. Instalando como desktop padrão."
+    INSTALL_MODE="2"
+else
+    echo "┌─────────────────────────────────────────────┐"
+    echo "│  Desktop detectado: $EXISTING_DM"
+    echo "│                                              │"
+    echo "│  1) Sessão adicional                         │"
+    echo "│     Harmoni aparece ao lado na tela de login │"
+    echo "│                                              │"
+    echo "│  2) Substituição completa                    │"
+    echo "│     Remove $EXISTING_DM, instala LightDM     │"
+    echo "│     com tema Harmoni + Plymouth boot splash  │"
+    echo "│     (reversível com: sudo apt remove harmoni)│"
+    echo "│                                              │"
+    echo "└─────────────────────────────────────────────┘"
+    echo ""
+
+    INSTALL_MODE="1"
+    if [ -t 0 ]; then
+        read -rp "  Opção [1]: " INSTALL_MODE
+        INSTALL_MODE="${INSTALL_MODE:-1}"
+    elif [ -e /dev/tty ]; then
+        echo -n "  Opção [1]: " > /dev/tty
+        read -r INSTALL_MODE < /dev/tty || INSTALL_MODE="1"
+        INSTALL_MODE="${INSTALL_MODE:-1}"
+    fi
+fi
+
 echo ""
-echo "  → Select 'Harmoni OS' at your login screen."
-echo "  → Or run: harmoni --setup (for LightDM/Ollama config)"
-echo ""
-echo "  Reboot to start: sudo reboot"
-echo "═══════════════════════════════════════════"
-echo ""
+
+# ── Mode 2: Full replacement ──
+if [ "$INSTALL_MODE" = "2" ]; then
+    echo "[Harmoni] Configurando substituição completa..."
+
+    # Block DM restarts during postinst
+    cat > /usr/sbin/policy-rc.d << 'POLICY'
+#!/bin/sh
+case "$1" in
+    lightdm|gdm|gdm3|sddm|display-manager) exit 101 ;;
+    *) exit 0 ;;
+esac
+POLICY
+    chmod 755 /usr/sbin/policy-rc.d
+
+    # LightDM and Xorg are already installed as package dependencies
+    # Just need to configure them
+    echo "[Harmoni] ✓ Xorg + LightDM already installed (package deps)"
+
+    # Remove DM restart block
+    rm -f /usr/sbin/policy-rc.d
+
+    # Backup + set LightDM as default
+    mkdir -p /etc/X11
+    if [ -f /etc/X11/default-display-manager ] && [ ! -f /etc/X11/default-display-manager.bak.harmoni ]; then
+        cp /etc/X11/default-display-manager /etc/X11/default-display-manager.bak.harmoni
+    fi
+    echo "/usr/sbin/lightdm" > /etc/X11/default-display-manager
+
+    # Apply LightDM configs (logo + background + theme)
+    mkdir -p /etc/lightdm
+    HARMONI_CONF="/usr/share/harmoni/config"
+
+    # Detect which greeter is available
+    if command -v slick-greeter &>/dev/null; then
+        GREETER="slick-greeter"
+    elif [ -f /usr/share/xgreeters/lightdm-gtk-greeter.desktop ]; then
+        GREETER="lightdm-gtk-greeter"
+    else
+        GREETER="lightdm-gtk-greeter"
+    fi
+
+    # Write lightdm.conf with correct greeter
+    cat > /etc/lightdm/lightdm.conf << LDMCONF
+[Seat:*]
+greeter-session=$GREETER
+user-session=harmoni
+greeter-hide-users=false
+allow-guest=false
+LDMCONF
+
+    # Apply greeter theme if slick-greeter
+    if [ "$GREETER" = "slick-greeter" ] && [ -f "$HARMONI_CONF/slick-greeter.conf" ]; then
+        cp "$HARMONI_CONF/slick-greeter.conf" /etc/lightdm/slick-greeter.conf
+    fi
+
+    # Apply GTK greeter theme if lightdm-gtk-greeter
+    if [ "$GREETER" = "lightdm-gtk-greeter" ]; then
+        cat > /etc/lightdm/lightdm-gtk-greeter.conf << 'GTKCONF'
+[greeter]
+background=/usr/share/backgrounds/harmoni.png
+theme-name=Adwaita-dark
+icon-theme-name=Adwaita
+font-name=Sans 11
+indicators=~host;~spacer;~session;~power
+position=50%,center 50%,center
+GTKCONF
+    fi
+    echo "[Harmoni] ✓ LightDM configured (greeter: $GREETER)"
+
+    # Plymouth boot splash
+    PLYMOUTH_THEME="/usr/share/plymouth/themes/harmoni"
+    if [ -d "$PLYMOUTH_THEME" ] && [ -f "$PLYMOUTH_THEME/harmoni.plymouth" ]; then
+        plymouth-set-default-theme harmoni 2>/dev/null || {
+            mkdir -p /etc/plymouth
+            printf "[Daemon]\nTheme=harmoni\n" > /etc/plymouth/plymouthd.conf
+        }
+        update-initramfs -u 2>/dev/null || true
+        echo "[Harmoni] ✓ Plymouth boot splash configured"
+    fi
+
+    # GRUB: quiet splash + fast timeout (nearly invisible)
+    if [ -f /etc/default/grub ]; then
+        if [ ! -f /etc/default/grub.bak.harmoni ]; then
+            cp /etc/default/grub /etc/default/grub.bak.harmoni
+        fi
+        # Add quiet splash
+        if ! grep -q "quiet splash" /etc/default/grub; then
+            sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT="\(.*\)"/GRUB_CMDLINE_LINUX_DEFAULT="\1 quiet splash"/' /etc/default/grub
+            sed -i 's/  */ /g' /etc/default/grub
+        fi
+        # Set timeout to 1 second (nearly invisible but still accessible with Shift)
+        sed -i 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=1/' /etc/default/grub
+        # Hide GRUB menu unless Shift is held
+        if ! grep -q "GRUB_TIMEOUT_STYLE" /etc/default/grub; then
+            echo 'GRUB_TIMEOUT_STYLE=hidden' >> /etc/default/grub
+        else
+            sed -i 's/^GRUB_TIMEOUT_STYLE=.*/GRUB_TIMEOUT_STYLE=hidden/' /etc/default/grub
+        fi
+        update-grub 2>/dev/null || true
+        echo "[Harmoni] ✓ GRUB configured (hidden, 1s timeout, quiet splash)"
+    fi
+
+    # Disable other DMs
+    for dm in gdm gdm3 sddm; do
+        if systemctl is-enabled "$dm" 2>/dev/null | grep -q "enabled"; then
+            systemctl disable "$dm" 2>/dev/null || true
+        fi
+    done
+    systemctl enable lightdm 2>/dev/null || true
+
+    # Ensure system boots to graphical target (not multi-user/text)
+    systemctl set-default graphical.target 2>/dev/null || true
+
+    echo ""
+    echo "═══════════════════════════════════════════"
+    echo "  ✓ Substituição completa configurada!"
+    echo ""
+    echo "  Boot: logo Harmoni (Plymouth)"
+    echo "  Login: LightDM com tema Harmoni"
+    echo "  Desktop: Harmoni OS"
+    echo ""
+    echo "  Reboot: sudo reboot"
+    echo "  Reverter: sudo apt remove harmoni && sudo reboot"
+    echo "═══════════════════════════════════════════"
+    echo ""
+else
+    echo "═══════════════════════════════════════════"
+    echo "  ✓ Harmoni instalado (sessão adicional)"
+    echo ""
+    echo "  Reboot e selecione 'Harmoni OS' na tela de login."
+    echo "  sudo reboot"
+    echo "═══════════════════════════════════════════"
+    echo ""
+fi
 
 # Never fail
 exit 0
@@ -165,6 +347,23 @@ if [ -f /etc/lightdm/slick-greeter.conf.bak.harmoni ]; then
 fi
 if [ -f /etc/lightdm/lightdm-gtk-greeter.conf.bak.harmoni ]; then
     mv /etc/lightdm/lightdm-gtk-greeter.conf.bak.harmoni /etc/lightdm/lightdm-gtk-greeter.conf
+fi
+
+# Restore Plymouth theme to default
+if command -v plymouth-set-default-theme &>/dev/null; then
+    CURRENT_THEME=$(plymouth-set-default-theme 2>/dev/null || echo "")
+    if [ "$CURRENT_THEME" = "harmoni" ]; then
+        plymouth-set-default-theme -R spinner 2>/dev/null || \
+        plymouth-set-default-theme -R ubuntu-logo 2>/dev/null || true
+        echo "[Harmoni] Restored default Plymouth theme"
+    fi
+fi
+
+# Restore GRUB if we changed it
+if [ -f /etc/default/grub.bak.harmoni ]; then
+    mv /etc/default/grub.bak.harmoni /etc/default/grub
+    update-grub 2>/dev/null || true
+    echo "[Harmoni] Restored GRUB config"
 fi
 
 # Clean venv
@@ -208,17 +407,36 @@ echo "=== Harmoni session starting $(date) ===" >> "$LOGFILE"
 xsetroot -solid '#0a0a0f' 2>/dev/null || true
 xsetroot -cursor_name left_ptr 2>/dev/null || true
 
-# Find Python
+# Find Python — try venv first, then system
 VENV="/usr/share/harmoni/.venv/bin/python3"
 if [ ! -x "$VENV" ]; then
-    VENV="python3"
+    VENV=$(which python3 2>/dev/null)
+    echo "WARNING: venv not found, using system python: $VENV" >> "$LOGFILE"
+fi
+
+if [ -z "$VENV" ]; then
+    echo "FATAL: No python3 found!" >> "$LOGFILE"
+    xterm -e "echo 'Harmoni: python3 not found. Check installation.'; bash" &
+    wait
+    exit 1
 fi
 
 # Ensure harmoni module is findable
 export PYTHONPATH="/usr/share/harmoni:${PYTHONPATH:-}"
 
+# Verify harmoni module is importable
+if ! $VENV -c "import harmoni" 2>/dev/null; then
+    echo "FATAL: Cannot import harmoni module" >> "$LOGFILE"
+    echo "Python: $VENV" >> "$LOGFILE"
+    echo "PYTHONPATH: $PYTHONPATH" >> "$LOGFILE"
+    $VENV -c "import harmoni" >> "$LOGFILE" 2>&1
+    xterm -e "echo 'Harmoni: module not found. Run: sudo apt install -f'; tail -10 $LOGFILE; echo; bash" &
+    wait
+    exit 1
+fi
+
 # Show splash BEFORE Openbox (user sees brand instantly)
-$VENV -m harmoni.splash &
+$VENV -m harmoni.ui.splash &
 SPLASH_PID=$!
 
 # Start Openbox in parallel
@@ -227,7 +445,7 @@ if command -v openbox &>/dev/null; then
     openbox --config-file "${OPENBOX_CONF}/rc.xml" &
     echo "Openbox started (PID $!)" >> "$LOGFILE"
 else
-    echo "WARNING: openbox not found" >> "$LOGFILE"
+    echo "WARNING: openbox not found, trying without WM" >> "$LOGFILE"
 fi
 
 # Start Harmoni (crash recovery loop)
@@ -319,6 +537,18 @@ if [ -f assets/harmoni_logo.png ]; then
     # Also copy to install dir so the running app can find it
     cp assets/harmoni_logo.png "${PKG_DIR}${INSTALL_DIR}/assets/harmoni_logo.png" 2>/dev/null || true
     echo "→ Harmoni logo bundled for LightDM + GUI"
+fi
+
+# ── Plymouth boot splash theme ──
+echo "→ Copying Plymouth theme..."
+if [ -d plymouth/harmoni ]; then
+    cp plymouth/harmoni/harmoni.plymouth "${PKG_DIR}/usr/share/plymouth/themes/harmoni/"
+    cp plymouth/harmoni/harmoni.script "${PKG_DIR}/usr/share/plymouth/themes/harmoni/"
+    # Use the same logo for Plymouth boot splash
+    if [ -f assets/harmoni_logo.png ]; then
+        cp assets/harmoni_logo.png "${PKG_DIR}/usr/share/plymouth/themes/harmoni/logo.png"
+    fi
+    echo "→ Plymouth theme bundled"
 fi
 
 # ── Background ──

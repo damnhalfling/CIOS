@@ -68,10 +68,27 @@ class OnboardingWizard:
         self._root.geometry("600x450")
         self._root.resizable(False, False)
 
-        # Center on screen
+        # Close splash screen if it's running
+        try:
+            from harmoni.ui.splash import signal_splash_done
+            signal_splash_done()
+        except Exception:
+            pass
+
+        # Center on primary monitor
         self._root.update_idletasks()
-        x = (self._root.winfo_screenwidth() - 600) // 2
-        y = (self._root.winfo_screenheight() - 450) // 2
+        try:
+            from harmoni.infra.monitors import get_primary_monitor
+            primary = get_primary_monitor()
+            if primary:
+                x = primary.x + (primary.width - 600) // 2
+                y = primary.y + (primary.height - 450) // 2
+            else:
+                x = (self._root.winfo_screenwidth() - 600) // 2
+                y = (self._root.winfo_screenheight() - 450) // 2
+        except Exception:
+            x = (self._root.winfo_screenwidth() - 600) // 2
+            y = (self._root.winfo_screenheight() - 450) // 2
         self._root.geometry(f"+{x}+{y}")
 
         self._container = tk.Frame(self._root, bg="#0a0a0f")
