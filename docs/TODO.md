@@ -194,16 +194,16 @@ API em produção: `https://api.cios-ia.com/` (Maestro v2.33.0).
 
 **O salto:** Continuidade temporal completa — o sistema entende arquivos, tabs, intenção, ambiente, prioridade, ferramentas, estado mental operacional.
 
-| # | Task | Modelo | Fase |
-|---|------|--------|------|
-| 310 | Memória operacional básica gratuita (últimos projetos, padrões, hábitos) | Free | 1 |
-| 311 | Context graph avançado (relações, objetivos, temporalidade, cross-session) | Premium | 4 |
-| 312 | "Continua o que eu estava fazendo ontem" → restaura estado completo | Free (local) | 1 |
-| 313 | Semantic indexing de atividade (não só intents, mas fluxos) | Premium | 4 |
-| 314 | Temporal model: deferred intents ("depois da reunião", "amanhã cedo") | Free | 2 |
-| 315 | Timeline operacional (scheduling semântico de intenções) | Free | 2 |
+| # | Task | Fase |
+|---|------|------|
+| 310 | Memória operacional básica gratuita (últimos projetos, padrões, hábitos) | 1 |
+| 311 | Context graph avançado (relações, objetivos, temporalidade, cross-session) | 4 |
+| 312 | "Continua o que eu estava fazendo ontem" → restaura estado completo | 1 |
+| 313 | Semantic indexing de atividade (não só intents, mas fluxos) | 4 |
+| 314 | Temporal model: deferred intents ("depois da reunião", "amanhã cedo") | 2 |
+| 315 | Timeline operacional (scheduling semântico de intenções) | 2 |
 
-**Nota:** Sem memória mínima, o sistema parece "chat stateless com automação". Memória operacional básica é parte do paradigma, não feature premium.
+**Nota:** Sem memória mínima, o sistema parece "chat stateless com automação". Memória operacional básica é parte do paradigma.
 
 ### 3. Runtime agêntico confiável
 
@@ -282,19 +282,19 @@ API em produção: `https://api.cios-ia.com/` (Maestro v2.33.0).
 
 ### 8. Intent graph / memory graph (kernel cognitivo)
 
-**Status:** Não implementado. Será o verdadeiro diferencial premium.
+**Status:** Não implementado. Será o verdadeiro diferencial do CIOS.
 
 **O salto:** Grafo operacional pessoal — relações, frequência, hábitos, objetivos, projetos, pessoas, workflows, temporalidade. Não banco vetorial genérico.
 
-| # | Task | Modelo | Fase |
-|---|------|--------|------|
-| 370 | Graph de intents (frequência, padrões, relações) | Premium | 4 |
-| 371 | Graph de projetos (pessoas, arquivos, ferramentas, estado) | Premium | 4 |
-| 372 | Inferência de hábitos (sugestões proativas) | Premium | 5 |
-| 373 | Cross-device sync do graph | Premium | 5 |
-| 374 | Intent memory compression (sumarização, pruning, relevance decay) | Premium | 4 |
+| # | Task | Fase |
+|---|------|------|
+| 370 | Graph de intents (frequência, padrões, relações) | 4 |
+| 371 | Graph de projetos (pessoas, arquivos, ferramentas, estado) | 4 |
+| 372 | Inferência de hábitos (sugestões proativas) | 5 |
+| 373 | Cross-device sync do graph | 5 |
+| 374 | Intent memory compression (sumarização, pruning, relevance decay) | 4 |
 
-**Modelo comercial:** Storage, embeddings, sync, inference, semantic indexing custam dinheiro real. Diferencial futuro = continuidade computacional.
+**Diferencial futuro:** continuidade computacional.
 
 ### 9. Segurança intent-native
 
@@ -396,24 +396,6 @@ Você: continua codando, consulta quando quiser
 
 ---
 
-## Modelo comercial (visão)
-
-| Camada | Free | Premium |
-|--------|------|---------|
-| Intent execution | ✅ | ✅ |
-| Skills de sistema | ✅ | ✅ |
-| Memória operacional básica | ✅ | ✅ |
-| Multi-channel intent (foreground/background) | ✅ | ✅ |
-| Scheduler cognitivo (modos, focus protection) | ✅ | ✅ |
-| Context graph avançado | — | ✅ |
-| Intelligence API (queries) | Limitado (3-5/dia) | Ilimitado |
-| Semantic indexing | — | ✅ |
-| Cross-device sync | — | ✅ |
-| Inferência de hábitos | — | ✅ |
-| Intent memory compression | — | ✅ |
-
----
-
 ## Fases de evolução
 
 ### FASE 1 — Fechar o loop (curto prazo)
@@ -484,7 +466,7 @@ Você: continua codando, consulta quando quiser
 | 423 | Foreground/background cognitive separation no compositor |
 
 ### FASE 4 — Memória cognitiva
-> CIOS como sistema contínuo. Diferencial premium.
+> CIOS como sistema contínuo.
 
 | # | Task |
 |---|------|
@@ -530,7 +512,7 @@ FASE 2    → Computação paralela (scheduler, arbitration, multi-channel, voz)
 FASE 3    → Intent-native core (compositor wlroots, focus, placement, overlays)
 FASE 4    → Memória cognitiva (graph, compression, semantic indexing)
 FASE 5    → Post-app computing (filesystem semântico, antecipação, zero-click)
-FUTURO    → Distribuição + Billing
+FUTURO    → Distribuição
 ```
 
 ---
