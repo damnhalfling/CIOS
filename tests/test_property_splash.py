@@ -11,7 +11,7 @@ from unittest.mock import patch
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from harmoni.ui.splash import update_splash_progress
+from cios.ui.splash import update_splash_progress
 
 
 # --- Strategies ---
@@ -58,7 +58,7 @@ class TestSplashProgressProtocol:
         with tempfile.TemporaryDirectory() as tmp:
             progress_file = Path(tmp) / ".splash_progress"
 
-            with patch("harmoni.ui.splash._PROGRESS_FILE", str(progress_file)):
+            with patch("cios.ui.splash._PROGRESS_FILE", str(progress_file)):
                 update_splash_progress(stage, current, total)
 
             # File must exist after writing

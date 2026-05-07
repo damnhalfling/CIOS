@@ -8,7 +8,7 @@ from unittest.mock import patch, MagicMock
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from harmoni.core.bridge import HarmoniBridge
+from cios.core.bridge import CIOSBridge
 
 
 # --- Strategies ---
@@ -25,9 +25,9 @@ _safe_word = st.text(
 _echo_command = _safe_word.map(lambda w: f"run echo {w}")
 
 
-def _make_bridge() -> HarmoniBridge:
+def _make_bridge() -> CIOSBridge:
     """Create a Bridge instance with MCP mocked (no real system polling)."""
-    with patch("harmoni.core.mcp.context") as mock_ctx:
+    with patch("cios.core.mcp.context") as mock_ctx:
         mock_ctx.start = MagicMock()
         mock_ctx.stop = MagicMock()
         mock_ctx.boot_times = {}
@@ -35,7 +35,7 @@ def _make_bridge() -> HarmoniBridge:
         mock_ctx.force_update_wifi = MagicMock()
         mock_ctx.force_update_audio = MagicMock()
         mock_ctx.force_update = MagicMock()
-        from harmoni.core.mcp import ContextSnapshot, SystemState
+        from cios.core.mcp import ContextSnapshot, SystemState
         mock_snapshot = ContextSnapshot(
             system=SystemState(
                 cpu_percent=15.0,
@@ -48,7 +48,7 @@ def _make_bridge() -> HarmoniBridge:
             ),
         )
         mock_ctx.snapshot.return_value = mock_snapshot
-        bridge = HarmoniBridge()
+        bridge = CIOSBridge()
     return bridge
 
 

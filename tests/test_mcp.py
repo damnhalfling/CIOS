@@ -4,7 +4,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from harmoni.core.mcp import (
+from cios.core.mcp import (
     SystemContext,
     ContextSnapshot,
     WifiState,

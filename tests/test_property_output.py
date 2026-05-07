@@ -12,9 +12,9 @@ import re
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from harmoni.core.planner import _sanitize_error
-from harmoni.core.humanizer import humanize_error
-from harmoni.core.error_recovery import enrich_error
+from cios.core.planner import _sanitize_error
+from cios.core.humanizer import humanize_error
+from cios.core.error_recovery import enrich_error
 
 
 # ── Forbidden patterns that must NEVER appear in user-facing output ──────
@@ -37,10 +37,10 @@ FORBIDDEN_PATTERNS = [
 _file_paths = st.sampled_from([
     "/usr/lib/python3/dist-packages/foo.py",
     "/home/user/.local/lib/python3.11/site-packages/bar/baz.py",
-    "/etc/systemd/system/harmoni.service",
+    "/etc/systemd/system/cios.service",
     "/var/log/syslog",
-    "/tmp/harmoni_crash_12345.log",
-    "/opt/harmoni/bin/daemon",
+    "/tmp/cios_crash_12345.log",
+    "/opt/cios/bin/daemon",
     "/usr/bin/python3.11",
     "/proc/1234/status",
 ])
@@ -57,7 +57,7 @@ _tracebacks = st.builds(
     st.sampled_from([
         "/usr/lib/python3/dist-packages/subprocess.py",
         "/home/user/project/main.py",
-        "/opt/harmoni/harmoni/core/executor.py",
+        "/opt/cios/cios/core/executor.py",
     ]),
     st.integers(min_value=1, max_value=999),
 )

@@ -4,11 +4,11 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from harmoni.core.executor import Executor, ExecResult
-from harmoni.core.intent_parser import Intent, IntentType
-from harmoni.core.memory import Memory
-from harmoni.core.mcp import ContextSnapshot, WifiState, AudioState, BatteryState
-from harmoni.core.planner import Planner, PlanResult
+from cios.core.executor import Executor, ExecResult
+from cios.core.intent_parser import Intent, IntentType
+from cios.core.memory import Memory
+from cios.core.mcp import ContextSnapshot, WifiState, AudioState, BatteryState
+from cios.core.planner import Planner, PlanResult
 
 
 @pytest.fixture
@@ -17,8 +17,8 @@ def planner(tmp_path):
     from unittest.mock import patch as _patch
 
     db_path = tmp_path / "test_planner.db"
-    with _patch("harmoni.core.config.DB_PATH", db_path), \
-         _patch("harmoni.core.config.ensure_dirs", lambda: None):
+    with _patch("cios.core.config.DB_PATH", db_path), \
+         _patch("cios.core.config.ensure_dirs", lambda: None):
         executor = Executor()
         memory = Memory()
         p = Planner(executor, memory)
@@ -65,9 +65,10 @@ class TestMCOPrecheck:
         mock_snap = ContextSnapshot(
             audio=AudioState(volume=75, muted=False),
         )
-        with patch("harmoni.core.planner.mcp") as mock_mcp:
+        with patch("cios.core.planner.mcp") as mock_mcp,              patch("cios.core.handlers.audio.mcp") as mock_mcp2:
             mock_mcp.snapshot.return_value = mock_snap
             mock_mcp.audio = mock_snap.audio
+            mock_mcp2.audio = mock_snap.audio
 
             intent = Intent(type=IntentType.AUDIO, confidence=0.9, params={"action": "status"})
             result = planner.execute(intent)
@@ -79,7 +80,7 @@ class TestMCOPrecheck:
         mock_snap = ContextSnapshot(
             audio=AudioState(volume=50, muted=True),
         )
-        with patch("harmoni.core.planner.mcp") as mock_mcp:
+        with patch("cios.core.planner.mcp") as mock_mcp:
             mock_mcp.snapshot.return_value = mock_snap
             mock_mcp.audio = mock_snap.audio
 
@@ -93,9 +94,10 @@ class TestMCOPrecheck:
         mock_snap = ContextSnapshot(
             wifi=WifiState(connected=True, ssid="Casa", signal=90, ip="192.168.1.5"),
         )
-        with patch("harmoni.core.planner.mcp") as mock_mcp:
+        with patch("cios.core.planner.mcp") as mock_mcp,              patch("cios.core.handlers.network.mcp") as mock_mcp2:
             mock_mcp.snapshot.return_value = mock_snap
             mock_mcp.wifi = mock_snap.wifi
+            mock_mcp2.wifi = mock_snap.wifi
 
             intent = Intent(type=IntentType.NETWORK, confidence=0.9, params={"action": "status"})
             result = planner.execute(intent)
@@ -107,9 +109,10 @@ class TestMCOPrecheck:
         mock_snap = ContextSnapshot(
             wifi=WifiState(connected=True, ssid="Casa", signal=90),
         )
-        with patch("harmoni.core.planner.mcp") as mock_mcp:
+        with patch("cios.core.planner.mcp") as mock_mcp,              patch("cios.core.handlers.network.mcp") as mock_mcp2:
             mock_mcp.snapshot.return_value = mock_snap
             mock_mcp.wifi = mock_snap.wifi
+            mock_mcp2.wifi = mock_snap.wifi
 
             intent = Intent(
                 type=IntentType.NETWORK, confidence=0.9,
@@ -150,9 +153,10 @@ class TestPlannerPower:
         mock_snap = ContextSnapshot(
             battery=BatteryState(present=False),
         )
-        with patch("harmoni.core.planner.mcp") as mock_mcp:
+        with patch("cios.core.planner.mcp") as mock_mcp,              patch("cios.core.handlers.system.mcp") as mock_mcp2:
             mock_mcp.snapshot.return_value = mock_snap
             mock_mcp.battery = mock_snap.battery
+            mock_mcp2.battery = mock_snap.battery
 
             intent = Intent(
                 type=IntentType.POWER, confidence=0.9,
@@ -167,9 +171,10 @@ class TestPlannerPower:
         mock_snap = ContextSnapshot(
             battery=BatteryState(present=True, percent=10, charging=False, time_remaining="0h30m"),
         )
-        with patch("harmoni.core.planner.mcp") as mock_mcp:
+        with patch("cios.core.planner.mcp") as mock_mcp,              patch("cios.core.handlers.system.mcp") as mock_mcp2:
             mock_mcp.snapshot.return_value = mock_snap
             mock_mcp.battery = mock_snap.battery
+            mock_mcp2.battery = mock_snap.battery
 
             intent = Intent(
                 type=IntentType.POWER, confidence=0.9,
@@ -222,7 +227,7 @@ class TestContinueProjectHandler:
 
         Validates: Requirements 2.4
         """
-        from harmoni.core.memory import SessionContext
+        from cios.core.memory import SessionContext
 
         # Save two sessions with different timestamps — "beta" is more recent
         planner.memory.save_session(SessionContext(
@@ -255,10 +260,10 @@ class TestContinueProjectHandler:
             raw_input="continuar",
         )
 
-        with patch("harmoni.core.planner._is_port_in_use", return_value=True), \
-             patch("harmoni.core.planner._detect_editor", return_value="code"), \
-             patch("harmoni.core.planner._open_editor") as mock_editor, \
-             patch("harmoni.core.planner._open_browser") as mock_browser, \
+        with patch("cios.core.handlers.dev._is_port_in_use", return_value=True), \
+             patch("cios.core.handlers.dev._detect_editor", return_value="code"), \
+             patch("cios.core.handlers.dev._open_editor") as mock_editor, \
+             patch("cios.core.handlers.dev._open_browser") as mock_browser, \
              patch("os.path.exists", return_value=True):
 
             result = planner._handle_continue_project(intent)
@@ -274,7 +279,7 @@ class TestContinueProjectHandler:
 
         Validates: Requirements 2.2
         """
-        from harmoni.core.memory import SessionContext
+        from cios.core.memory import SessionContext
 
         planner.memory.save_session(SessionContext(
             project_name="fidelidade",
@@ -295,10 +300,10 @@ class TestContinueProjectHandler:
             raw_input="continuar projeto fidelidade",
         )
 
-        with patch("harmoni.core.planner._is_port_in_use", return_value=True), \
-             patch("harmoni.core.planner._detect_editor", return_value="code"), \
-             patch("harmoni.core.planner._open_editor") as mock_editor, \
-             patch("harmoni.core.planner._open_browser") as mock_browser, \
+        with patch("cios.core.handlers.dev._is_port_in_use", return_value=True), \
+             patch("cios.core.handlers.dev._detect_editor", return_value="code"), \
+             patch("cios.core.handlers.dev._open_editor") as mock_editor, \
+             patch("cios.core.handlers.dev._open_browser") as mock_browser, \
              patch("os.path.exists", return_value=True):
 
             result = planner._handle_continue_project(intent)
@@ -313,7 +318,7 @@ class TestContinueProjectHandler:
 
         Validates: Requirements 2.5
         """
-        from harmoni.core.memory import SessionContext
+        from cios.core.memory import SessionContext
 
         planner.memory.save_session(SessionContext(
             project_name="deleted-app",
@@ -379,7 +384,7 @@ class TestContinueProjectHandler:
 
         Validates: Requirements 2.5
         """
-        from harmoni.core.memory import SessionContext
+        from cios.core.memory import SessionContext
 
         planner.memory.save_session(SessionContext(
             project_name="webapp",

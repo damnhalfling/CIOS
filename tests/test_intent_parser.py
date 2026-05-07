@@ -2,7 +2,7 @@
 
 import pytest
 
-from harmoni.core.intent_parser import IntentType, Intent, parse_intent
+from cios.core.intent_parser import IntentType, Intent, parse_intent
 
 
 class TestDevStart:
@@ -264,7 +264,7 @@ class TestUnknown:
         "",
         "asdfghjkl",
         "tell me a joke",
-        "what is the meaning of life",
+        "the quick brown fox jumps over the lazy dog",
     ])
     def test_unknown_patterns(self, input_text):
         intent = parse_intent(input_text)

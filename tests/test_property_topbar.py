@@ -11,7 +11,7 @@ from unittest.mock import patch
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from harmoni.ui.topbar import signal_topbar_processing, signal_topbar_idle
+from cios.ui.topbar import signal_topbar_processing, signal_topbar_idle
 
 
 # --- Strategies ---
@@ -44,7 +44,7 @@ class TestTopbarActivitySignaling:
         with tempfile.TemporaryDirectory() as tmp:
             activity_file = os.path.join(tmp, ".topbar_activity")
 
-            with patch("harmoni.ui.topbar._ACTIVITY_FILE", activity_file):
+            with patch("cios.ui.topbar._ACTIVITY_FILE", activity_file):
                 signal_topbar_processing(activity)
 
             # File must exist after signaling processing
@@ -69,7 +69,7 @@ class TestTopbarActivitySignaling:
         with tempfile.TemporaryDirectory() as tmp:
             activity_file = os.path.join(tmp, ".topbar_activity")
 
-            with patch("harmoni.ui.topbar._ACTIVITY_FILE", activity_file):
+            with patch("cios.ui.topbar._ACTIVITY_FILE", activity_file):
                 # First create the file via processing signal
                 signal_topbar_processing(activity)
                 assert os.path.exists(activity_file), (
@@ -94,7 +94,7 @@ class TestTopbarActivitySignaling:
         with tempfile.TemporaryDirectory() as tmp:
             activity_file = os.path.join(tmp, ".topbar_activity")
 
-            with patch("harmoni.ui.topbar._ACTIVITY_FILE", activity_file):
+            with patch("cios.ui.topbar._ACTIVITY_FILE", activity_file):
                 signal_topbar_processing(activity)
 
             with open(activity_file, "r") as f:

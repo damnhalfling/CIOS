@@ -4,18 +4,18 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from harmoni.core.bridge import HarmoniBridge
+from cios.core.bridge import CIOSBridge
 
 
 @pytest.fixture
 def bridge():
     """Provide a Bridge instance with MCP mocked (no real system polling)."""
-    with patch("harmoni.core.mcp.context") as mock_ctx:
+    with patch("cios.core.mcp.context") as mock_ctx:
         mock_ctx.start = MagicMock()
         mock_ctx.stop = MagicMock()
         mock_ctx.boot_times = {}
         # Mock snapshot for get_system_status (returns real-looking data)
-        from harmoni.core.mcp import ContextSnapshot, SystemState
+        from cios.core.mcp import ContextSnapshot, SystemState
         mock_snapshot = ContextSnapshot(
             system=SystemState(
                 cpu_percent=15.0,
@@ -28,7 +28,7 @@ def bridge():
             ),
         )
         mock_ctx.snapshot.return_value = mock_snapshot
-        b = HarmoniBridge()
+        b = CIOSBridge()
         yield b
         b.close()
 
@@ -65,7 +65,7 @@ class TestBridgeIntentRouting:
 
     def test_unknown_intent_without_llm(self, bridge):
         """Unknown intent without LLM fallback returns error."""
-        with patch("harmoni.core.bridge.resolve_unknown_intent", return_value=None):
+        with patch("cios.core.bridge.resolve_unknown_intent", return_value=None):
             result = bridge.execute_command("asdfghjkl")
             assert result["status"] == "error"
 
@@ -88,7 +88,7 @@ class TestBridgeConfirmation:
 
     def test_suspend_no_confirmation(self, bridge):
         """Non-destructive session actions don't need confirmation."""
-        with patch("harmoni.core.planner.execute_session_action") as mock_exec:
+        with patch("cios.core.handlers.system.execute_session_action") as mock_exec:
             mock_exec.return_value = (["Suspender (modo dormir)"], True, None)
             result = bridge.execute_command("suspender", confirmed=True)
             # suspend is not destructive, so no confirm
@@ -103,7 +103,7 @@ class TestBridgeErrorHandling:
     """Error handling in bridge."""
 
     def test_exception_returns_error(self, bridge):
-        with patch("harmoni.core.bridge.parse_intent", side_effect=RuntimeError("boom")):
+        with patch("cios.core.bridge.parse_intent", side_effect=RuntimeError("boom")):
             result = bridge.execute_command("anything")
             assert result["status"] == "error"
 
@@ -183,8 +183,8 @@ class TestBridgeStreamingProgress:
         """Topbar signals transition: Entendendo… → Executando… → idle."""
         topbar_calls = []
 
-        with patch("harmoni.ui.topbar.signal_topbar_processing") as mock_proc, \
-             patch("harmoni.ui.topbar.signal_topbar_idle") as mock_idle:
+        with patch("cios.ui.topbar.signal_topbar_processing") as mock_proc, \
+             patch("cios.ui.topbar.signal_topbar_idle") as mock_idle:
             mock_proc.side_effect = lambda msg: topbar_calls.append(("processing", msg))
             mock_idle.side_effect = lambda: topbar_calls.append(("idle",))
 
@@ -204,17 +204,17 @@ class TestBridgeStreamingProgress:
 
     def test_streaming_topbar_idle_on_unknown_intent(self, bridge):
         """Topbar returns to idle when intent is unknown."""
-        with patch("harmoni.ui.topbar.signal_topbar_processing"), \
-             patch("harmoni.ui.topbar.signal_topbar_idle") as mock_idle, \
-             patch("harmoni.core.bridge.resolve_unknown_intent", return_value=None), \
-             patch("harmoni.core.bridge.classify_intent", return_value=None):
+        with patch("cios.ui.topbar.signal_topbar_processing"), \
+             patch("cios.ui.topbar.signal_topbar_idle") as mock_idle, \
+             patch("cios.core.bridge.resolve_unknown_intent", return_value=None), \
+             patch("cios.core.bridge.classify_intent", return_value=None):
             bridge.execute_streaming("asdfghjkl", on_step=lambda *a: None)
             mock_idle.assert_called()
 
     def test_streaming_topbar_idle_on_confirmation(self, bridge):
         """Topbar returns to idle when confirmation is needed."""
-        with patch("harmoni.ui.topbar.signal_topbar_processing"), \
-             patch("harmoni.ui.topbar.signal_topbar_idle") as mock_idle:
+        with patch("cios.ui.topbar.signal_topbar_processing"), \
+             patch("cios.ui.topbar.signal_topbar_idle") as mock_idle:
             result = bridge.execute_streaming(
                 "organize my downloads", on_step=lambda *a: None,
             )
@@ -223,8 +223,8 @@ class TestBridgeStreamingProgress:
 
     def test_streaming_topbar_idle_on_clarification(self, bridge):
         """Topbar returns to idle when clarification is needed."""
-        with patch("harmoni.ui.topbar.signal_topbar_processing"), \
-             patch("harmoni.ui.topbar.signal_topbar_idle") as mock_idle:
+        with patch("cios.ui.topbar.signal_topbar_processing"), \
+             patch("cios.ui.topbar.signal_topbar_idle") as mock_idle:
             # "abrir" without app name triggers clarification
             result = bridge.execute_streaming(
                 "abrir", on_step=lambda *a: None,

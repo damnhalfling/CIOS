@@ -2,7 +2,7 @@
 
 import pytest
 
-from harmoni.core.executor import Executor, ExecResult
+from cios.core.executor import Executor, ExecResult
 
 
 class TestExecResult:

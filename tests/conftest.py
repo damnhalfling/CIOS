@@ -1,4 +1,4 @@
-"""Shared fixtures for Harmoni tests."""
+"""Shared fixtures for CIOS tests."""
 
 import os
 import subprocess
@@ -57,23 +57,23 @@ def isolate_home(tmp_path):
     """Ensure tests never touch the real home directory or run dangerous commands."""
     fake_home = tmp_path / "home"
     fake_home.mkdir()
-    harmoni_home = fake_home / ".harmoni"
-    harmoni_home.mkdir()
+    cios_home = fake_home / ".cios"
+    cios_home.mkdir()
 
     original_run = subprocess.run
     original_popen = subprocess.Popen
 
     with patch.dict(os.environ, {
         "HOME": str(fake_home),
-        "HARMONI_HOME": str(harmoni_home),
+        "CIOS_HOME": str(cios_home),
     }):
         # Create required subdirectories
-        (harmoni_home / "logs").mkdir(exist_ok=True)
+        (cios_home / "logs").mkdir(exist_ok=True)
 
-        with patch("harmoni.core.config.HARMONI_HOME", harmoni_home), \
-             patch("harmoni.core.config.DB_PATH", harmoni_home / "memory.db"), \
-             patch("harmoni.core.config.LOG_DIR", harmoni_home / "logs"), \
-             patch("harmoni.core.config.SETTINGS_PATH", harmoni_home / "settings.json"), \
+        with patch("cios.core.config.CIOS_HOME", cios_home), \
+             patch("cios.core.config.DB_PATH", cios_home / "memory.db"), \
+             patch("cios.core.config.LOG_DIR", cios_home / "logs"), \
+             patch("cios.core.config.SETTINGS_PATH", cios_home / "settings.json"), \
              patch("subprocess.run", _safe_subprocess_run(original_run)), \
              patch("subprocess.Popen", _safe_subprocess_popen(original_popen)):
             yield fake_home
@@ -82,5 +82,5 @@ def isolate_home(tmp_path):
 @pytest.fixture
 def executor():
     """Provide a real Executor instance (safe — blocked commands are intercepted)."""
-    from harmoni.core.executor import Executor
+    from cios.core.executor import Executor
     return Executor()

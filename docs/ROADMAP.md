@@ -1,7 +1,7 @@
 # Harmoni OS — Roadmap
 
 > Substituindo apps por intenção.
-> Atualizado: Maio 2026 — v0.14.0
+> Atualizado: Maio 2026 — v0.15.0
 
 ---
 
@@ -64,8 +64,35 @@ Se não for 100% confiável → fluxo guiado. Se for confiável → automático.
 - ✅ Installer com opção de substituição completa (LightDM + Plymouth)
 - ✅ Modal de confirmação com focus correto (Enter confirma, não reenvia)
 
-### P3 — Demo
-- ⏳ Gravação manual em máquina real (celular)
+### P3 — Demo ✅
+- ✅ Gravação manual em máquina real
+
+---
+
+## Fase atual: Hardening + Intelligence
+
+### P3.5 — Hardening IA local ✅
+- ✅ Ollama auto-start no boot (ollama_manager.py)
+- ✅ Indicador de IA no topbar (🧠 verde/amarelo/vermelho)
+- ✅ Diagnóstico de conectividade Ollama no boot
+
+### Media Player Inline ✅
+- ✅ Skill media_player.py (scan, thumbnails, playback via mpv)
+- ✅ Intents PT/EN: "mostre fotos", "mostre vídeos", "tocar música", "parar"
+- ✅ Detecção automática de pendrives/mídias montadas
+- ✅ Thumbnails com cache (Pillow + ffmpeg)
+- ✅ Graceful degradation (sem mpv → informa, sem Pillow → sem thumbnails)
+
+---
+
+### Conversation Threads ✅
+- ✅ ThreadManager: coordena estado de conversa com lock único (thread-safe)
+- ✅ ThreadClassifier: classificação determinística (pronomes PT/EN, frases de continuação, proximidade temporal, intent)
+- ✅ ThreadStore: persistência SQLite (50 threads, enforce limit, filtros por data/intent)
+- ✅ Bridge refactor: delega _conversation e _pending_question ao ThreadManager
+- ✅ ThreadPanel GUI: substitui recents, expand/collapse, indicadores de pending/timeout
+- ✅ Cloud sync: payload sanitizado (sem params/credentials), daemon thread, 10s timeout
+- ✅ 9 property tests (Hypothesis) + testes unitários + integração (140 novos testes)
 
 ---
 
@@ -73,8 +100,8 @@ Se não for 100% confiável → fluxo guiado. Se for confiável → automático.
 
 | Fase | Objetivo | Quando |
 |------|----------|--------|
-| Harmoni Intelligence | IA cloud opcional (news, explain, write, translate) | Após P0-P3 |
-| Demo voz | Wake word, confirmação por voz, 3 fluxos matadores | Após Intelligence |
+| Intelligence Client (P4) | Client no OS que consome api.harmoni-ia.com | AGORA |
+| Módulo de Voz (P6) | STT/TTS como I/O agnóstico (mic → texto → pipeline → TTS) | Após P4 |
 | Wayland compositor | Compositor próprio (wlroots-based) | Antes de distribuição |
 | Distribuição | 1-liner, AppImage, distro própria | Quando tiver impacto |
 
@@ -105,18 +132,18 @@ Se não for 100% confiável → fluxo guiado. Se for confiável → automático.
 
 ---
 
-## Números (v0.14.0)
+## Números (v0.15.0)
 
 | Métrica | Valor |
 |---------|-------|
-| Skills | 21 |
-| Intent patterns | 155+ (PT/EN) |
-| Traduções humanizer | 220+ (PT/EN) |
+| Skills | 22 (+media_player) |
+| Intent patterns | 170+ (PT/EN) |
+| Traduções humanizer | 230+ (PT/EN) |
 | Tipos de erro | 19 |
-| Testes | 468+ |
-| Property tests (Hypothesis) | 13 |
+| Testes | 608+ |
+| Property tests (Hypothesis) | 22 |
 | Modos de execução | 6 |
-| Itens concluídos | 150+ |
+| Itens concluídos | 175+ |
 
 ---
 
@@ -132,4 +159,4 @@ LLM só para intents desconhecidos. Pattern matching resolve 80%+.
 
 ---
 
-*Atualizado: Maio 2026 — v0.13.0*
+*Atualizado: Maio 2026 — v0.15.0*

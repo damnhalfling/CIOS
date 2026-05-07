@@ -4,7 +4,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from harmoni.core.model_router import (
+from cios.core.model_router import (
     _call_provider,
     _is_transient,
     _retry_call,
@@ -62,7 +62,7 @@ class TestRetryCall:
             ConnectionError("connection refused"),
             "ok",
         ])
-        with patch("harmoni.core.model_router.time.sleep"):
+        with patch("cios.core.model_router.time.sleep"):
             result = _retry_call(fn, "prompt", "system", "test")
         assert result == "ok"
         assert fn.call_count == 2
@@ -75,7 +75,7 @@ class TestRetryCall:
 
     def test_gives_up_after_max_retries(self):
         fn = MagicMock(side_effect=ConnectionError("connection refused"))
-        with patch("harmoni.core.model_router.time.sleep"):
+        with patch("cios.core.model_router.time.sleep"):
             result = _retry_call(fn, "prompt", "system", "test")
         assert result is None
         assert fn.call_count == 2  # initial + 1 retry
@@ -91,9 +91,9 @@ class TestFallbackChain:
     """Provider fallback chain: primary → all configured → None."""
 
     def test_primary_succeeds(self):
-        with patch("harmoni.core.model_router.config") as mock_config, \
-             patch("harmoni.core.model_router._retry_call") as mock_retry, \
-             patch("harmoni.core.model_router._circuit_is_open", return_value=False):
+        with patch("cios.core.model_router.config") as mock_config, \
+             patch("cios.core.model_router._retry_call") as mock_retry, \
+             patch("cios.core.model_router._circuit_is_open", return_value=False):
             mock_config.get.return_value = "openai"
             mock_retry.return_value = '{"intent": "status"}'
 
@@ -113,10 +113,10 @@ class TestFallbackChain:
                 return '{"intent": "status"}'  # fallback succeeds
             return None
 
-        with patch("harmoni.core.model_router.config") as mock_config, \
-             patch("harmoni.core.model_router._retry_call", side_effect=mock_retry), \
-             patch("harmoni.core.model_router._circuit_is_open", return_value=False), \
-             patch("harmoni.core.model_router._provider_is_configured", return_value=True):
+        with patch("cios.core.model_router.config") as mock_config, \
+             patch("cios.core.model_router._retry_call", side_effect=mock_retry), \
+             patch("cios.core.model_router._circuit_is_open", return_value=False), \
+             patch("cios.core.model_router._provider_is_configured", return_value=True):
             mock_config.get.return_value = "openai"
 
             result = _call_provider("test prompt", "system")
@@ -124,10 +124,10 @@ class TestFallbackChain:
             assert call_count["n"] == 2
 
     def test_all_providers_fail(self):
-        with patch("harmoni.core.model_router.config") as mock_config, \
-             patch("harmoni.core.model_router._retry_call", return_value=None), \
-             patch("harmoni.core.model_router._circuit_is_open", return_value=False), \
-             patch("harmoni.core.model_router._provider_is_configured", return_value=True):
+        with patch("cios.core.model_router.config") as mock_config, \
+             patch("cios.core.model_router._retry_call", return_value=None), \
+             patch("cios.core.model_router._circuit_is_open", return_value=False), \
+             patch("cios.core.model_router._provider_is_configured", return_value=True):
             mock_config.get.return_value = "openai"
 
             result = _call_provider("test prompt", "system")
@@ -141,10 +141,10 @@ class TestFallbackChain:
             call_count["n"] += 1
             return None
 
-        with patch("harmoni.core.model_router.config") as mock_config, \
-             patch("harmoni.core.model_router._retry_call", side_effect=mock_retry), \
-             patch("harmoni.core.model_router._circuit_is_open", return_value=False), \
-             patch("harmoni.core.model_router._provider_is_configured", return_value=False):
+        with patch("cios.core.model_router.config") as mock_config, \
+             patch("cios.core.model_router._retry_call", side_effect=mock_retry), \
+             patch("cios.core.model_router._circuit_is_open", return_value=False), \
+             patch("cios.core.model_router._provider_is_configured", return_value=False):
             mock_config.get.return_value = "ollama"
 
             result = _call_provider("test prompt", "system")
@@ -165,10 +165,10 @@ class TestFallbackChain:
         def mock_circuit(provider):
             return provider == "ollama"  # ollama circuit is open
 
-        with patch("harmoni.core.model_router.config") as mock_config, \
-             patch("harmoni.core.model_router._retry_call", side_effect=mock_retry), \
-             patch("harmoni.core.model_router._circuit_is_open", side_effect=mock_circuit), \
-             patch("harmoni.core.model_router._provider_is_configured", return_value=True):
+        with patch("cios.core.model_router.config") as mock_config, \
+             patch("cios.core.model_router._retry_call", side_effect=mock_retry), \
+             patch("cios.core.model_router._circuit_is_open", side_effect=mock_circuit), \
+             patch("cios.core.model_router._provider_is_configured", return_value=True):
             mock_config.get.return_value = "openai"
 
             result = _call_provider("test prompt", "system")
@@ -186,10 +186,10 @@ class TestFallbackChain:
                 return '{"intent": "status"}'
             return None
 
-        with patch("harmoni.core.model_router.config") as mock_config, \
-             patch("harmoni.core.model_router._retry_call", side_effect=mock_retry), \
-             patch("harmoni.core.model_router._circuit_is_open", return_value=False), \
-             patch("harmoni.core.model_router._provider_is_configured", return_value=True):
+        with patch("cios.core.model_router.config") as mock_config, \
+             patch("cios.core.model_router._retry_call", side_effect=mock_retry), \
+             patch("cios.core.model_router._circuit_is_open", return_value=False), \
+             patch("cios.core.model_router._provider_is_configured", return_value=True):
             mock_config.get.return_value = "openai"
 
             result = _call_provider("test prompt", "system")
@@ -255,25 +255,25 @@ class TestProviderConfigured:
     """Check if providers have necessary credentials."""
 
     def test_ollama_configured_when_reachable(self):
-        with patch("harmoni.core.model_router._ollama_is_reachable", return_value=True):
+        with patch("cios.core.model_router._ollama_is_reachable", return_value=True):
             assert _provider_is_configured("ollama") is True
 
     def test_ollama_not_configured_when_unreachable(self):
-        with patch("harmoni.core.model_router._ollama_is_reachable", return_value=False):
+        with patch("cios.core.model_router._ollama_is_reachable", return_value=False):
             assert _provider_is_configured("ollama") is False
 
     def test_openai_needs_key(self):
-        with patch("harmoni.core.model_router.config") as mock_config:
+        with patch("cios.core.model_router.config") as mock_config:
             mock_config.get.return_value = ""
             assert _provider_is_configured("openai") is False
 
     def test_openai_configured_with_key(self):
-        with patch("harmoni.core.model_router.config") as mock_config:
+        with patch("cios.core.model_router.config") as mock_config:
             mock_config.get.return_value = "sk-test-key"
             assert _provider_is_configured("openai") is True
 
     def test_anthropic_needs_key(self):
-        with patch("harmoni.core.model_router.config") as mock_config:
+        with patch("cios.core.model_router.config") as mock_config:
             mock_config.get.return_value = ""
             assert _provider_is_configured("anthropic") is False
 
@@ -285,7 +285,7 @@ class TestFallbackStatus:
         _circuit_state.clear()
 
     def test_returns_all_providers(self):
-        with patch("harmoni.core.model_router.config") as mock_config:
+        with patch("cios.core.model_router.config") as mock_config:
             mock_config.get.return_value = "ollama"
             status = get_fallback_status()
             assert status["primary"] == "ollama"
@@ -297,7 +297,7 @@ class TestFallbackStatus:
     def test_shows_circuit_state(self):
         for _ in range(3):
             _circuit_record_failure("openai")
-        with patch("harmoni.core.model_router.config") as mock_config:
+        with patch("cios.core.model_router.config") as mock_config:
             mock_config.get.return_value = "ollama"
             status = get_fallback_status()
             assert status["providers"]["openai"]["circuit_open"] is True
@@ -308,25 +308,25 @@ class TestRouteToLLM:
     """JSON parsing from LLM responses."""
 
     def test_parses_clean_json(self):
-        with patch("harmoni.core.model_router._call_provider",
+        with patch("cios.core.model_router._call_provider",
                     return_value='{"intent": "status", "params": {}, "plan": ["check"]}'):
             result = route_to_llm("test")
             assert result["intent"] == "status"
 
     def test_extracts_json_from_text(self):
-        with patch("harmoni.core.model_router._call_provider",
+        with patch("cios.core.model_router._call_provider",
                     return_value='Here is the result: {"intent": "status"} hope that helps'):
             result = route_to_llm("test")
             assert result["intent"] == "status"
 
     def test_returns_none_on_no_json(self):
-        with patch("harmoni.core.model_router._call_provider",
+        with patch("cios.core.model_router._call_provider",
                     return_value="I don't understand"):
             result = route_to_llm("test")
             assert result is None
 
     def test_returns_none_when_provider_fails(self):
-        with patch("harmoni.core.model_router._call_provider", return_value=None):
+        with patch("cios.core.model_router._call_provider", return_value=None):
             result = route_to_llm("test")
             assert result is None
 
@@ -335,7 +335,7 @@ class TestResolveUnknownIntent:
     """LLM-based intent resolution."""
 
     def test_resolves_valid_intent(self):
-        with patch("harmoni.core.model_router.route_to_llm",
+        with patch("cios.core.model_router.route_to_llm",
                     return_value={"intent": "system_health", "params": {}}):
             intent = resolve_unknown_intent("my laptop feels warm")
             assert intent is not None
@@ -343,13 +343,13 @@ class TestResolveUnknownIntent:
             assert intent.confidence == 0.7
 
     def test_returns_none_on_invalid_intent(self):
-        with patch("harmoni.core.model_router.route_to_llm",
+        with patch("cios.core.model_router.route_to_llm",
                     return_value={"intent": "nonexistent_intent"}):
             intent = resolve_unknown_intent("do something weird")
             assert intent is None
 
     def test_returns_none_when_llm_fails(self):
-        with patch("harmoni.core.model_router.route_to_llm", return_value=None):
+        with patch("cios.core.model_router.route_to_llm", return_value=None):
             intent = resolve_unknown_intent("gibberish")
             assert intent is None
 

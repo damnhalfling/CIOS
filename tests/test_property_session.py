@@ -10,9 +10,9 @@ from unittest.mock import patch, MagicMock
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from harmoni.core.memory import Memory, SessionContext
-from harmoni.core.intent_parser import Intent, IntentType
-from harmoni.core.executor import Executor, ExecResult
+from cios.core.memory import Memory, SessionContext
+from cios.core.intent_parser import Intent, IntentType
+from cios.core.executor import Executor, ExecResult
 
 
 # --- Strategies ---
@@ -51,8 +51,8 @@ _session_context = st.builds(
 
 def _make_memory(db_path: Path) -> Memory:
     """Create a Memory instance backed by the given DB path."""
-    with patch("harmoni.core.config.DB_PATH", db_path), \
-         patch("harmoni.core.config.ensure_dirs", lambda: None):
+    with patch("cios.core.config.DB_PATH", db_path), \
+         patch("cios.core.config.ensure_dirs", lambda: None):
         return Memory()
 
 
@@ -214,7 +214,7 @@ class TestSessionRestoration:
 
                 executor = MagicMock(spec=Executor)
 
-                from harmoni.core.planner import Planner
+                from cios.core.planner import Planner
 
                 planner = Planner(executor=executor, memory=mem)
 
@@ -243,13 +243,13 @@ class TestSessionRestoration:
                     )
                 ]
 
-                with patch("harmoni.core.planner._is_port_in_use", return_value=server_running), \
-                     patch("harmoni.core.planner._detect_editor", return_value="code"), \
-                     patch("harmoni.core.planner._open_editor") as mock_editor, \
-                     patch("harmoni.core.planner._open_browser") as mock_browser, \
+                with patch("cios.core.handlers.dev._is_port_in_use", return_value=server_running), \
+                     patch("cios.core.handlers.dev._detect_editor", return_value="code"), \
+                     patch("cios.core.handlers.dev._open_editor") as mock_editor, \
+                     patch("cios.core.handlers.dev._open_browser") as mock_browser, \
                      patch("os.path.exists", return_value=True), \
-                     patch("harmoni.core.planner.detect_project") as mock_detect, \
-                     patch("harmoni.core.planner.execute_dev_start", return_value=(fake_dev_plan, fake_dev_results, 12345)) as mock_dev_start:
+                     patch("cios.core.handlers.dev.detect_project") as mock_detect, \
+                     patch("cios.core.handlers.dev.execute_dev_start", return_value=(fake_dev_plan, fake_dev_results, 12345)) as mock_dev_start:
 
                     result = planner._handle_continue_project(intent)
 

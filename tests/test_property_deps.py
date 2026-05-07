@@ -8,8 +8,8 @@ from unittest.mock import patch, MagicMock
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from harmoni.infra.deps import check_and_install_deps, DEPENDENCY_REGISTRY
-from harmoni.core.mcp import (
+from cios.infra.deps import check_and_install_deps, DEPENDENCY_REGISTRY
+from cios.core.mcp import (
     _scan_wifi,
     _scan_audio,
     _scan_bluetooth,
@@ -119,8 +119,8 @@ class TestDependencyDegradation:
                 return None
             return f"/usr/bin/{binary}"
 
-        with patch("harmoni.infra.deps.shutil.which", side_effect=fake_which), \
-             patch("harmoni.infra.deps._try_install", return_value=False):
+        with patch("cios.infra.deps.shutil.which", side_effect=fake_which), \
+             patch("cios.infra.deps._try_install", return_value=False):
             result = check_and_install_deps()
 
         # Result must be a list

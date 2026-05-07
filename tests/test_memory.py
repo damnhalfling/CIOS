@@ -4,7 +4,7 @@ import time
 
 import pytest
 
-from harmoni.core.memory import Memory, MemoryRecord
+from cios.core.memory import Memory, MemoryRecord
 
 
 @pytest.fixture
@@ -13,8 +13,8 @@ def memory(tmp_path):
     from unittest.mock import patch
 
     db_path = tmp_path / "test_memory.db"
-    with patch("harmoni.core.config.DB_PATH", db_path), \
-         patch("harmoni.core.config.ensure_dirs", lambda: None):
+    with patch("cios.core.config.DB_PATH", db_path), \
+         patch("cios.core.config.ensure_dirs", lambda: None):
         mem = Memory()
         yield mem
         mem.close()
@@ -201,7 +201,7 @@ class TestMemoryRecent:
 
 # --- Session Context Tests ---
 
-from harmoni.core.memory import SessionContext
+from cios.core.memory import SessionContext
 
 
 def _make_session(name: str = "fidelidade", **overrides) -> SessionContext:

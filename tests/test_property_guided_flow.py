@@ -9,9 +9,9 @@ from unittest.mock import patch, MagicMock, PropertyMock
 from hypothesis import given, settings, assume
 from hypothesis import strategies as st
 
-from harmoni.core.bridge import HarmoniBridge, PendingQuestion, GuidedFlowStep
-from harmoni.core.intent_parser import Intent, IntentType
-from harmoni.skills.network import WifiNetwork
+from cios.core.bridge import CIOSBridge, PendingQuestion, GuidedFlowStep
+from cios.core.intent_parser import Intent, IntentType
+from cios.skills.network import WifiNetwork
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -57,7 +57,7 @@ _wifi_network_list = st.lists(
 
 def _make_bridge():
     """Create a Bridge instance with MCP fully mocked."""
-    with patch("harmoni.core.mcp.context") as mock_ctx:
+    with patch("cios.core.mcp.context") as mock_ctx:
         mock_ctx.start = MagicMock()
         mock_ctx.stop = MagicMock()
         mock_ctx.boot_times = {}
@@ -65,7 +65,7 @@ def _make_bridge():
         mock_ctx.force_update_wifi = MagicMock()
         mock_ctx.force_update_audio = MagicMock()
         mock_ctx.force_update = MagicMock()
-        from harmoni.core.mcp import ContextSnapshot, SystemState
+        from cios.core.mcp import ContextSnapshot, SystemState
         mock_snapshot = ContextSnapshot(
             system=SystemState(
                 cpu_percent=15.0,
@@ -78,7 +78,7 @@ def _make_bridge():
             ),
         )
         mock_ctx.snapshot.return_value = mock_snapshot
-        bridge = HarmoniBridge()
+        bridge = CIOSBridge()
     return bridge
 
 
@@ -104,8 +104,8 @@ class TestGuidedFlowNetworkOptions:
         """
         bridge = _make_bridge()
         try:
-            with patch("harmoni.skills.network.list_networks", return_value=networks), \
-                 patch("harmoni.core.mcp.context") as mock_mcp:
+            with patch("cios.skills.network.list_networks", return_value=networks), \
+                 patch("cios.core.mcp.context") as mock_mcp:
                 # Not connected, no known networks
                 mock_mcp.wifi.connected = False
                 mock_mcp.known_networks = []
@@ -149,8 +149,8 @@ class TestGuidedFlowNetworkOptions:
         bridge = _make_bridge()
         try:
             # Step 1: Trigger the guided flow
-            with patch("harmoni.skills.network.list_networks", return_value=networks), \
-                 patch("harmoni.core.mcp.context") as mock_mcp:
+            with patch("cios.skills.network.list_networks", return_value=networks), \
+                 patch("cios.core.mcp.context") as mock_mcp:
                 mock_mcp.wifi.connected = False
                 mock_mcp.known_networks = []
 
@@ -176,7 +176,7 @@ class TestGuidedFlowNetworkOptions:
 
             # Step 2: Answer with the first SSID (unknown network → should ask password)
             first_ssid = networks[0].ssid
-            with patch("harmoni.core.mcp.context") as mock_mcp:
+            with patch("cios.core.mcp.context") as mock_mcp:
                 mock_mcp.known_networks = []  # Not a known network
                 mock_mcp.notify_activity = MagicMock()
 
@@ -292,9 +292,9 @@ class TestConversationContextPendingQuestion:
             )
 
             # Mock parse_intent to return our intent missing the app param
-            with patch("harmoni.core.bridge.parse_intent", return_value=intent), \
-                 patch("harmoni.core.bridge.classify_intent", return_value=None), \
-                 patch("harmoni.core.bridge.resolve_unknown_intent", return_value=None):
+            with patch("cios.core.bridge.parse_intent", return_value=intent), \
+                 patch("cios.core.bridge.classify_intent", return_value=None), \
+                 patch("cios.core.bridge.resolve_unknown_intent", return_value=None):
                 result = bridge.execute_command("abrir")
 
             # 1. _pending_question should be set
@@ -311,15 +311,16 @@ class TestConversationContextPendingQuestion:
 
             def mock_execute(intent_arg):
                 executed_intents.append(intent_arg)
-                from harmoni.core.planner import PlanResult
+                from cios.core.planner import PlanResult
                 return PlanResult(
                     plan_steps=["Abrindo app"],
+                    results=[],
                     summary=f"App {intent_arg.params.get('app', '')} aberto",
                     outcome="success",
                 )
 
             with patch.object(bridge._planner, "execute", side_effect=mock_execute), \
-                 patch("harmoni.core.mcp.context") as mock_ctx:
+                 patch("cios.core.mcp.context") as mock_ctx:
                 mock_ctx.notify_activity = MagicMock()
                 mock_ctx.snapshot.return_value = MagicMock()
                 result2 = bridge.execute_command(answer)
@@ -356,9 +357,9 @@ class TestConversationContextPendingQuestion:
                 raw_input="matar processo",
             )
 
-            with patch("harmoni.core.bridge.parse_intent", return_value=intent), \
-                 patch("harmoni.core.bridge.classify_intent", return_value=None), \
-                 patch("harmoni.core.bridge.resolve_unknown_intent", return_value=None):
+            with patch("cios.core.bridge.parse_intent", return_value=intent), \
+                 patch("cios.core.bridge.classify_intent", return_value=None), \
+                 patch("cios.core.bridge.resolve_unknown_intent", return_value=None):
                 result = bridge.execute_command("matar processo")
 
             # 1. _pending_question should be set
@@ -374,15 +375,16 @@ class TestConversationContextPendingQuestion:
 
             def mock_execute(intent_arg):
                 executed_intents.append(intent_arg)
-                from harmoni.core.planner import PlanResult
+                from cios.core.planner import PlanResult
                 return PlanResult(
                     plan_steps=["Matando processo"],
+                    results=[],
                     summary="Processo encerrado",
                     outcome="success",
                 )
 
             with patch.object(bridge._planner, "execute", side_effect=mock_execute), \
-                 patch("harmoni.core.mcp.context") as mock_ctx:
+                 patch("cios.core.mcp.context") as mock_ctx:
                 mock_ctx.notify_activity = MagicMock()
                 mock_ctx.snapshot.return_value = MagicMock()
                 result2 = bridge.execute_command(port_str)
@@ -420,9 +422,9 @@ class TestConversationContextPendingQuestion:
                 raw_input="organizar",
             )
 
-            with patch("harmoni.core.bridge.parse_intent", return_value=intent), \
-                 patch("harmoni.core.bridge.classify_intent", return_value=None), \
-                 patch("harmoni.core.bridge.resolve_unknown_intent", return_value=None):
+            with patch("cios.core.bridge.parse_intent", return_value=intent), \
+                 patch("cios.core.bridge.classify_intent", return_value=None), \
+                 patch("cios.core.bridge.resolve_unknown_intent", return_value=None):
                 result = bridge.execute_command("organizar")
 
             # 1. _pending_question should be set
@@ -442,15 +444,16 @@ class TestConversationContextPendingQuestion:
 
             def mock_execute(intent_arg):
                 executed_intents.append(intent_arg)
-                from harmoni.core.planner import PlanResult
+                from cios.core.planner import PlanResult
                 return PlanResult(
                     plan_steps=["Organizando arquivos"],
+                    results=[],
                     summary="Arquivos organizados",
                     outcome="success",
                 )
 
             with patch.object(bridge._planner, "execute", side_effect=mock_execute), \
-                 patch("harmoni.core.mcp.context") as mock_ctx:
+                 patch("cios.core.mcp.context") as mock_ctx:
                 mock_ctx.notify_activity = MagicMock()
                 mock_ctx.snapshot.return_value = MagicMock()
                 result2 = bridge.execute_command(answer)
@@ -486,9 +489,9 @@ class TestConversationContextPendingQuestion:
             intent = intent_factory()
 
             # Step 1: Trigger clarification
-            with patch("harmoni.core.bridge.parse_intent", return_value=intent), \
-                 patch("harmoni.core.bridge.classify_intent", return_value=None), \
-                 patch("harmoni.core.bridge.resolve_unknown_intent", return_value=None):
+            with patch("cios.core.bridge.parse_intent", return_value=intent), \
+                 patch("cios.core.bridge.classify_intent", return_value=None), \
+                 patch("cios.core.bridge.resolve_unknown_intent", return_value=None):
                 bridge.execute_command(intent.raw_input)
 
             assert bridge._pending_question is not None, (
@@ -508,16 +511,17 @@ class TestConversationContextPendingQuestion:
                 actual_answer = "3000"
 
             def mock_execute(intent_arg):
-                from harmoni.core.planner import PlanResult
+                from cios.core.planner import PlanResult
                 return PlanResult(
                     plan_steps=["Step"],
+                    results=[],
                     summary="Done",
                     outcome="success",
                 )
 
-            with patch("harmoni.core.bridge.parse_intent", side_effect=tracking_parse_intent), \
+            with patch("cios.core.bridge.parse_intent", side_effect=tracking_parse_intent), \
                  patch.object(bridge._planner, "execute", side_effect=mock_execute), \
-                 patch("harmoni.core.mcp.context") as mock_ctx:
+                 patch("cios.core.mcp.context") as mock_ctx:
                 mock_ctx.notify_activity = MagicMock()
                 mock_ctx.snapshot.return_value = MagicMock()
                 bridge.execute_command(actual_answer)

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════
-#  Harmoni — VM Test: No GPU Acceleration
+#  CIOS — VM Test: No GPU Acceleration
 #  Validates UI renders correctly without GPU/3D acceleration.
 #
 #  Validates: Requirements 4.3, 4.5
@@ -19,7 +19,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DEB_FILE="${1:-}"
-VM_NAME="harmoni-test-nogpu"
+VM_NAME="cios-test-nogpu"
 VAGRANT_DIR="$(mktemp -d)"
 PASS=0
 FAIL=0
@@ -56,13 +56,13 @@ trap cleanup EXIT
 
 echo ""
 echo "  ╔═══════════════════════════════════════════╗"
-echo "  ║  Harmoni — No GPU VM Test                 ║"
+echo "  ║  CIOS — No GPU VM Test                 ║"
 echo "  ╚═══════════════════════════════════════════╝"
 echo ""
 
 # ── Locate .deb ──
 if [ -z "$DEB_FILE" ]; then
-    DEB_FILE=$(ls -1 "$PROJECT_ROOT"/harmoni_*_amd64.deb 2>/dev/null | head -1 || true)
+    DEB_FILE=$(ls -1 "$PROJECT_ROOT"/cios_*_amd64.deb 2>/dev/null | head -1 || true)
 fi
 if [ -z "$DEB_FILE" ] || [ ! -f "$DEB_FILE" ]; then
     echo "  ✗ No .deb file found. Build first: bash build-deb.sh"
@@ -81,18 +81,18 @@ echo ""
 # ── Generate Vagrantfile ──
 # Key difference: 3D acceleration explicitly disabled, VRAM minimal,
 # graphics controller set to VMSVGA (no GPU passthrough).
-cp "$DEB_FILE" "$VAGRANT_DIR/harmoni.deb"
+cp "$DEB_FILE" "$VAGRANT_DIR/cios.deb"
 
 cat > "$VAGRANT_DIR/Vagrantfile" << 'VAGRANTFILE'
 Vagrant.configure("2") do |config|
   config.vm.box = "debian/bookworm64"
-  config.vm.hostname = "harmoni-test-nogpu"
+  config.vm.hostname = "cios-test-nogpu"
 
   config.vm.provider "virtualbox" do |vb|
     vb.memory = "2048"
     vb.cpus = 2
     vb.gui = false
-    vb.name = "harmoni-test-nogpu"
+    vb.name = "cios-test-nogpu"
 
     # Explicitly disable GPU acceleration
     vb.customize ["modifyvm", :id, "--graphicscontroller", "vmsvga"]
@@ -100,7 +100,7 @@ Vagrant.configure("2") do |config|
     vb.customize ["modifyvm", :id, "--vram", "16"]
   end
 
-  config.vm.provision "file", source: "harmoni.deb", destination: "/tmp/harmoni.deb"
+  config.vm.provision "file", source: "cios.deb", destination: "/tmp/cios.deb"
 
   config.vm.provision "shell", inline: <<-SHELL
     set -e
@@ -111,9 +111,9 @@ Vagrant.configure("2") do |config|
     apt-get install -y -qq python3 python3-pip python3-venv python3-tk \
       openbox wmctrl xdotool curl xclip x11-xserver-utils xvfb mesa-utils
 
-    echo "=== [2/5] Installing Harmoni .deb ==="
-    dpkg -i /tmp/harmoni.deb || apt-get install -f -y -qq
-    echo "INSTALL_EXIT=$?" > /tmp/harmoni_results.txt
+    echo "=== [2/5] Installing CIOS .deb ==="
+    dpkg -i /tmp/cios.deb || apt-get install -f -y -qq
+    echo "INSTALL_EXIT=$?" > /tmp/cios_results.txt
 
     echo "=== [3/5] Verifying no GPU acceleration ==="
     # Start Xvfb (software rendering only, no GPU)
@@ -132,15 +132,15 @@ Vagrant.configure("2") do |config|
     fi
 
     echo "=== [4/5] Validating MCP + core skills ==="
-    PYTHON="/usr/share/harmoni/.venv/bin/python3"
+    PYTHON="/usr/share/cios/.venv/bin/python3"
     if [ ! -x "$PYTHON" ]; then
       PYTHON="python3"
     fi
-    export PYTHONPATH="/usr/share/harmoni:${PYTHONPATH:-}"
+    export PYTHONPATH="/usr/share/cios:${PYTHONPATH:-}"
 
     # MCP initialization
     $PYTHON -c "
-from harmoni.core.mcp import SystemContext
+from cios.core.mcp import SystemContext
 ctx = SystemContext()
 ctx.start()
 snap = ctx.snapshot()
@@ -150,7 +150,7 @@ print('MCP_OK')
 
     # Core skill execution: status
     $PYTHON -c "
-from harmoni.core.intent_parser import parse_intent
+from cios.core.intent_parser import parse_intent
 i = parse_intent('status')
 assert i.type.value == 'status', f'Expected status, got {i.type.value}'
 print('SKILL_STATUS_OK')
@@ -158,14 +158,14 @@ print('SKILL_STATUS_OK')
 
     # Core skill execution: system_health
     $PYTHON -c "
-from harmoni.core.intent_parser import parse_intent
+from cios.core.intent_parser import parse_intent
 i = parse_intent('como está meu sistema')
 print(f'SKILL_HEALTH_OK type={i.type.value}')
 " > /tmp/skill_health.txt 2>&1 || echo "SKILL_HEALTH_FAIL" > /tmp/skill_health.txt
 
     # Core skill execution: app_launch
     $PYTHON -c "
-from harmoni.core.intent_parser import parse_intent
+from cios.core.intent_parser import parse_intent
 i = parse_intent('abrir terminal')
 print(f'SKILL_APP_OK type={i.type.value}')
 " > /tmp/skill_app.txt 2>&1 || echo "SKILL_APP_FAIL" > /tmp/skill_app.txt
@@ -174,7 +174,7 @@ print(f'SKILL_APP_OK type={i.type.value}')
     # Xvfb is already running from step 3 (software rendering)
 
     # Start splash screen — must not crash without GPU
-    timeout 5 $PYTHON -m harmoni.ui.splash &
+    timeout 5 $PYTHON -m cios.ui.splash &
     SPLASH_PID=$!
     sleep 2
     if kill -0 $SPLASH_PID 2>/dev/null; then
@@ -185,7 +185,7 @@ print(f'SKILL_APP_OK type={i.type.value}')
     fi
 
     # Start main GUI — must not crash without GPU
-    timeout 5 $PYTHON -m harmoni.ui.gui &
+    timeout 5 $PYTHON -m cios.ui.gui &
     GUI_PID=$!
     sleep 2
     if kill -0 $GUI_PID 2>/dev/null; then
@@ -200,8 +200,8 @@ print(f'SKILL_APP_OK type={i.type.value}')
 import tkinter as tk
 root = tk.Tk()
 root.geometry('400x300')
-root.title('Harmoni Render Test')
-label = tk.Label(root, text='Harmoni OS', font=('sans-serif', 16))
+root.title('CIOS Render Test')
+label = tk.Label(root, text='CIOS', font=('sans-serif', 16))
 label.pack(pady=20)
 root.update()
 root.destroy()
@@ -223,10 +223,10 @@ echo ""
 
 # ── Validate install ──
 echo "  [2/6] Install validation"
-check "Package installed" vagrant ssh -c "dpkg -s harmoni" 2>/dev/null
-check "Install dir exists" vagrant ssh -c "test -d /usr/share/harmoni" 2>/dev/null
-check "Session script executable" vagrant ssh -c "test -x /usr/local/bin/harmoni-session" 2>/dev/null
-check "Xsession registered" vagrant ssh -c "test -f /usr/share/xsessions/harmoni.desktop" 2>/dev/null
+check "Package installed" vagrant ssh -c "dpkg -s cios" 2>/dev/null
+check "Install dir exists" vagrant ssh -c "test -d /usr/share/cios" 2>/dev/null
+check "Session script executable" vagrant ssh -c "test -x /usr/local/bin/cios-session" 2>/dev/null
+check "Xsession registered" vagrant ssh -c "test -f /usr/share/xsessions/cios.desktop" 2>/dev/null
 echo ""
 
 # ── Validate no GPU ──

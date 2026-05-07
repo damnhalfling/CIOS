@@ -1,21 +1,21 @@
 <p align="center">
-  <img src="assets/background.png" width="600" alt="Harmoni OS" />
+  <img src="assets/background.png" width="600" alt="CIOS" />
 </p>
 
-<h1 align="center">Harmoni</h1>
+<h1 align="center">CIOS</h1>
 
 <p align="center">
   <strong>Substituindo apps por intenção.<br>Você fala. O computador faz.</strong>
 </p>
 
 <p align="center">
-  <a href="https://github.com/damnhalfling/harmoni/releases"><img src="https://img.shields.io/github/v/release/damnhalfling/harmoni" alt="Release" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/damnhalfling/harmoni" alt="License" /></a>
+  <a href="https://github.com/damnhalfling/cios/releases"><img src="https://img.shields.io/github/v/release/damnhalfling/cios" alt="Release" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/damnhalfling/cios" alt="License" /></a>
   <img src="https://img.shields.io/badge/tests-468%20passing-brightgreen" alt="Tests" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/damnhalfling/harmoni/releases/latest"><strong>⬇ Download .deb</strong></a>&nbsp;&nbsp;·&nbsp;&nbsp;
+  <a href="https://github.com/damnhalfling/cios/releases/latest"><strong>⬇ Download .deb</strong></a>&nbsp;&nbsp;·&nbsp;&nbsp;
   <a href="#english"><strong>English</strong></a>&nbsp;&nbsp;·&nbsp;&nbsp;
   <a href="#português"><strong>Português</strong></a>
 </p>
@@ -37,7 +37,7 @@ Computers still work the same way they did decades ago:
 
 ## The shift
 
-Harmoni OS eliminates the traditional interface.
+CIOS eliminates the traditional interface.
 
 You don't use apps. **You express intent.**
 
@@ -71,7 +71,7 @@ No terminal. No menus. No jargon. Just results.
 
 ## What changed
 
-| Traditional model | Harmoni OS |
+| Traditional model | CIOS |
 |---|---|
 | Open apps | Declare intent |
 | Navigate menus | Direct execution |
@@ -81,7 +81,7 @@ No terminal. No menus. No jargon. Just results.
 
 ## How it works
 
-Harmoni OS is built on three layers:
+CIOS is built on three layers:
 
 ### MCP — Model Context Protocol
 
@@ -103,9 +103,9 @@ No wasted steps. No wrong guesses.
 
 ### Skills
 
-Real system execution. 21 skills, zero abstraction.
+Real system execution. 26 skills, zero abstraction.
 
-Wi-Fi (nmcli) · Audio (pactl) · Files · Processes · Packages (apt) · Windows (EWMH) · Clipboard · Battery · Brightness · Dev environments · Disk analysis · Auto-learning · File search · Workflow start · Explore system
+Wi-Fi (nmcli) · Audio (pactl) · Files · Processes · Packages (apt) · Windows (EWMH) · Clipboard · Battery · Brightness · Dev environments · Disk analysis · Auto-learning · File search · Workflow start · Explore system · Gallery management · Favorites & albums · Duplicate detection · Face clustering · Screen capture · Image editing
 
 **No LLM for critical actions.** Pattern matching handles 80%+ of intents. Hybrid classifier (regex → cache → LLM) ensures natural language works while keeping latency low.
 
@@ -137,7 +137,7 @@ Your voice stays on your machine. Always.
 **No GNOME. No KDE. Just intent.**
 
 ```
-Boot → Display Manager → "Harmoni OS" → Splash → Ready
+Boot → Display Manager → "CIOS" → Splash → Ready
 ```
 
 ## Conversational by design
@@ -146,24 +146,24 @@ Boot → Display Manager → "Harmoni OS" → Splash → Ready
 
 ```
 You: connect to wifi
-Harmoni: Which network?
+CIOS: Which network?
   Starlink — 85%
   Vizinho — 40%
 You: Starlink
-Harmoni: Connected to Starlink (192.168.1.42)
+CIOS: Connected to Starlink (192.168.1.42)
 ```
 
 Every error includes a recovery suggestion. **Zero dead-ends.**
 
-## Harmoni Intelligence (optional)
+## CIOS Intelligence (optional)
 
-For tasks that need cloud AI — like summarizing news, generating text, or translating — Harmoni OS can connect to **Harmoni Intelligence**, an optional cloud service.
+For tasks that need cloud AI — like summarizing news, generating text, or translating — CIOS can connect to **CIOS Intelligence**, an optional cloud service.
 
 The OS uses Ollama locally to compress your input before sending, keeping token usage minimal. Authentication is via Google login.
 
 ```
 You: "what happened in the world today?"
-Harmoni: "I can look that up with Harmoni Intelligence."
+CIOS: "I can look that up with CIOS Intelligence."
          [Activate] [No thanks]
 ```
 
@@ -192,7 +192,17 @@ Everything local stays local. Intelligence is opt-in.
 | `I want to work on project X` | Opens editor + backend + browser for the project |
 | `where is the contract?` | Searches files by name and content |
 | `I want to watch a video` | Opens the right media player |
-| `update harmoni` | Checks for updates and installs |
+| `update cios` | Checks for updates and installs |
+| `favoritar` | Adds current photo to favorites |
+| `fotos de ontem` | Shows photos from yesterday |
+| `fotos duplicadas` | Finds duplicate images (pHash + MD5) |
+| `fotos do João` | Shows photos of a named person |
+| `criar álbum viagem` | Creates a photo album |
+| `print screen` | Takes a screenshot |
+| `gravar tela` | Starts screen recording |
+| `parar gravação` | Stops screen recording |
+| `girar foto` | Rotates current image 90° |
+| `info da foto` | Shows EXIF metadata |
 
 All commands work in **English** and **Portuguese**.
 
@@ -200,22 +210,22 @@ All commands work in **English** and **Portuguese**.
 
 ```bash
 # One-line install
-curl -sL https://raw.githubusercontent.com/damnhalfling/harmoni/main/install-harmoni.sh | sudo bash
+curl -sL https://raw.githubusercontent.com/damnhalfling/cios/main/install-cios.sh | sudo bash
 ```
 
 ```bash
 # Or manual (IMPORTANT: use install script to prevent session logout)
-sudo bash install-harmoni.sh ./harmoni_0.14.0_amd64.deb
+sudo bash install-cios.sh ./cios_0.14.0_amd64.deb
 sudo reboot
 ```
 
-Select **Harmoni OS** at the login screen. That's it.
+Select **CIOS** at the login screen. That's it.
 
 The installer offers two modes:
-1. **Session only** — adds Harmoni alongside GNOME/KDE
-2. **Full replacement** — switches to LightDM with Harmoni theme + Plymouth boot splash (logo on boot, no text)
+1. **Session only** — adds CIOS alongside GNOME/KDE
+2. **Full replacement** — switches to LightDM with CIOS theme + Plymouth boot splash (logo on boot, no text)
 
-After install, say **"update harmoni"** anytime to get the latest version automatically.
+After install, say **"update cios"** anytime to get the latest version automatically.
 
 ## Test without leaving your desktop
 
@@ -223,35 +233,48 @@ After install, say **"update harmoni"** anytime to get the latest version automa
 sudo apt install xserver-xephyr openbox wmctrl xdotool
 Xephyr :2 -screen 1280x720 &
 DISPLAY=:2 openbox &
-DISPLAY=:2 .venv/bin/harmoni
+DISPLAY=:2 .venv/bin/cios
 ```
 
 ## Execution modes
 
 ```bash
-harmoni              # GUI (default)
-harmoni --cli        # Terminal (Rich + prompt_toolkit)
-harmoni --daemon     # Background daemon (Unix socket)
-harmoni --overlay    # Hotkey overlay (Ctrl+Space)
-harmoni --topbar     # System status bar
-harmoni --setup      # Re-run onboarding wizard
+cios              # GUI (default)
+cios --cli        # Terminal (Rich + prompt_toolkit)
+cios --daemon     # Background daemon (Unix socket)
+cios --overlay    # Hotkey overlay (Ctrl+Space)
+cios --topbar     # System status bar
+cios --setup      # Re-run onboarding wizard
 ```
 
 ## LLM provider
 
-Harmoni OS uses **Ollama** as its local LLM provider. Ollama runs entirely on your machine — free, private, no cloud dependency.
+CIOS uses **Ollama** as its local LLM provider. Ollama runs entirely on your machine — free, private, no cloud dependency.
 
 Ollama handles:
 - Intent classification for unknown patterns
-- Token compression before sending to Harmoni Intelligence (optional)
+- Token compression before sending to CIOS Intelligence (optional)
 - Local AI tasks that don't need cloud processing
 
 Ollama is auto-installed during setup.
 
+### Fallback chain (when Ollama is unavailable)
+
+If Ollama (or any configured LLM) is unreachable, CIOS degrades gracefully:
+
+1. **Pattern matching (regex)** — handles 80%+ of intents with zero LLM dependency
+2. **Intent cache (SQLite)** — previously classified inputs are reused instantly
+3. **Fuzzy cache match** — similar inputs hit cached results via word-overlap similarity
+4. **LLM classification** — lightweight prompt to classify intent (~200-500ms)
+5. **Full LLM resolve** — generates a plan for complex/unknown intents
+6. **Graceful error** — "Não entendi o que você quer" with recovery suggestion
+
+In practice: if no LLM is available, all regex-matched intents (the vast majority) work normally. Only truly unknown inputs that have never been cached will fail — and even then, the user gets a helpful error message, never a crash.
+
 ## Status
 
 - ✅ Independent X session — running on real hardware
-- ✅ 21 skills — Wi-Fi, audio, files, packages, windows, clipboard, dev environments, self-update, file search, workflow start
+- ✅ 26 skills — Wi-Fi, audio, files, packages, windows, clipboard, dev environments, self-update, file search, workflow start, gallery management, duplicates, face clustering, screen capture
 - ✅ Hybrid intent classifier — regex + LLM cache with stemming + auto-learning
 - ✅ Voice offline — STT + TTS, fully local
 - ✅ Multi-monitor — secondary screen as full interaction surface
@@ -262,15 +285,17 @@ Ollama is auto-installed during setup.
 - ✅ Onboarding wizard
 - ✅ Conversational UX with 3-turn context
 - ✅ Project auto-creation ("work on project X" creates it if not found)
+- ✅ Media gallery — favorites, albums, duplicates, face clustering, date/text search, editing
+- ✅ Screen capture — screenshot (full/window/region) + screen recording
+- ✅ XDG user directories — auto-created on login
 
 **This is not a prototype. It runs.**
 
 ## Roadmap
 
-- ⏳ Harmoni Intelligence integration (optional cloud AI)
-- ⏳ Boot optimization (<100ms core actions)
-- ⏳ Refined conversational UX
-- ⏳ Smarter skills with deeper context
+- ⏳ CIOS Intelligence integration (optional cloud AI) — almost done
+- ⏳ Voice module (STT/TTS as alternative I/O)
+- ⏳ Google Workspace MCP (Calendar, Gmail, Drive)
 - ⏳ Custom Debian-based distribution
 
 ## Architecture (for contributors)
@@ -278,7 +303,7 @@ Ollama is auto-installed during setup.
 ```
 User Input → Intent Parser → Classifier → MCO → Planner → Executor → Humanizer → UI
                   │              │          │       │          │            │
-            148+ Patterns    Cache +      MCP     21 Skills   Shell      Translates
+            180+ Patterns    Cache +      MCP     26 Skills   Shell      Translates
             (PT/EN)         LLM +       (live    + Auto-     Control    to human
                            Stemming     state)   Learner      │        language
                                                             Memory
@@ -287,17 +312,18 @@ User Input → Intent Parser → Classifier → MCO → Planner → Executor →
 <details>
 <summary><strong>Core components</strong></summary>
 
-- **Intent Parser** — 148+ regex patterns (PT/EN), hybrid LLM classifier with cache + stemming for natural language
+- **Intent Parser** — 180+ regex patterns (PT/EN), hybrid LLM classifier with cache + stemming for natural language
 - **Intent Classifier** — SQLite-cached LLM classifications, fuzzy matching with light PT stemming, auto-learning from successful executions
 - **MCP** — Live system state with reactive watchers (nmcli monitor, pactl subscribe) + adaptive polling (1s/5s/15s)
 - **MCO** — Decision layer: resolves from MCP state instantly when possible
-- **Planner** — 28 handlers with context-aware execution and `_resilient_call()` retry
+- **Planner** — 30 handlers with context-aware execution and `_resilient_call()` retry
 - **Executor** — Safe shell execution with timeout, blocked command list, background processes
 - **Humanizer** — 220+ translations PT/EN, all technical output becomes plain language
 - **Model Router** — Ollama (local, default) with fallback support
 - **Memory** — SQLite store of intents, commands, and outcomes
 - **Error Recovery** — 17 error types classified with actionable suggestions (PT/EN)
 - **Bridge** — 3-turn conversation context, clarification, pronoun resolution, post-action validation
+- **Gallery Store** — SQLite persistence for favorites, albums, trash, face embeddings, duplicate cache
 - **Voice** — STT (whisper.cpp) + TTS (piper), both local and offline
 - **Daemon** — Unix socket server for IPC
 - **Auto-Learning** — Detects repeated patterns, saves shortcuts, reuses them
@@ -308,29 +334,37 @@ User Input → Intent Parser → Classifier → MCO → Planner → Executor →
 <summary><strong>Project structure</strong></summary>
 
 ```
-harmoni-os/
-├── harmoni/
+cios-os/
+├── cios/
 │   ├── main.py                 # Entry point (6 modes)
 │   ├── core/
 │   │   ├── bridge.py           # UI ↔ backend (sync + streaming + conversation)
-│   │   ├── intent_parser.py    # 148+ regex patterns PT/EN
+│   │   ├── intent_parser.py    # 180+ regex patterns PT/EN
 │   │   ├── intent_classifier.py # Hybrid LLM classifier + cache + stemming
-│   │   ├── planner.py          # 25 handlers + MCO + _resilient_call()
+│   │   ├── planner.py          # 30 handlers + MCO + _resilient_call()
+│   │   ├── handlers/           # Intent handlers (gallery, media, screen, etc.)
 │   │   ├── mcp.py              # Live system state (watchers + adaptive polling)
 │   │   ├── executor.py         # Safe shell execution
-│   │   ├── humanizer.py        # Technical → human translation (185+ PT/EN)
-│   │   ├── model_router.py     # LLM routing (Ollama default)
-│   │   ├── config.py           # Persistent settings (~/.harmoni/)
+│   │   ├── humanizer.py        # Technical → human translation (220+ PT/EN)
+│   │   ├── model_router.py     # LLM routing (Ollama default, full fallback chain)
+│   │   ├── config.py           # Persistent settings (~/.cios/) + XDG dirs
 │   │   ├── memory.py           # SQLite history
 │   │   └── error_recovery.py   # 17 error types + actionable suggestions
-│   ├── skills/                 # 21 system skills
-│   ├── ui/                     # GUI, CLI, hotkey, topbar, splash, theme
+│   ├── skills/                 # 26 system skills
+│   │   ├── gallery_store.py    # Favorites, albums, trash (SQLite)
+│   │   ├── gallery_search.py   # Date + text/CLIP search
+│   │   ├── duplicates.py       # pHash + MD5 duplicate detection
+│   │   ├── face_cluster.py     # Face detection + DBSCAN clustering
+│   │   ├── image_edit.py       # Rotate, flip, crop, brightness, EXIF, share
+│   │   ├── screen_capture.py   # Screenshot + screen recording
+│   │   └── ...                 # network, audio, bluetooth, etc.
+│   ├── ui/                     # GUI, CLI, hotkey, topbar, splash, gallery, viewer
 │   └── infra/                  # Daemon, voice, multi-monitor
-├── session/                    # X session config (Openbox)
-├── tests/                      # 323 tests
+├── session/                    # X session config (Openbox) + XDG setup
+├── tests/                      # 468 tests
 ├── .github/workflows/          # CI: test → build → release
 ├── build-deb.sh                # .deb package builder
-├── install-harmoni.sh          # One-line installer
+├── install-cios.sh             # One-line installer
 └── pyproject.toml
 ```
 
@@ -339,11 +373,11 @@ harmoni-os/
 ## Quick start (development)
 
 ```bash
-cd harmoni-os
+cd cios-os
 python3 -m venv .venv
 .venv/bin/pip install -e ".[test]"
-.venv/bin/harmoni              # GUI
-.venv/bin/pytest tests/ -v      # 323 tests
+.venv/bin/cios              # GUI
+.venv/bin/pytest tests/ -v      # 468 tests
 ```
 
 **Requirements:** Python 3.10+ · Linux (Ubuntu/Debian) · Optional: Ollama, xclip, xbindkeys, brightnessctl
@@ -381,7 +415,7 @@ Computadores ainda funcionam da mesma forma há décadas: você abre aplicativos
 
 ### A mudança
 
-Harmoni OS elimina a interface tradicional. Você não usa apps. **Você expressa intenção.**
+CIOS elimina a interface tradicional. Você não usa apps. **Você expressa intenção.**
 
 ### Veja funcionando
 
@@ -405,22 +439,22 @@ Pronto.
 
 ### O que mudou
 
-| Modelo tradicional | Harmoni OS |
+| Modelo tradicional | CIOS |
 |---|---|
 | Abrir apps | Declarar intenção |
 | Navegar menus | Execução direta |
 | Gerenciar janelas | Ignorar janelas |
 | Procurar arquivos | Pedir o resultado |
 
-### Harmoni Intelligence (opcional)
+### CIOS Intelligence (opcional)
 
-Para tarefas que precisam de IA cloud — como resumir notícias, gerar texto, ou traduzir — o Harmoni OS pode se conectar ao **Harmoni Intelligence**, um serviço cloud opcional.
+Para tarefas que precisam de IA cloud — como resumir notícias, gerar texto, ou traduzir — o CIOS pode se conectar ao **CIOS Intelligence**, um serviço cloud opcional.
 
 O OS usa Ollama localmente para comprimir seu input antes de enviar, mantendo o uso de tokens mínimo. Autenticação via login Google.
 
 ```
 Você: "o que aconteceu hoje no mundo?"
-Harmoni: "Posso buscar isso com Harmoni Intelligence."
+CIOS: "Posso buscar isso com CIOS Intelligence."
          [Ativar] [Não, obrigado]
 ```
 
@@ -447,35 +481,35 @@ Tudo local permanece local. Intelligence é opt-in.
 | `quero trabalhar no projeto X` | Abre editor + backend + browser |
 | `onde está o contrato?` | Busca arquivos por nome e conteúdo |
 | `quero assistir um vídeo` | Abre o player de vídeo |
-| `atualizar harmoni` | Verifica e instala atualizações |
+| `atualizar cios` | Verifica e instala atualizações |
 
 ### UX Conversacional
 
 ```
 Você: conectar no wifi
-Harmoni: Qual rede?
+CIOS: Qual rede?
   Starlink — 85%
   Vizinho — 40%
 Você: Starlink
-Harmoni: Conectado na Starlink (192.168.1.42)
+CIOS: Conectado na Starlink (192.168.1.42)
 ```
 
 ### Instalação
 
 ```bash
 # Instalação automática
-curl -sL https://raw.githubusercontent.com/damnhalfling/harmoni/main/install-harmoni.sh | sudo bash
+curl -sL https://raw.githubusercontent.com/damnhalfling/cios/main/install-cios.sh | sudo bash
 ```
 
 ```bash
 # Ou manual (IMPORTANTE: use o install script para evitar logout durante instalação)
-sudo bash install-harmoni.sh ./harmoni_0.14.0_amd64.deb
+sudo bash install-cios.sh ./cios_0.14.0_amd64.deb
 sudo reboot
 ```
 
-Selecione **Harmoni OS** na tela de login.
+Selecione **CIOS** na tela de login.
 
-Depois de instalado, diga **"atualizar harmoni"** a qualquer momento para atualizar automaticamente.
+Depois de instalado, diga **"atualizar cios"** a qualquer momento para atualizar automaticamente.
 
 ### Configuração de IA
 
@@ -485,19 +519,19 @@ No primeiro boot, o **Onboarding Wizard** guia a configuração:
 ### Modos de execução
 
 ```bash
-harmoni              # GUI (padrão)
-harmoni --cli        # Terminal
-harmoni --daemon     # Daemon (socket Unix)
-harmoni --overlay    # Overlay (Ctrl+Space)
-harmoni --topbar     # Barra de status
-harmoni --setup      # Re-executar setup
+cios              # GUI (padrão)
+cios --cli        # Terminal
+cios --daemon     # Daemon (socket Unix)
+cios --overlay    # Overlay (Ctrl+Space)
+cios --topbar     # Barra de status
+cios --setup      # Re-executar setup
 ```
 
 ---
 
 > **Interfaces foram criadas porque computadores não entendiam você.**
-> **Harmoni OS existe porque agora eles entendem.**
+> **CIOS existe porque agora eles entendem.**
 
 ---
 
-*Harmoni OS v0.14.3 — May 2026*
+*CIOS v0.14.3 — May 2026*

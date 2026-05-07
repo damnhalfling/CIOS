@@ -50,6 +50,44 @@ _install_if_missing() {
 }
 _install_if_missing
 
+# ── 0.5. Ensure XDG user directories exist ──
+_ensure_user_dirs() {
+    local dirs=(
+        "$HOME/Desktop"
+        "$HOME/Documents"
+        "$HOME/Downloads"
+        "$HOME/Music"
+        "$HOME/Pictures"
+        "$HOME/Pictures/Screenshots"
+        "$HOME/Videos"
+        "$HOME/Videos/Recordings"
+        "$HOME/Templates"
+        "$HOME/Public"
+    )
+    for d in "${dirs[@]}"; do
+        mkdir -p "$d" 2>/dev/null
+    done
+
+    # Create user-dirs.dirs config if missing
+    local config_dir="${XDG_CONFIG_HOME:-$HOME/.config}"
+    local user_dirs_file="$config_dir/user-dirs.dirs"
+    if [ ! -f "$user_dirs_file" ]; then
+        mkdir -p "$config_dir"
+        cat > "$user_dirs_file" << 'EOF'
+XDG_DESKTOP_DIR="$HOME/Desktop"
+XDG_DOWNLOAD_DIR="$HOME/Downloads"
+XDG_TEMPLATES_DIR="$HOME/Templates"
+XDG_PUBLICSHARE_DIR="$HOME/Public"
+XDG_DOCUMENTS_DIR="$HOME/Documents"
+XDG_MUSIC_DIR="$HOME/Music"
+XDG_PICTURES_DIR="$HOME/Pictures"
+XDG_VIDEOS_DIR="$HOME/Videos"
+EOF
+        echo "Created user-dirs.dirs" >> "$LOGFILE"
+    fi
+}
+_ensure_user_dirs
+
 # ── 1. Set background IMMEDIATELY (< 50ms, prevents ANY flash) ──
 xsetroot -solid '#0a0a0f' 2>/dev/null || true
 xsetroot -cursor_name left_ptr 2>/dev/null || true

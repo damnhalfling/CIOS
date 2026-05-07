@@ -11,7 +11,7 @@ os.environ["LC_MESSAGES"] = ""
 os.environ["LC_ALL"] = ""
 os.environ["LANGUAGE"] = ""
 
-from harmoni.core.humanizer import (
+from cios.core.humanizer import (
     humanize_step,
     humanize_summary,
     humanize_error,
@@ -19,8 +19,8 @@ from harmoni.core.humanizer import (
     _detect_language,
     _translate_pt,
 )
-import harmoni.core.humanizer
-harmoni.core.humanizer._LANG = "en"
+import cios.core.humanizer
+cios.core.humanizer._LANG = "en"
 
 
 class TestHumanizeStep:
@@ -137,23 +137,23 @@ class TestPTBRTranslation:
     """PT-BR translation layer."""
 
     def test_translate_pt_when_pt(self):
-        with patch("harmoni.core.humanizer._LANG", "pt"):
+        with patch("cios.core.humanizer._LANG", "pt"):
             result = _translate_pt("Checking connection…")
             assert result == "Verificando conexão…"
 
     def test_translate_pt_when_en(self):
-        with patch("harmoni.core.humanizer._LANG", "en"):
+        with patch("cios.core.humanizer._LANG", "en"):
             result = _translate_pt("Checking connection…")
             assert result == "Checking connection…"
 
     def test_translate_multiple_phrases(self):
-        with patch("harmoni.core.humanizer._LANG", "pt"):
+        with patch("cios.core.humanizer._LANG", "pt"):
             result = _translate_pt("Volume: 75%")
             assert "Volume:" in result
 
     def test_translate_dev_start_steps_pt(self):
         """Dev Start step translations produce clean PT output."""
-        with patch("harmoni.core.humanizer._LANG", "pt"):
+        with patch("cios.core.humanizer._LANG", "pt"):
             assert _translate_pt("Installing required components…") == "Instalando componentes…"
             assert _translate_pt("Freeing up port…") == "Liberando porta…"
             assert _translate_pt("Starting server…") == "Iniciando servidor…"
@@ -165,7 +165,7 @@ class TestPTBRTranslation:
 
     def test_translate_continue_project_steps_pt(self):
         """Continue project step translations produce clean PT output."""
-        with patch("harmoni.core.humanizer._LANG", "pt"):
+        with patch("cios.core.humanizer._LANG", "pt"):
             assert _translate_pt("Restoring project…") == "Restaurando projeto…"
             assert _translate_pt("Server already running.") == "Servidor já está rodando."
             assert _translate_pt("Server stopped — starting…") == "Servidor parado — iniciando…"
@@ -188,7 +188,7 @@ class TestHumanizeResult:
     """Full result humanization."""
 
     def test_humanize_result_structure(self):
-        from harmoni.core.planner import PlanResult
+        from cios.core.planner import PlanResult
 
         plan_result = PlanResult(
             plan_steps=["Starting server (npm run dev)", "Server running on port 3000 (PID 1234)"],

@@ -11,10 +11,10 @@ from unittest.mock import patch, MagicMock
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from harmoni.core.executor import Executor, ExecResult
-from harmoni.core.intent_parser import Intent, IntentType
-from harmoni.core.memory import Memory
-from harmoni.core.planner import Planner, PlanResult
+from cios.core.executor import Executor, ExecResult
+from cios.core.intent_parser import Intent, IntentType
+from cios.core.memory import Memory
+from cios.core.planner import Planner, PlanResult
 
 
 # ── All IntentType values that have registered handlers in the Planner ───
@@ -155,7 +155,7 @@ def _make_mock_mcp():
     mock_mcp.known_networks = []
 
     # Snapshot
-    from harmoni.core.mcp import (
+    from cios.core.mcp import (
         ContextSnapshot, WifiState, AudioState, BatteryState,
         SystemState, BluetoothState,
     )
@@ -188,7 +188,7 @@ def _execute_handler(intent_type: IntentType) -> PlanResult:
         raw_input=f"test {intent_type.value}",
     )
 
-    from harmoni.skills.dev_start import ProjectInfo
+    from cios.skills.dev_start import ProjectInfo
 
     mock_project = ProjectInfo(
         type="node", root="/tmp/test", start_command="npm run dev",
@@ -237,36 +237,45 @@ def _execute_handler(intent_type: IntentType) -> PlanResult:
     mock_search_report.results = []
 
     patches = {
-        "harmoni.core.planner.mcp": mock_mcp,
-        "harmoni.core.planner.detect_project": MagicMock(return_value=mock_project),
-        "harmoni.core.planner.execute_dev_start": MagicMock(return_value=(
+        "cios.core.handlers.network.mcp": mock_mcp,
+        "cios.core.handlers.audio.mcp": mock_mcp,
+        "cios.core.handlers.system.mcp": mock_mcp,
+        "cios.core.planner.mcp": mock_mcp,
+        "cios.core.handlers.dev.detect_project": MagicMock(return_value=mock_project),
+        "cios.core.handlers.dev.execute_dev_start": MagicMock(return_value=(
             ["Detecting project", "Starting server", "Server running on :3000"],
             [ExecResult(command="npm run dev", returncode=0, stdout="", stderr="", duration=0.5)],
             42,
         )),
-        "harmoni.core.planner.find_process_on_port": MagicMock(return_value=None),
-        "harmoni.core.planner.kill_process_on_port": MagicMock(return_value=(
+        "cios.core.handlers.process.find_process_on_port": MagicMock(return_value=None),
+        "cios.core.handlers.process.kill_process_on_port": MagicMock(return_value=(
             ["Killing process on port 3000"],
             ExecResult(command="kill", returncode=0, stdout="", stderr="", duration=0.1),
         )),
-        "harmoni.core.planner.list_listening_ports": MagicMock(return_value=[]),
-        "harmoni.core.planner.analyze_text": MagicMock(return_value=mock_insight),
-        "harmoni.core.planner.organize_directory": MagicMock(return_value=mock_org_result),
-        "harmoni.core.planner.check_system_health": MagicMock(return_value=mock_health_report),
-        "harmoni.core.planner.find_app": MagicMock(return_value=None),
-        "harmoni.core.planner.launch_app": MagicMock(return_value=(["Launching"], True, "")),
-        "harmoni.core.planner.execute_session_action": MagicMock(return_value=(["Locking screen"], True, "")),
-        "harmoni.core.planner.get_session_action": MagicMock(return_value=mock_action),
-        "harmoni.core.planner.analyze_disk": MagicMock(return_value=mock_disk_report),
-        "harmoni.core.planner.clean_safe": MagicMock(return_value=(["Cleaning"], 0, [])),
-        "harmoni.core.planner.format_capabilities": MagicMock(return_value=(["Listing capabilities"], "I can help with many things")),
-        "harmoni.core.planner.list_installed_apps_grouped": MagicMock(return_value=(["Listing apps"], "Apps: Firefox, Code")),
-        "harmoni.core.planner.search_files": MagicMock(return_value=mock_search_report),
-        "harmoni.core.planner.find_and_open": MagicMock(return_value=(["Searching for file"], False, "File not found")),
-        "harmoni.core.planner._scan_project_dirs": MagicMock(return_value=[]),
-        "harmoni.core.planner._find_project": MagicMock(return_value=None),
-        "harmoni.core.planner._is_port_in_use": MagicMock(return_value=False),
-        "harmoni.core.planner.time.sleep": MagicMock(),
+        "cios.core.handlers.process.list_listening_ports": MagicMock(return_value=[]),
+        "cios.core.handlers.logs.analyze_text": MagicMock(return_value=mock_insight),
+        "cios.core.handlers.dev.analyze_text": MagicMock(return_value=mock_insight),
+        "cios.core.handlers.files.organize_directory": MagicMock(return_value=mock_org_result),
+        "cios.core.handlers.system.check_system_health": MagicMock(return_value=mock_health_report),
+        "cios.core.handlers.apps.find_app": MagicMock(return_value=None),
+        "cios.core.handlers.apps.launch_app": MagicMock(return_value=(["Launching"], True, "")),
+        "cios.core.handlers.dev.find_app": MagicMock(return_value=None),
+        "cios.core.handlers.dev.launch_app": MagicMock(return_value=(["Launching"], True, "")),
+        "cios.core.handlers.media.find_app": MagicMock(return_value=None),
+        "cios.core.handlers.media.launch_app": MagicMock(return_value=(["Launching"], True, "")),
+        "cios.core.handlers.system.execute_session_action": MagicMock(return_value=(["Locking screen"], True, "")),
+        "cios.core.handlers.system.get_session_action": MagicMock(return_value=mock_action),
+        "cios.core.handlers.disk.analyze_disk": MagicMock(return_value=mock_disk_report),
+        "cios.core.handlers.disk.clean_safe": MagicMock(return_value=(["Cleaning"], 0, [])),
+        "cios.core.handlers.apps.format_capabilities": MagicMock(return_value=(["Listing capabilities"], "I can help with many things")),
+        "cios.core.handlers.apps.list_installed_apps_grouped": MagicMock(return_value=(["Listing apps"], "Apps: Firefox, Code")),
+        "cios.core.handlers.files.search_files": MagicMock(return_value=mock_search_report),
+        "cios.core.handlers.files.find_and_open": MagicMock(return_value=(["Searching for file"], False, "File not found")),
+        "cios.core.handlers.dev._scan_project_dirs": MagicMock(return_value=[]),
+        "cios.core.handlers.dev._find_project": MagicMock(return_value=None),
+        "cios.core.handlers.dev._is_port_in_use": MagicMock(return_value=False),
+        "cios.core.handlers.dev.time.sleep": MagicMock(),
+        "cios.core.handlers.logs.time.sleep": MagicMock(),
         "os.path.exists": MagicMock(return_value=True),
         "os.path.isdir": MagicMock(return_value=False),
     }
@@ -276,20 +285,20 @@ def _execute_handler(intent_type: IntentType) -> PlanResult:
     mock_net.list_networks.return_value = []
     mock_net.connect.return_value = (["Connecting"], True, "Connected")
     mock_net.disconnect.return_value = (["Disconnecting"], True, "Disconnected")
-    patches["harmoni.core.planner.network_skill"] = mock_net
+    patches["cios.core.handlers.network.network_skill"] = mock_net
 
     mock_audio = MagicMock()
     mock_audio.change_volume.return_value = (["Adjusting volume"], True, "Volume: 60%")
     mock_audio.set_volume.return_value = (["Setting volume"], True, "Volume: 50%")
     mock_audio.mute.return_value = (["Muting"], True, "Muted")
-    patches["harmoni.core.planner.audio_skill"] = mock_audio
+    patches["cios.core.handlers.audio.audio_skill"] = mock_audio
 
     mock_power = MagicMock()
     mock_power.get_brightness.return_value = 70
     mock_power.change_brightness.return_value = (["Adjusting brightness"], True, "Brightness: 80%")
     mock_power.set_brightness.return_value = (["Setting brightness"], True, "Brightness: 50%")
     mock_power.enable_power_saving.return_value = (["Enabling power saving"], True, "Power saving enabled")
-    patches["harmoni.core.planner.power_skill"] = mock_power
+    patches["cios.core.handlers.system.power_skill"] = mock_power
 
     mock_pkg = MagicMock()
     mock_pkg.search_packages.return_value = mock_pkg_result
@@ -297,7 +306,7 @@ def _execute_handler(intent_type: IntentType) -> PlanResult:
     mock_pkg.remove_package.return_value = mock_pkg_result
     mock_pkg.update_lists.return_value = mock_pkg_result
     mock_pkg.upgrade_packages.return_value = mock_pkg_result
-    patches["harmoni.core.planner.pkg_skill"] = mock_pkg
+    patches["cios.core.handlers.packages.pkg_skill"] = mock_pkg
 
     mock_clip = MagicMock()
     mock_cb = MagicMock()
@@ -306,13 +315,13 @@ def _execute_handler(intent_type: IntentType) -> PlanResult:
     mock_cb.get_history.return_value = []
     mock_clip.CognitiveClipboard.return_value = mock_cb
     mock_clip.detect_content_type.return_value = "text"
-    patches["harmoni.core.planner.clipboard_skill"] = mock_clip
+    patches["cios.core.handlers.peripherals.clipboard_skill"] = mock_clip
 
     mock_window = MagicMock()
     mock_window.list_windows.return_value = []
     mock_window.find_window.return_value = None
     mock_window.get_active_window.return_value = None
-    patches["harmoni.core.planner.window_skill"] = mock_window
+    patches["cios.core.handlers.peripherals.window_skill"] = mock_window
 
     mock_bt = MagicMock()
     mock_bt.is_available.return_value = False
@@ -320,12 +329,12 @@ def _execute_handler(intent_type: IntentType) -> PlanResult:
     mock_bt.list_connected.return_value = []
     mock_bt.list_paired.return_value = []
     mock_bt.scan.return_value = []
-    patches["harmoni.core.planner.bt_skill"] = mock_bt
+    patches["cios.core.handlers.peripherals.bt_skill"] = mock_bt
 
     mock_update = MagicMock()
     mock_update.get_current_version.return_value = "1.0.0"
     mock_update.check_update_summary.return_value = (["Checking updates"], "Up to date (v1.0.0)")
-    patches["harmoni.core.planner.update_skill"] = mock_update
+    patches["cios.core.handlers.misc.update_skill"] = mock_update
 
     with contextlib.ExitStack() as stack:
         for target, mock_obj in patches.items():

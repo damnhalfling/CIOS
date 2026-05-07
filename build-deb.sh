@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════
-#  Harmoni — Build .deb package
+#  CIOS — Build .deb package
 #  Usage: bash build-deb.sh [VERSION]
 #  Example: bash build-deb.sh 0.3.0
 # ═══════════════════════════════════════════════════
 set -euo pipefail
 
 VERSION="${1:-0.3.0}"
-PKG_NAME="harmoni"
+PKG_NAME="cios"
 PKG_DIR="${PKG_NAME}_${VERSION}_amd64"
-INSTALL_DIR="/usr/share/harmoni"
+INSTALL_DIR="/usr/share/cios"
 
 echo "╔═══════════════════════════════════════════╗"
-echo "║  Harmoni — Building .deb v${VERSION}          ║"
+echo "║  CIOS — Building .deb v${VERSION}             ║"
 echo "╚═══════════════════════════════════════════╝"
 
 # ── Clean previous build ──
@@ -20,21 +20,21 @@ rm -rf "${PKG_DIR}" "${PKG_DIR}.deb"
 
 # ── Create directory structure ──
 mkdir -p "${PKG_DIR}/DEBIAN"
-mkdir -p "${PKG_DIR}${INSTALL_DIR}/harmoni/core"
-mkdir -p "${PKG_DIR}${INSTALL_DIR}/harmoni/ui"
-mkdir -p "${PKG_DIR}${INSTALL_DIR}/harmoni/infra"
-mkdir -p "${PKG_DIR}${INSTALL_DIR}/harmoni/skills"
+mkdir -p "${PKG_DIR}${INSTALL_DIR}/cios/core"
+mkdir -p "${PKG_DIR}${INSTALL_DIR}/cios/ui"
+mkdir -p "${PKG_DIR}${INSTALL_DIR}/cios/infra"
+mkdir -p "${PKG_DIR}${INSTALL_DIR}/cios/skills"
 mkdir -p "${PKG_DIR}${INSTALL_DIR}/assets"
 mkdir -p "${PKG_DIR}${INSTALL_DIR}/config"
 mkdir -p "${PKG_DIR}/usr/local/bin"
 mkdir -p "${PKG_DIR}/usr/share/xsessions"
-mkdir -p "${PKG_DIR}/usr/share/plymouth/themes/harmoni"
+mkdir -p "${PKG_DIR}/usr/share/plymouth/themes/cios"
 mkdir -p "${PKG_DIR}/usr/share/backgrounds"
-mkdir -p "${PKG_DIR}/etc/xdg/openbox-harmoni"
+mkdir -p "${PKG_DIR}/etc/xdg/openbox-cios"
 
 # ── DEBIAN/control ──
 cat > "${PKG_DIR}/DEBIAN/control" << EOF
-Package: harmoni
+Package: cios
 Version: ${VERSION}
 Section: x11
 Priority: optional
@@ -43,13 +43,13 @@ Depends: python3 (>= 3.10), python3-pip, python3-venv, python3-tk, xorg, lightdm
 Recommends: pipewire-pulse | pulseaudio-utils, network-manager, i3lock, plymouth
 Suggests: slick-greeter, plymouth-themes
 Maintainer: damnhalfling <damnhalfling@github.com>
-Description: Harmoni OS — AI-first desktop interface
+Description: CIOS — AI-first desktop interface
  A AI-first layer that replaces apps with intent-driven
  execution on top of Linux. Speak intent, get results.
  .
  Can be installed as an additional X session alongside
  GNOME/KDE, or as the default desktop with custom login.
-Homepage: https://github.com/damnhalfling/harmoni
+Homepage: https://github.com/damnhalfling/cios
 EOF
 
 # ── DEBIAN/preinst (clean previous version) ──
@@ -58,31 +58,31 @@ cat > "${PKG_DIR}/DEBIAN/preinst" << 'PREINST'
 export PATH="$PATH:/usr/local/sbin:/usr/sbin:/sbin"
 
 # Always clean pycache (prevents stale bytecode on upgrades)
-find /usr/share/harmoni -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+find /usr/share/cios -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 
 # ── Remove previous version if installed ──
-if dpkg -s harmoni >/dev/null 2>&1; then
-    PREV_VER=$(dpkg-query -W -f='${Version}' harmoni 2>/dev/null || echo "unknown")
-    echo "[Harmoni] Previous version detected: ${PREV_VER}"
-    echo "[Harmoni] Cleaning up before upgrade..."
+if dpkg -s cios >/dev/null 2>&1; then
+    PREV_VER=$(dpkg-query -W -f='${Version}' cios 2>/dev/null || echo "unknown")
+    echo "[CIOS] Previous version detected: ${PREV_VER}"
+    echo "[CIOS] Cleaning up before upgrade..."
 
     # Stop daemon if running (socket only, not the session)
-    if [ -f /tmp/harmoni.sock ]; then
-        echo '{"command":"shutdown"}' | socat - UNIX-CONNECT:/tmp/harmoni.sock 2>/dev/null || true
+    if [ -f /tmp/cios.sock ]; then
+        echo '{"command":"shutdown"}' | socat - UNIX-CONNECT:/tmp/cios.sock 2>/dev/null || true
         sleep 0.5
     fi
 
-    # NOTE: Do NOT kill harmoni-session or harmoni.main here!
-    # The user might be running dpkg -i from within the Harmoni session itself.
+    # NOTE: Do NOT kill cios-session or cios.main here!
+    # The user might be running dpkg -i from within the CIOS session itself.
     # Killing those processes would terminate the X session and log out the user.
 
     # Remove old venv (will be recreated by postinst)
-    if [ -d /usr/share/harmoni/.venv ]; then
-        echo "[Harmoni] Removing old virtual environment..."
-        rm -rf /usr/share/harmoni/.venv
+    if [ -d /usr/share/cios/.venv ]; then
+        echo "[CIOS] Removing old virtual environment..."
+        rm -rf /usr/share/cios/.venv
     fi
 
-    echo "[Harmoni] Cleanup complete."
+    echo "[CIOS] Cleanup complete."
 fi
 
 exit 0
@@ -92,49 +92,49 @@ chmod 755 "${PKG_DIR}/DEBIAN/preinst"
 # ── DEBIAN/postinst ──
 cat > "${PKG_DIR}/DEBIAN/postinst" << 'POSTINST'
 #!/bin/bash
-# Harmoni postinst — interactive installation with mode selection.
+# CIOS postinst — interactive installation with mode selection.
 # Handles everything: venv, deps, LightDM, Plymouth, GRUB.
 export PATH="$PATH:/usr/local/sbin:/usr/sbin:/sbin"
 export DEBIAN_FRONTEND=noninteractive
 
 echo ""
 echo "╔═══════════════════════════════════════════╗"
-echo "║       Harmoni OS — Installer             ║"
+echo "║       CIOS — Installer                   ║"
 echo "╚═══════════════════════════════════════════╝"
 echo ""
 
 # ── Create Python venv + install deps ──
-echo "[Harmoni] Setting up Python environment..."
-if [ ! -d /usr/share/harmoni/.venv ]; then
-    python3 -m venv /usr/share/harmoni/.venv 2>/dev/null || {
-        echo "[Harmoni] ⚠ Could not create venv. Will use system Python."
+echo "[CIOS] Setting up Python environment..."
+if [ ! -d /usr/share/cios/.venv ]; then
+    python3 -m venv /usr/share/cios/.venv 2>/dev/null || {
+        echo "[CIOS] ⚠ Could not create venv. Will use system Python."
         pip3 install --quiet --break-system-packages \
             boto3==1.35.86 prompt_toolkit==3.0.48 rich==13.9.4 psutil==6.1.1 2>/dev/null || true
     }
 fi
 
-if [ -d /usr/share/harmoni/.venv ]; then
-    /usr/share/harmoni/.venv/bin/pip install --quiet \
+if [ -d /usr/share/cios/.venv ]; then
+    /usr/share/cios/.venv/bin/pip install --quiet \
         boto3==1.35.86 \
         prompt_toolkit==3.0.48 \
         rich==13.9.4 \
         psutil==6.1.1 2>/dev/null || true
 
-    /usr/share/harmoni/.venv/bin/pip install --quiet -e /usr/share/harmoni 2>/dev/null || true
+    /usr/share/cios/.venv/bin/pip install --quiet -e /usr/share/cios 2>/dev/null || true
 fi
 
-chmod +x /usr/local/bin/harmoni-session 2>/dev/null || true
-echo "[Harmoni] ✓ Python environment ready"
+chmod +x /usr/local/bin/cios-session 2>/dev/null || true
+echo "[CIOS] ✓ Python environment ready"
 
 # ── Apply LightDM branding if LightDM is installed (both modes) ──
 if [ -d /etc/lightdm ] && command -v lightdm &>/dev/null; then
-    HARMONI_CONF="/usr/share/harmoni/config"
-    if [ -f "$HARMONI_CONF/slick-greeter.conf" ] && [ -f /usr/share/pixmaps/harmoni-logo.png ]; then
-        if [ ! -f /etc/lightdm/slick-greeter.conf.bak.harmoni ]; then
-            cp /etc/lightdm/slick-greeter.conf /etc/lightdm/slick-greeter.conf.bak.harmoni 2>/dev/null || true
+    CIOS_CONF="/usr/share/cios/config"
+    if [ -f "$CIOS_CONF/slick-greeter.conf" ] && [ -f /usr/share/pixmaps/cios-logo.png ]; then
+        if [ ! -f /etc/lightdm/slick-greeter.conf.bak.cios ]; then
+            cp /etc/lightdm/slick-greeter.conf /etc/lightdm/slick-greeter.conf.bak.cios 2>/dev/null || true
         fi
-        cp "$HARMONI_CONF/slick-greeter.conf" /etc/lightdm/slick-greeter.conf
-        echo "[Harmoni] ✓ LightDM branding applied (logo + background)"
+        cp "$CIOS_CONF/slick-greeter.conf" /etc/lightdm/slick-greeter.conf
+        echo "[CIOS] ✓ LightDM branding applied (logo + background)"
     fi
 fi
 
@@ -153,19 +153,19 @@ done
 
 if [ -z "$EXISTING_DM" ]; then
     # No existing desktop — full replacement automatically
-    echo "[Harmoni] Nenhum desktop detectado. Instalando como desktop padrão."
+    echo "[CIOS] Nenhum desktop detectado. Instalando como desktop padrão."
     INSTALL_MODE="2"
 else
     echo "┌─────────────────────────────────────────────┐"
     echo "│  Desktop detectado: $EXISTING_DM"
     echo "│                                              │"
     echo "│  1) Sessão adicional                         │"
-    echo "│     Harmoni aparece ao lado na tela de login │"
+    echo "│     CIOS aparece ao lado na tela de login    │"
     echo "│                                              │"
     echo "│  2) Substituição completa                    │"
     echo "│     Remove $EXISTING_DM, instala LightDM     │"
-    echo "│     com tema Harmoni + Plymouth boot splash  │"
-    echo "│     (reversível com: sudo apt remove harmoni)│"
+    echo "│     com tema CIOS + Plymouth boot splash     │"
+    echo "│     (reversível com: sudo apt remove cios)   │"
     echo "│                                              │"
     echo "└─────────────────────────────────────────────┘"
     echo ""
@@ -185,7 +185,7 @@ echo ""
 
 # ── Mode 2: Full replacement ──
 if [ "$INSTALL_MODE" = "2" ]; then
-    echo "[Harmoni] Configurando substituição completa..."
+    echo "[CIOS] Configurando substituição completa..."
 
     # Block DM restarts during postinst
     cat > /usr/sbin/policy-rc.d << 'POLICY'
@@ -199,21 +199,21 @@ POLICY
 
     # LightDM and Xorg are already installed as package dependencies
     # Just need to configure them
-    echo "[Harmoni] ✓ Xorg + LightDM already installed (package deps)"
+    echo "[CIOS] ✓ Xorg + LightDM already installed (package deps)"
 
     # Remove DM restart block
     rm -f /usr/sbin/policy-rc.d
 
     # Backup + set LightDM as default
     mkdir -p /etc/X11
-    if [ -f /etc/X11/default-display-manager ] && [ ! -f /etc/X11/default-display-manager.bak.harmoni ]; then
-        cp /etc/X11/default-display-manager /etc/X11/default-display-manager.bak.harmoni
+    if [ -f /etc/X11/default-display-manager ] && [ ! -f /etc/X11/default-display-manager.bak.cios ]; then
+        cp /etc/X11/default-display-manager /etc/X11/default-display-manager.bak.cios
     fi
     echo "/usr/sbin/lightdm" > /etc/X11/default-display-manager
 
     # Apply LightDM configs (logo + background + theme)
     mkdir -p /etc/lightdm
-    HARMONI_CONF="/usr/share/harmoni/config"
+    CIOS_CONF="/usr/share/cios/config"
 
     # Detect which greeter is available
     if command -v slick-greeter &>/dev/null; then
@@ -228,21 +228,21 @@ POLICY
     cat > /etc/lightdm/lightdm.conf << LDMCONF
 [Seat:*]
 greeter-session=$GREETER
-user-session=harmoni
+user-session=cios
 greeter-hide-users=false
 allow-guest=false
 LDMCONF
 
     # Apply greeter theme if slick-greeter
-    if [ "$GREETER" = "slick-greeter" ] && [ -f "$HARMONI_CONF/slick-greeter.conf" ]; then
-        cp "$HARMONI_CONF/slick-greeter.conf" /etc/lightdm/slick-greeter.conf
+    if [ "$GREETER" = "slick-greeter" ] && [ -f "$CIOS_CONF/slick-greeter.conf" ]; then
+        cp "$CIOS_CONF/slick-greeter.conf" /etc/lightdm/slick-greeter.conf
     fi
 
     # Apply GTK greeter theme if lightdm-gtk-greeter
     if [ "$GREETER" = "lightdm-gtk-greeter" ]; then
         cat > /etc/lightdm/lightdm-gtk-greeter.conf << 'GTKCONF'
 [greeter]
-background=/usr/share/backgrounds/harmoni.png
+background=/usr/share/backgrounds/cios.png
 theme-name=Adwaita-dark
 icon-theme-name=Adwaita
 font-name=Sans 11
@@ -250,39 +250,67 @@ indicators=~host;~spacer;~session;~power
 position=50%,center 50%,center
 GTKCONF
     fi
-    echo "[Harmoni] ✓ LightDM configured (greeter: $GREETER)"
+    echo "[CIOS] ✓ LightDM configured (greeter: $GREETER)"
 
-    # Plymouth boot splash
-    PLYMOUTH_THEME="/usr/share/plymouth/themes/harmoni"
-    if [ -d "$PLYMOUTH_THEME" ] && [ -f "$PLYMOUTH_THEME/harmoni.plymouth" ]; then
-        plymouth-set-default-theme harmoni 2>/dev/null || {
+    # ── Plymouth boot splash (instant, in initramfs) ──
+    PLYMOUTH_THEME="/usr/share/plymouth/themes/cios"
+    if [ -d "$PLYMOUTH_THEME" ] && [ -f "$PLYMOUTH_THEME/cios.plymouth" ]; then
+        plymouth-set-default-theme cios 2>/dev/null || {
             mkdir -p /etc/plymouth
-            printf "[Daemon]\nTheme=harmoni\n" > /etc/plymouth/plymouthd.conf
+            printf "[Daemon]\nTheme=cios\n" > /etc/plymouth/plymouthd.conf
         }
+
+        # Force Plymouth into initramfs for instant splash after BIOS
+        mkdir -p /etc/initramfs-tools/conf.d
+        echo "FRAMEBUFFER=y" > /etc/initramfs-tools/conf.d/cios-splash
+
+        # Include GPU drivers in initramfs (KMS = instant framebuffer)
+        INITRAMFS_MODULES="/etc/initramfs-tools/modules"
+        for mod in drm drm_kms_helper i915 amdgpu nouveau radeon; do
+            if ! grep -q "^${mod}$" "$INITRAMFS_MODULES" 2>/dev/null; then
+                echo "$mod" >> "$INITRAMFS_MODULES"
+            fi
+        done
+
         update-initramfs -u 2>/dev/null || true
-        echo "[Harmoni] ✓ Plymouth boot splash configured"
+        echo "[CIOS] ✓ Plymouth configured (initramfs, instant splash)"
     fi
 
-    # GRUB: quiet splash + fast timeout (nearly invisible)
+    # ── GRUB: invisible, zero delay, silent kernel ──
     if [ -f /etc/default/grub ]; then
-        if [ ! -f /etc/default/grub.bak.harmoni ]; then
-            cp /etc/default/grub /etc/default/grub.bak.harmoni
+        if [ ! -f /etc/default/grub.bak.cios ]; then
+            cp /etc/default/grub /etc/default/grub.bak.cios
         fi
-        # Add quiet splash
-        if ! grep -q "quiet splash" /etc/default/grub; then
-            sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT="\(.*\)"/GRUB_CMDLINE_LINUX_DEFAULT="\1 quiet splash"/' /etc/default/grub
-            sed -i 's/  */ /g' /etc/default/grub
-        fi
-        # Set timeout to 1 second (nearly invisible but still accessible with Shift)
-        sed -i 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=1/' /etc/default/grub
-        # Hide GRUB menu unless Shift is held
-        if ! grep -q "GRUB_TIMEOUT_STYLE" /etc/default/grub; then
-            echo 'GRUB_TIMEOUT_STYLE=hidden' >> /etc/default/grub
-        else
+
+        # Replace GRUB_CMDLINE_LINUX_DEFAULT with fully silent boot
+        sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash loglevel=0 vt.global_cursor_default=0 rd.udev.log_priority=3 systemd.show_status=false"/' /etc/default/grub
+
+        # Zero timeout — GRUB is invisible (Shift/Esc still works to access menu)
+        sed -i 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=0/' /etc/default/grub
+
+        # Hidden style — no countdown, no menu
+        if grep -q "^GRUB_TIMEOUT_STYLE" /etc/default/grub; then
             sed -i 's/^GRUB_TIMEOUT_STYLE=.*/GRUB_TIMEOUT_STYLE=hidden/' /etc/default/grub
+        else
+            echo 'GRUB_TIMEOUT_STYLE=hidden' >> /etc/default/grub
         fi
+
+        # Don't probe for other OS (faster boot, cleaner menu)
+        if grep -q "^GRUB_DISABLE_OS_PROBER" /etc/default/grub; then
+            sed -i 's/^GRUB_DISABLE_OS_PROBER=.*/GRUB_DISABLE_OS_PROBER=true/' /etc/default/grub
+        else
+            echo 'GRUB_DISABLE_OS_PROBER=true' >> /etc/default/grub
+        fi
+
+        # Even after failed boot, keep timeout minimal (2s safety net)
+        if grep -q "^GRUB_RECORDFAIL_TIMEOUT" /etc/default/grub; then
+            sed -i 's/^GRUB_RECORDFAIL_TIMEOUT=.*/GRUB_RECORDFAIL_TIMEOUT=2/' /etc/default/grub
+        else
+            echo 'GRUB_RECORDFAIL_TIMEOUT=2' >> /etc/default/grub
+        fi
+
         update-grub 2>/dev/null || true
-        echo "[Harmoni] ✓ GRUB configured (hidden, 1s timeout, quiet splash)"
+        echo "[CIOS] ✓ GRUB invisible (0s timeout, silent kernel, no OS probe)"
     fi
 
     # Disable other DMs
@@ -300,19 +328,59 @@ GTKCONF
     echo "═══════════════════════════════════════════"
     echo "  ✓ Substituição completa configurada!"
     echo ""
-    echo "  Boot: logo Harmoni (Plymouth)"
-    echo "  Login: LightDM com tema Harmoni"
-    echo "  Desktop: Harmoni OS"
+    echo "  Boot: logo CIOS (Plymouth)"
+    echo "  Login: LightDM com tema CIOS"
+    echo "  Desktop: CIOS"
     echo ""
     echo "  Reboot: sudo reboot"
-    echo "  Reverter: sudo apt remove harmoni && sudo reboot"
+    echo "  Reverter: sudo apt remove cios && sudo reboot"
     echo "═══════════════════════════════════════════"
     echo ""
 else
+    # ── Mode 1: Session only — but still optimize boot if Plymouth available ──
+    PLYMOUTH_THEME="/usr/share/plymouth/themes/cios"
+    if [ -d "$PLYMOUTH_THEME" ] && [ -f "$PLYMOUTH_THEME/cios.plymouth" ] && command -v plymouth-set-default-theme &>/dev/null; then
+        plymouth-set-default-theme cios 2>/dev/null || true
+
+        # Plymouth in initramfs for instant splash
+        mkdir -p /etc/initramfs-tools/conf.d
+        echo "FRAMEBUFFER=y" > /etc/initramfs-tools/conf.d/cios-splash
+
+        INITRAMFS_MODULES="/etc/initramfs-tools/modules"
+        for mod in drm drm_kms_helper i915 amdgpu nouveau radeon; do
+            if ! grep -q "^${mod}$" "$INITRAMFS_MODULES" 2>/dev/null; then
+                echo "$mod" >> "$INITRAMFS_MODULES"
+            fi
+        done
+
+        update-initramfs -u 2>/dev/null || true
+
+        # Silent GRUB
+        if [ -f /etc/default/grub ]; then
+            if [ ! -f /etc/default/grub.bak.cios ]; then
+                cp /etc/default/grub /etc/default/grub.bak.cios
+            fi
+            sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash loglevel=0 vt.global_cursor_default=0 rd.udev.log_priority=3 systemd.show_status=false"/' /etc/default/grub
+            sed -i 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=0/' /etc/default/grub
+            if grep -q "^GRUB_TIMEOUT_STYLE" /etc/default/grub; then
+                sed -i 's/^GRUB_TIMEOUT_STYLE=.*/GRUB_TIMEOUT_STYLE=hidden/' /etc/default/grub
+            else
+                echo 'GRUB_TIMEOUT_STYLE=hidden' >> /etc/default/grub
+            fi
+            if grep -q "^GRUB_RECORDFAIL_TIMEOUT" /etc/default/grub; then
+                sed -i 's/^GRUB_RECORDFAIL_TIMEOUT=.*/GRUB_RECORDFAIL_TIMEOUT=2/' /etc/default/grub
+            else
+                echo 'GRUB_RECORDFAIL_TIMEOUT=2' >> /etc/default/grub
+            fi
+            update-grub 2>/dev/null || true
+        fi
+        echo "[CIOS] ✓ Boot otimizado (Plymouth + GRUB silencioso)"
+    fi
+
     echo "═══════════════════════════════════════════"
-    echo "  ✓ Harmoni instalado (sessão adicional)"
+    echo "  ✓ CIOS instalado (sessão adicional)"
     echo ""
-    echo "  Reboot e selecione 'Harmoni OS' na tela de login."
+    echo "  Reboot e selecione 'CIOS' na tela de login."
     echo "  sudo reboot"
     echo "═══════════════════════════════════════════"
     echo ""
@@ -329,47 +397,60 @@ cat > "${PKG_DIR}/DEBIAN/prerm" << 'PRERM'
 set -e
 export PATH="$PATH:/usr/local/sbin:/usr/sbin:/sbin"
 
-echo "[Harmoni] Removing..."
+echo "[CIOS] Removing..."
 
 # Restore original display manager if we changed it
-if [ -f /etc/X11/default-display-manager.bak.harmoni ]; then
-    cp /etc/X11/default-display-manager.bak.harmoni /etc/X11/default-display-manager
-    rm -f /etc/X11/default-display-manager.bak.harmoni
-    echo "[Harmoni] Restored original display manager"
+if [ -f /etc/X11/default-display-manager.bak.cios ]; then
+    cp /etc/X11/default-display-manager.bak.cios /etc/X11/default-display-manager
+    rm -f /etc/X11/default-display-manager.bak.cios
+    echo "[CIOS] Restored original display manager"
 fi
 
 # Restore LightDM configs if we changed them
-if [ -f /etc/lightdm/lightdm.conf.bak.harmoni ]; then
-    mv /etc/lightdm/lightdm.conf.bak.harmoni /etc/lightdm/lightdm.conf
+if [ -f /etc/lightdm/lightdm.conf.bak.cios ]; then
+    mv /etc/lightdm/lightdm.conf.bak.cios /etc/lightdm/lightdm.conf
 fi
-if [ -f /etc/lightdm/slick-greeter.conf.bak.harmoni ]; then
-    mv /etc/lightdm/slick-greeter.conf.bak.harmoni /etc/lightdm/slick-greeter.conf
+if [ -f /etc/lightdm/slick-greeter.conf.bak.cios ]; then
+    mv /etc/lightdm/slick-greeter.conf.bak.cios /etc/lightdm/slick-greeter.conf
 fi
-if [ -f /etc/lightdm/lightdm-gtk-greeter.conf.bak.harmoni ]; then
-    mv /etc/lightdm/lightdm-gtk-greeter.conf.bak.harmoni /etc/lightdm/lightdm-gtk-greeter.conf
+if [ -f /etc/lightdm/lightdm-gtk-greeter.conf.bak.cios ]; then
+    mv /etc/lightdm/lightdm-gtk-greeter.conf.bak.cios /etc/lightdm/lightdm-gtk-greeter.conf
 fi
 
 # Restore Plymouth theme to default
 if command -v plymouth-set-default-theme &>/dev/null; then
     CURRENT_THEME=$(plymouth-set-default-theme 2>/dev/null || echo "")
-    if [ "$CURRENT_THEME" = "harmoni" ]; then
+    if [ "$CURRENT_THEME" = "cios" ]; then
         plymouth-set-default-theme -R spinner 2>/dev/null || \
         plymouth-set-default-theme -R ubuntu-logo 2>/dev/null || true
-        echo "[Harmoni] Restored default Plymouth theme"
+        echo "[CIOS] Restored default Plymouth theme"
     fi
 fi
 
+# Remove initramfs splash config
+rm -f /etc/initramfs-tools/conf.d/cios-splash
+
+# Remove GPU modules we added (only the ones we explicitly added)
+INITRAMFS_MODULES="/etc/initramfs-tools/modules"
+if [ -f "$INITRAMFS_MODULES" ]; then
+    for mod in drm drm_kms_helper i915 amdgpu nouveau radeon; do
+        sed -i "/^${mod}$/d" "$INITRAMFS_MODULES" 2>/dev/null || true
+    done
+fi
+
+update-initramfs -u 2>/dev/null || true
+
 # Restore GRUB if we changed it
-if [ -f /etc/default/grub.bak.harmoni ]; then
-    mv /etc/default/grub.bak.harmoni /etc/default/grub
+if [ -f /etc/default/grub.bak.cios ]; then
+    mv /etc/default/grub.bak.cios /etc/default/grub
     update-grub 2>/dev/null || true
-    echo "[Harmoni] Restored GRUB config"
+    echo "[CIOS] Restored GRUB config"
 fi
 
 # Clean venv
-rm -rf /usr/share/harmoni/.venv
+rm -rf /usr/share/cios/.venv
 
-echo "[Harmoni] Removed."
+echo "[CIOS] Removed."
 PRERM
 chmod 755 "${PKG_DIR}/DEBIAN/prerm"
 
@@ -378,19 +459,19 @@ echo "→ Copying application files..."
 
 # Core Python modules
 cp pyproject.toml "${PKG_DIR}${INSTALL_DIR}/"
-cp -r harmoni/*.py "${PKG_DIR}${INSTALL_DIR}/harmoni/"
-cp -r harmoni/core/*.py "${PKG_DIR}${INSTALL_DIR}/harmoni/core/"
-cp -r harmoni/ui/*.py "${PKG_DIR}${INSTALL_DIR}/harmoni/ui/"
-cp -r harmoni/infra/*.py "${PKG_DIR}${INSTALL_DIR}/harmoni/infra/"
-cp -r harmoni/skills/*.py "${PKG_DIR}${INSTALL_DIR}/harmoni/skills/"
+cp -r cios/*.py "${PKG_DIR}${INSTALL_DIR}/cios/"
+cp -r cios/core/*.py "${PKG_DIR}${INSTALL_DIR}/cios/core/"
+cp -r cios/ui/*.py "${PKG_DIR}${INSTALL_DIR}/cios/ui/"
+cp -r cios/infra/*.py "${PKG_DIR}${INSTALL_DIR}/cios/infra/"
+cp -r cios/skills/*.py "${PKG_DIR}${INSTALL_DIR}/cios/skills/"
 
 # ── Session files ──
 echo "→ Copying session files..."
 
 # Session script
-cat > "${PKG_DIR}/usr/local/bin/harmoni-session" << 'SESSION'
+cat > "${PKG_DIR}/usr/local/bin/cios-session" << 'SESSION'
 #!/bin/bash
-# Harmoni X Session — optimized boot
+# CIOS X Session — optimized boot
 # Zero flicker. Splash with real progress. Crash recovery.
 
 export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
@@ -398,17 +479,17 @@ export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 export NO_AT_BRIDGE=1
 export GTK_A11Y=none
 
-LOGFILE="$HOME/.harmoni/session.log"
-mkdir -p "$HOME/.harmoni"
+LOGFILE="$HOME/.cios/session.log"
+mkdir -p "$HOME/.cios"
 
-echo "=== Harmoni session starting $(date) ===" >> "$LOGFILE"
+echo "=== CIOS session starting $(date) ===" >> "$LOGFILE"
 
 # Set background IMMEDIATELY (prevents any flash)
 xsetroot -solid '#0a0a0f' 2>/dev/null || true
 xsetroot -cursor_name left_ptr 2>/dev/null || true
 
 # Find Python — try venv first, then system
-VENV="/usr/share/harmoni/.venv/bin/python3"
+VENV="/usr/share/cios/.venv/bin/python3"
 if [ ! -x "$VENV" ]; then
     VENV=$(which python3 2>/dev/null)
     echo "WARNING: venv not found, using system python: $VENV" >> "$LOGFILE"
@@ -416,31 +497,31 @@ fi
 
 if [ -z "$VENV" ]; then
     echo "FATAL: No python3 found!" >> "$LOGFILE"
-    xterm -e "echo 'Harmoni: python3 not found. Check installation.'; bash" &
+    xterm -e "echo 'CIOS: python3 not found. Check installation.'; bash" &
     wait
     exit 1
 fi
 
-# Ensure harmoni module is findable
-export PYTHONPATH="/usr/share/harmoni:${PYTHONPATH:-}"
+# Ensure cios module is findable
+export PYTHONPATH="/usr/share/cios:${PYTHONPATH:-}"
 
-# Verify harmoni module is importable
-if ! $VENV -c "import harmoni" 2>/dev/null; then
-    echo "FATAL: Cannot import harmoni module" >> "$LOGFILE"
+# Verify cios module is importable
+if ! $VENV -c "import cios" 2>/dev/null; then
+    echo "FATAL: Cannot import cios module" >> "$LOGFILE"
     echo "Python: $VENV" >> "$LOGFILE"
     echo "PYTHONPATH: $PYTHONPATH" >> "$LOGFILE"
-    $VENV -c "import harmoni" >> "$LOGFILE" 2>&1
-    xterm -e "echo 'Harmoni: module not found. Run: sudo apt install -f'; tail -10 $LOGFILE; echo; bash" &
+    $VENV -c "import cios" >> "$LOGFILE" 2>&1
+    xterm -e "echo 'CIOS: module not found. Run: sudo apt install -f'; tail -10 $LOGFILE; echo; bash" &
     wait
     exit 1
 fi
 
 # Show splash BEFORE Openbox (user sees brand instantly)
-$VENV -m harmoni.ui.splash &
+$VENV -m cios.ui.splash &
 SPLASH_PID=$!
 
 # Start Openbox in parallel
-OPENBOX_CONF="/etc/xdg/openbox-harmoni"
+OPENBOX_CONF="/etc/xdg/openbox-cios"
 if command -v openbox &>/dev/null; then
     openbox --config-file "${OPENBOX_CONF}/rc.xml" &
     echo "Openbox started (PID $!)" >> "$LOGFILE"
@@ -448,13 +529,13 @@ else
     echo "WARNING: openbox not found, trying without WM" >> "$LOGFILE"
 fi
 
-# Start Harmoni (crash recovery loop)
+# Start CIOS (crash recovery loop)
 CRASH_COUNT=0
 while true; do
-    echo "Starting Harmoni at $(date)" >> "$LOGFILE"
-    $VENV -m harmoni.main >> "$LOGFILE" 2>&1
+    echo "Starting CIOS at $(date)" >> "$LOGFILE"
+    $VENV -m cios.main >> "$LOGFILE" 2>&1
     EXIT_CODE=$?
-    echo "Harmoni exited with code $EXIT_CODE at $(date)" >> "$LOGFILE"
+    echo "CIOS exited with code $EXIT_CODE at $(date)" >> "$LOGFILE"
 
     kill $SPLASH_PID 2>/dev/null || true
 
@@ -465,47 +546,47 @@ while true; do
     CRASH_COUNT=$((CRASH_COUNT + 1))
     if [ $CRASH_COUNT -ge 3 ]; then
         echo "Too many crashes, opening terminal" >> "$LOGFILE"
-        xterm -e "echo 'Harmoni crashed 3x. Check ~/.harmoni/session.log'; tail -30 $LOGFILE; echo; bash" &
+        xterm -e "echo 'CIOS crashed 3x. Check ~/.cios/session.log'; tail -30 $LOGFILE; echo; bash" &
         wait
         break
     fi
 
-    $VENV -m harmoni.splash &
+    $VENV -m cios.ui.splash &
     SPLASH_PID=$!
     sleep 1
 done
 
 echo "=== Session ended $(date) ===" >> "$LOGFILE"
 SESSION
-chmod 755 "${PKG_DIR}/usr/local/bin/harmoni-session"
+chmod 755 "${PKG_DIR}/usr/local/bin/cios-session"
 
 # X session desktop entry
-cat > "${PKG_DIR}/usr/share/xsessions/harmoni.desktop" << 'XSESSION'
+cat > "${PKG_DIR}/usr/share/xsessions/cios.desktop" << 'XSESSION'
 [Desktop Entry]
-Name=Harmoni OS
+Name=CIOS
 Comment=AI-first desktop interface
-Exec=/usr/local/bin/harmoni-session
+Exec=/usr/local/bin/cios-session
 Type=Application
-DesktopNames=Harmoni
+DesktopNames=CIOS
 XSESSION
 
 # Openbox config
-cp session/rc.xml "${PKG_DIR}/etc/xdg/openbox-harmoni/rc.xml"
+cp session/rc.xml "${PKG_DIR}/etc/xdg/openbox-cios/rc.xml"
 
 # Openbox autostart (fallback)
-cat > "${PKG_DIR}/etc/xdg/openbox-harmoni/autostart" << 'AUTOSTART'
+cat > "${PKG_DIR}/etc/xdg/openbox-cios/autostart" << 'AUTOSTART'
 #!/bin/bash
 # Fallback autostart — used if session script doesn't handle it
 xsetroot -solid '#0a0a0f' 2>/dev/null || true
 export NO_AT_BRIDGE=1
 export GTK_A11Y=none
-export PYTHONPATH="/usr/share/harmoni:${PYTHONPATH:-}"
-VENV="/usr/share/harmoni/.venv/bin/python3"
+export PYTHONPATH="/usr/share/cios:${PYTHONPATH:-}"
+VENV="/usr/share/cios/.venv/bin/python3"
 [ ! -x "$VENV" ] && VENV="python3"
-$VENV -m harmoni.splash &
-$VENV -m harmoni.main &
+$VENV -m cios.ui.splash &
+$VENV -m cios.main &
 AUTOSTART
-chmod 755 "${PKG_DIR}/etc/xdg/openbox-harmoni/autostart"
+chmod 755 "${PKG_DIR}/etc/xdg/openbox-cios/autostart"
 
 # ── LightDM config (bundled, applied only in full replacement mode) ──
 echo "→ Bundling LightDM configs..."
@@ -513,15 +594,15 @@ echo "→ Bundling LightDM configs..."
 cat > "${PKG_DIR}${INSTALL_DIR}/config/lightdm.conf" << 'LIGHTDM'
 [Seat:*]
 greeter-session=slick-greeter
-user-session=harmoni
+user-session=cios
 greeter-hide-users=false
 allow-guest=false
 LIGHTDM
 
 cat > "${PKG_DIR}${INSTALL_DIR}/config/slick-greeter.conf" << 'GREETER'
 [Greeter]
-background=/usr/share/backgrounds/harmoni.png
-logo=/usr/share/pixmaps/harmoni-logo.png
+background=/usr/share/backgrounds/cios.png
+logo=/usr/share/pixmaps/cios-logo.png
 theme-name=Adwaita-dark
 icon-theme-name=Adwaita
 draw-grid=false
@@ -532,37 +613,37 @@ GREETER
 
 # ── Logo for LightDM ──
 mkdir -p "${PKG_DIR}/usr/share/pixmaps"
-if [ -f assets/harmoni_logo.png ]; then
-    cp assets/harmoni_logo.png "${PKG_DIR}/usr/share/pixmaps/harmoni-logo.png"
+if [ -f assets/cios_logo.png ]; then
+    cp assets/cios_logo.png "${PKG_DIR}/usr/share/pixmaps/cios-logo.png"
     # Also copy to install dir so the running app can find it
-    cp assets/harmoni_logo.png "${PKG_DIR}${INSTALL_DIR}/assets/harmoni_logo.png" 2>/dev/null || true
-    echo "→ Harmoni logo bundled for LightDM + GUI"
+    cp assets/cios_logo.png "${PKG_DIR}${INSTALL_DIR}/assets/cios_logo.png" 2>/dev/null || true
+    echo "→ CIOS logo bundled for LightDM + GUI"
 fi
 
 # ── Plymouth boot splash theme ──
 echo "→ Copying Plymouth theme..."
-if [ -d plymouth/harmoni ]; then
-    cp plymouth/harmoni/harmoni.plymouth "${PKG_DIR}/usr/share/plymouth/themes/harmoni/"
-    cp plymouth/harmoni/harmoni.script "${PKG_DIR}/usr/share/plymouth/themes/harmoni/"
+if [ -d plymouth/cios ]; then
+    cp plymouth/cios/cios.plymouth "${PKG_DIR}/usr/share/plymouth/themes/cios/"
+    cp plymouth/cios/cios.script "${PKG_DIR}/usr/share/plymouth/themes/cios/"
     # Use the same logo for Plymouth boot splash
-    if [ -f assets/harmoni_logo.png ]; then
-        cp assets/harmoni_logo.png "${PKG_DIR}/usr/share/plymouth/themes/harmoni/logo.png"
+    if [ -f assets/cios_logo.png ]; then
+        cp assets/cios_logo.png "${PKG_DIR}/usr/share/plymouth/themes/cios/logo.png"
     fi
     echo "→ Plymouth theme bundled"
 fi
 
 # ── Background ──
 if [ -f assets/background.png ]; then
-    cp assets/background.png "${PKG_DIR}/usr/share/backgrounds/harmoni.png"
-    sed -i 's/harmoni\.jpg/harmoni.png/' "${PKG_DIR}${INSTALL_DIR}/config/slick-greeter.conf"
+    cp assets/background.png "${PKG_DIR}/usr/share/backgrounds/cios.png"
+    sed -i 's/cios\.jpg/cios.png/' "${PKG_DIR}${INSTALL_DIR}/config/slick-greeter.conf"
 elif [ -f assets/background.jpg ]; then
-    cp assets/background.jpg "${PKG_DIR}/usr/share/backgrounds/harmoni.jpg"
+    cp assets/background.jpg "${PKG_DIR}/usr/share/backgrounds/cios.jpg"
 else
     echo "→ Generating placeholder background..."
     python3 assets/generate_background.py 2>/dev/null || true
     if [ -f assets/background.png ]; then
-        cp assets/background.png "${PKG_DIR}/usr/share/backgrounds/harmoni.png"
-        sed -i 's/harmoni\.jpg/harmoni.png/' "${PKG_DIR}${INSTALL_DIR}/config/slick-greeter.conf"
+        cp assets/background.png "${PKG_DIR}/usr/share/backgrounds/cios.png"
+        sed -i 's/cios\.jpg/cios.png/' "${PKG_DIR}${INSTALL_DIR}/config/slick-greeter.conf"
     else
         echo "  ⚠ Could not generate background (non-critical)"
     fi

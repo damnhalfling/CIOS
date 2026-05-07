@@ -1,7 +1,7 @@
 [project]
-name = "harmoni-os"
-version = "0.14.15"
-description = "Harmoni OS — AI-first system interface that replaces apps with intent-driven execution on Linux"
+name = "cios"
+version = "0.16.0"
+description = "CIOS — Cognitive Intent-first Operational System. Replaces apps with intent-driven execution on Linux"
 requires-python = ">=3.10"
 dependencies = [
     "boto3==1.35.86",
@@ -19,11 +19,11 @@ test = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["harmoni*"]
+include = ["cios*"]
 exclude = ["demo*", "tests*"]
 
 [project.scripts]
-harmoni = "harmoni.main:main"
+cios = "cios.main:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -39,20 +39,20 @@ addopts = [
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
 ]
-collect_ignore_glob = ["**/harmoni/**"]
+collect_ignore_glob = ["**/cios/**"]
 
 [tool.coverage.run]
-source = ["harmoni"]
+source = ["cios"]
 omit = [
-    "harmoni/ui/*.py",
-    "harmoni/main.py",
-    "harmoni/infra/voice.py",
-    "harmoni/infra/daemon.py",
-    "harmoni/infra/monitors.py",
-    "harmoni/skills/auto_learn.py",
-    "harmoni/skills/clipboard.py",
-    "harmoni/skills/window_control.py",
-    "harmoni/skills/package_manager.py",
+    "cios/ui/*.py",
+    "cios/main.py",
+    "cios/infra/voice.py",
+    "cios/infra/daemon.py",
+    "cios/infra/monitors.py",
+    "cios/skills/auto_learn.py",
+    "cios/skills/clipboard.py",
+    "cios/skills/window_control.py",
+    "cios/skills/package_manager.py",
 ]
 
 [tool.coverage.report]

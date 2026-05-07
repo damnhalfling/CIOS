@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, patch
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from harmoni.core.executor import ExecResult
-from harmoni.skills.dev_start import ProjectInfo, execute_dev_start
+from cios.core.executor import ExecResult
+from cios.skills.dev_start import ProjectInfo, execute_dev_start
 
 
 # --- Strategies ---
@@ -101,12 +101,12 @@ class TestDevStartWorkflowProperty:
         deps_installed = dep_state == "installed"
         port_occupied = port_state == "occupied"
 
-        with patch("harmoni.skills.dev_start.needs_install", return_value=not deps_installed), \
-             patch("harmoni.skills.dev_start._is_port_in_use", return_value=port_occupied), \
-             patch("harmoni.skills.dev_start._wait_for_port_free", return_value=True), \
-             patch("harmoni.skills.dev_start._detect_editor", return_value=None), \
-             patch("harmoni.skills.dev_start._open_browser"), \
-             patch("harmoni.skills.dev_start.time.sleep"):
+        with patch("cios.skills.dev_start.needs_install", return_value=not deps_installed), \
+             patch("cios.skills.dev_start._is_port_in_use", return_value=port_occupied), \
+             patch("cios.skills.dev_start._wait_for_port_free", return_value=True), \
+             patch("cios.skills.dev_start._detect_editor", return_value=None), \
+             patch("cios.skills.dev_start._open_browser"), \
+             patch("cios.skills.dev_start.time.sleep"):
 
             plan, results, pid = execute_dev_start(executor, project=project)
 

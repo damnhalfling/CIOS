@@ -4,7 +4,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from harmoni.infra.deps import (
+from cios.infra.deps import (
     check_and_install_deps,
     get_missing_tools,
     get_degraded_features,
@@ -47,7 +47,7 @@ class TestCheckAndInstallDeps:
 
     def test_all_tools_present_returns_empty(self):
         """When all tools are present, returns empty list."""
-        with patch("harmoni.infra.deps.shutil.which", return_value="/usr/bin/tool"):
+        with patch("cios.infra.deps.shutil.which", return_value="/usr/bin/tool"):
             result = check_and_install_deps()
             assert result == []
             assert get_missing_tools() == set()
@@ -60,8 +60,8 @@ class TestCheckAndInstallDeps:
                 return None
             return f"/usr/bin/{binary}"
 
-        with patch("harmoni.infra.deps.shutil.which", side_effect=fake_which), \
-             patch("harmoni.infra.deps._try_install", return_value=False):
+        with patch("cios.infra.deps.shutil.which", side_effect=fake_which), \
+             patch("cios.infra.deps._try_install", return_value=False):
             result = check_and_install_deps()
             assert "nmcli" in result
             assert "nmcli" in get_missing_tools()
@@ -74,8 +74,8 @@ class TestCheckAndInstallDeps:
                 return None
             return f"/usr/bin/{binary}"
 
-        with patch("harmoni.infra.deps.shutil.which", side_effect=fake_which), \
-             patch("harmoni.infra.deps._try_install", return_value=False):
+        with patch("cios.infra.deps.shutil.which", side_effect=fake_which), \
+             patch("cios.infra.deps._try_install", return_value=False):
             result = check_and_install_deps()
             assert "pactl" in result
             assert "Áudio indisponível" in get_degraded_features().values()
@@ -87,8 +87,8 @@ class TestCheckAndInstallDeps:
                 return None
             return f"/usr/bin/{binary}"
 
-        with patch("harmoni.infra.deps.shutil.which", side_effect=fake_which), \
-             patch("harmoni.infra.deps._try_install", return_value=False):
+        with patch("cios.infra.deps.shutil.which", side_effect=fake_which), \
+             patch("cios.infra.deps._try_install", return_value=False):
             result = check_and_install_deps()
             assert "bluetoothctl" in result
             assert "Bluetooth indisponível" in get_degraded_features().values()
@@ -100,8 +100,8 @@ class TestCheckAndInstallDeps:
                 return None
             return f"/usr/bin/{binary}"
 
-        with patch("harmoni.infra.deps.shutil.which", side_effect=fake_which), \
-             patch("harmoni.infra.deps._try_install", return_value=False):
+        with patch("cios.infra.deps.shutil.which", side_effect=fake_which), \
+             patch("cios.infra.deps._try_install", return_value=False):
             result = check_and_install_deps()
             assert "xdotool" in result
             assert "wmctrl" in result
@@ -122,8 +122,8 @@ class TestCheckAndInstallDeps:
                 return "/usr/bin/nmcli"
             return f"/usr/bin/{binary}"
 
-        with patch("harmoni.infra.deps.shutil.which", side_effect=fake_which), \
-             patch("harmoni.infra.deps._try_install", return_value=True):
+        with patch("cios.infra.deps.shutil.which", side_effect=fake_which), \
+             patch("cios.infra.deps._try_install", return_value=True):
             result = check_and_install_deps()
             assert "nmcli" not in result
 
@@ -134,8 +134,8 @@ class TestCheckAndInstallDeps:
                 return None
             return f"/usr/bin/{binary}"
 
-        with patch("harmoni.infra.deps.shutil.which", side_effect=fake_which), \
-             patch("harmoni.infra.deps._try_install", return_value=False):
+        with patch("cios.infra.deps.shutil.which", side_effect=fake_which), \
+             patch("cios.infra.deps._try_install", return_value=False):
             result = check_and_install_deps()
             assert "nmcli" in result
 
@@ -148,8 +148,8 @@ class TestCheckAndInstallDeps:
                 return None
             return f"/usr/bin/{binary}"
 
-        with patch("harmoni.infra.deps.shutil.which", side_effect=fake_which), \
-             patch("harmoni.infra.deps._try_install", return_value=False):
+        with patch("cios.infra.deps.shutil.which", side_effect=fake_which), \
+             patch("cios.infra.deps._try_install", return_value=False):
             result = check_and_install_deps()
             for tool in missing_set:
                 assert tool in result
@@ -162,8 +162,8 @@ class TestCheckAndInstallDeps:
                 return None
             return f"/usr/bin/{binary}"
 
-        with patch("harmoni.infra.deps.shutil.which", side_effect=fake_which), \
-             patch("harmoni.infra.deps._try_install", return_value=False):
+        with patch("cios.infra.deps.shutil.which", side_effect=fake_which), \
+             patch("cios.infra.deps._try_install", return_value=False):
             check_and_install_deps()
             assert is_tool_available("nmcli") is False
             assert is_tool_available("pactl") is True
@@ -175,19 +175,19 @@ class TestInstallStrategies:
     def test_has_passwordless_sudo_true(self):
         mock_result = MagicMock()
         mock_result.returncode = 0
-        with patch("harmoni.infra.deps.shutil.which", return_value="/usr/bin/sudo"), \
+        with patch("cios.infra.deps.shutil.which", return_value="/usr/bin/sudo"), \
              patch("subprocess.run", return_value=mock_result):
             assert _has_passwordless_sudo() is True
 
     def test_has_passwordless_sudo_false(self):
         mock_result = MagicMock()
         mock_result.returncode = 1
-        with patch("harmoni.infra.deps.shutil.which", return_value="/usr/bin/sudo"), \
+        with patch("cios.infra.deps.shutil.which", return_value="/usr/bin/sudo"), \
              patch("subprocess.run", return_value=mock_result):
             assert _has_passwordless_sudo() is False
 
     def test_has_passwordless_sudo_no_sudo(self):
-        with patch("harmoni.infra.deps.shutil.which", return_value=None):
+        with patch("cios.infra.deps.shutil.which", return_value=None):
             assert _has_passwordless_sudo() is False
 
 
@@ -195,7 +195,7 @@ class TestMCPScannerGracefulDegradation:
     """Verify MCP scanners return safe defaults when tools are missing."""
 
     def test_wifi_scanner_returns_default_on_missing_nmcli(self):
-        from harmoni.core.mcp import _scan_wifi, WifiState
+        from cios.core.mcp import _scan_wifi, WifiState
         with patch("subprocess.run", side_effect=FileNotFoundError("nmcli")):
             state = _scan_wifi()
             assert isinstance(state, WifiState)
@@ -203,7 +203,7 @@ class TestMCPScannerGracefulDegradation:
             assert state.ssid == ""
 
     def test_audio_scanner_returns_default_on_missing_pactl_and_wpctl(self):
-        from harmoni.core.mcp import _scan_audio, AudioState
+        from cios.core.mcp import _scan_audio, AudioState
         with patch("subprocess.run", side_effect=FileNotFoundError("pactl")):
             state = _scan_audio()
             assert isinstance(state, AudioState)
@@ -211,7 +211,7 @@ class TestMCPScannerGracefulDegradation:
             assert state.muted is False
 
     def test_bluetooth_scanner_returns_default_on_missing_bluetoothctl(self):
-        from harmoni.core.mcp import _scan_bluetooth, BluetoothState
+        from cios.core.mcp import _scan_bluetooth, BluetoothState
         with patch("subprocess.run", side_effect=FileNotFoundError("bluetoothctl")):
             state = _scan_bluetooth()
             assert isinstance(state, BluetoothState)
@@ -219,7 +219,7 @@ class TestMCPScannerGracefulDegradation:
             assert state.connected_devices == []
 
     def test_known_networks_returns_empty_on_missing_nmcli(self):
-        from harmoni.core.mcp import _scan_known_networks
+        from cios.core.mcp import _scan_known_networks
         with patch("subprocess.run", side_effect=FileNotFoundError("nmcli")):
             networks = _scan_known_networks()
             assert networks == []

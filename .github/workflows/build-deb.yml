@@ -26,7 +26,7 @@ jobs:
           pip install -e ".[test]"
 
       - name: Run tests
-        run: pytest --cov=harmoni --cov-report=term-missing --cov-report=xml
+        run: pytest --cov=cios --cov-report=term-missing --cov-report=xml
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
@@ -80,7 +80,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: harmoni_${{ steps.version.outputs.VERSION }}_amd64.deb
+          files: cios_${{ steps.version.outputs.VERSION }}_amd64.deb
           generate_release_notes: true
           draft: false
           prerelease: false
