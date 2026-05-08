@@ -35,7 +35,7 @@
   <desktops>
     <number>1</number>
     <firstdesk>1</firstdesk>
-    <names><name>Harmoni</name></names>
+    <names><name>CIOS</name></names>
   </desktops>
 
   <!-- Atalhos mínimos — só o essencial -->
@@ -56,10 +56,10 @@
       <action name="Close"/>
     </keybind>
 
-    <!-- Super pra focar no Harmoni -->
+    <!-- Super pra focar no CIOS -->
     <keybind key="Super_L">
       <action name="Execute">
-        <command>wmctrl -a Harmoni || true</command>
+        <command>wmctrl -a CIOS || true</command>
       </action>
     </keybind>
 
@@ -104,21 +104,24 @@
   </mouse>
 
   <applications>
-    <!-- Harmoni main window: no decoration, NOT fullscreen (respects topbar) -->
-    <application class="Harmoni" type="normal">
+    <!-- CIOS main window: no decoration, maximized -->
+    <application class="CIOS" type="normal">
       <decor>no</decor>
+      <maximized>yes</maximized>
       <layer>normal</layer>
       <focus>yes</focus>
     </application>
-    <!-- Tkinter windows (classe Tk) -->
+    <!-- Tkinter windows (classe Tk) — fallback -->
     <application class="Tk" type="normal">
       <decor>no</decor>
+      <maximized>yes</maximized>
       <layer>normal</layer>
       <focus>yes</focus>
     </application>
-    <!-- All Toplevel windows from Harmoni: no decoration -->
-    <application title="Harmoni*">
+    <!-- All Toplevel windows from CIOS: no decoration -->
+    <application title="CIOS*">
       <decor>no</decor>
+      <maximized>yes</maximized>
       <layer>normal</layer>
       <focus>yes</focus>
     </application>
