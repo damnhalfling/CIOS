@@ -14,7 +14,7 @@ from hypothesis import strategies as st
 
 from cios.core.error_recovery import enrich_error
 from cios.core.humanizer import humanize_error
-from cios.core.planner import _sanitize_error
+from cios.core.handlers._common import sanitize_error as _sanitize_error
 
 # ── Forbidden patterns that must NEVER appear in user-facing output ──────
 
