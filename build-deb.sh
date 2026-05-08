@@ -105,6 +105,18 @@ echo ""
 
 # ── Create Python venv + install deps ──
 echo "[CIOS] Setting up Python environment..."
+
+# Ensure python3-tk is installed for the correct Python version
+PY_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
+if ! python3 -c "import tkinter" 2>/dev/null; then
+    echo "[CIOS] Installing python3-tk..."
+    apt-get install -y python3-tk 2>/dev/null || true
+    # Try version-specific package (e.g., python3.11-tk)
+    if ! python3 -c "import tkinter" 2>/dev/null && [ -n "$PY_VER" ]; then
+        apt-get install -y "python${PY_VER}-tk" 2>/dev/null || true
+    fi
+fi
+
 if [ ! -d /usr/share/cios/.venv ]; then
     python3 -m venv --system-site-packages /usr/share/cios/.venv 2>/dev/null || {
         echo "[CIOS] ⚠ Could not create venv. Will use system Python."
@@ -114,6 +126,13 @@ if [ ! -d /usr/share/cios/.venv ]; then
 fi
 
 if [ -d /usr/share/cios/.venv ]; then
+    # Verify venv has tkinter access, recreate if not
+    if ! /usr/share/cios/.venv/bin/python3 -c "import tkinter" 2>/dev/null; then
+        echo "[CIOS] Venv missing tkinter, recreating with --system-site-packages..."
+        rm -rf /usr/share/cios/.venv
+        python3 -m venv --system-site-packages /usr/share/cios/.venv 2>/dev/null || true
+    fi
+
     /usr/share/cios/.venv/bin/pip install --quiet \
         prompt_toolkit==3.0.48 \
         rich==13.9.4 \
@@ -494,16 +513,11 @@ if [ ! -x "$VENV" ]; then
     echo "WARNING: venv not found, using system python: $VENV" >> "$LOGFILE"
 fi
 
-# Verify tkinter is accessible (venv may need --system-site-packages)
+# Verify tkinter is accessible — if venv can't import it, fall back to system python
 if [ -x "/usr/share/cios/.venv/bin/python3" ]; then
     if ! /usr/share/cios/.venv/bin/python3 -c "import tkinter" 2>/dev/null; then
-        echo "WARNING: tkinter not available in venv, recreating with --system-site-packages" >> "$LOGFILE"
-        rm -rf /usr/share/cios/.venv
-        python3 -m venv --system-site-packages /usr/share/cios/.venv 2>/dev/null
-        /usr/share/cios/.venv/bin/pip install --quiet prompt_toolkit rich psutil 2>/dev/null || true
-        /usr/share/cios/.venv/bin/pip install --quiet -e /usr/share/cios 2>/dev/null || true
-        VENV="/usr/share/cios/.venv/bin/python3"
-        echo "Venv recreated successfully" >> "$LOGFILE"
+        echo "WARNING: tkinter not available in venv, falling back to system python" >> "$LOGFILE"
+        VENV=$(which python3 2>/dev/null)
     fi
 fi
 
@@ -597,10 +611,7 @@ VENV="/usr/share/cios/.venv/bin/python3"
 if [ ! -x "$VENV" ]; then
     VENV="python3"
 elif ! $VENV -c "import tkinter" 2>/dev/null; then
-    rm -rf /usr/share/cios/.venv
-    python3 -m venv --system-site-packages /usr/share/cios/.venv 2>/dev/null
-    /usr/share/cios/.venv/bin/pip install --quiet prompt_toolkit rich psutil 2>/dev/null || true
-    /usr/share/cios/.venv/bin/pip install --quiet -e /usr/share/cios 2>/dev/null || true
+    VENV="python3"
 fi
 $VENV -m cios.ui.splash &
 $VENV -m cios.main &
