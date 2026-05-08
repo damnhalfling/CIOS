@@ -17,21 +17,21 @@ Features:
 import logging
 import re
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Optional, Callable
 
 from cios.core.config import ensure_dirs
 from cios.core.error_recovery import enrich_error, is_retryable
 from cios.core.executor import Executor
-from cios.core.humanizer import humanize_result, humanize_error
+from cios.core.humanizer import humanize_error, humanize_result
+from cios.core.intent_classifier import classify_intent, learn_from_success
 from cios.core.intent_parser import Intent, IntentType, parse_intent
 from cios.core.memory import Memory
 from cios.core.model_router import resolve_unknown_intent
-from cios.core.intent_classifier import classify_intent, learn_from_success
 from cios.core.planner import Planner, PlanResult
 from cios.core.thread_manager import (
-    ThreadStore,
     ThreadManager,
+    ThreadStore,
 )
 
 logger = logging.getLogger(__name__)
@@ -39,26 +39,32 @@ logger = logging.getLogger(__name__)
 
 class _CancelledError(Exception):
     """Raised when user cancels the current operation."""
+
     pass
 
+
 # Intents that change system state (need post-action validation)
-_STATE_CHANGING_INTENTS = frozenset([
-    IntentType.NETWORK,
-    IntentType.AUDIO,
-    IntentType.POWER,
-    IntentType.SESSION,
-    IntentType.PACKAGE,
-    IntentType.BLUETOOTH,
-])
+_STATE_CHANGING_INTENTS = frozenset(
+    [
+        IntentType.NETWORK,
+        IntentType.AUDIO,
+        IntentType.POWER,
+        IntentType.SESSION,
+        IntentType.PACKAGE,
+        IntentType.BLUETOOTH,
+    ]
+)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  CONVERSATION CONTEXT (#74)
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class ConversationTurn:
     """A single turn in the conversation."""
+
     user_input: str
     intent_type: str  # IntentType.value
     params: dict = field(default_factory=dict)
@@ -70,35 +76,51 @@ class ConversationTurn:
 @dataclass
 class GuidedFlowStep:
     """A single step in a multi-step guided flow."""
-    question: str              # Human-readable question
-    question_type: str         # "choice", "text", "password"
+
+    question: str  # Human-readable question
+    question_type: str  # "choice", "text", "password"
     options: list[str] = field(default_factory=list)  # Available choices (for "choice" type)
-    param_key: str = ""        # Which intent param this fills
+    param_key: str = ""  # Which intent param this fills
 
 
 @dataclass
 class GuidedFlow:
     """State for a multi-step guided conversation flow."""
-    intent: Intent             # The original intent being built
+
+    intent: Intent  # The original intent being built
     steps: list[GuidedFlowStep] = field(default_factory=list)  # All steps
-    current_step: int = 0      # Index of current step
+    current_step: int = 0  # Index of current step
     collected: dict = field(default_factory=dict)  # Params collected so far
 
 
 @dataclass
 class PendingQuestion:
     """A question waiting for user's answer."""
+
     intent: Intent
     question_type: str  # "ssid", "password", "target", "app", "port", "confirm_action"
     options: list[str] = field(default_factory=list)  # available choices
     timestamp: float = 0.0
     # Multi-step guided flow support
-    flow_steps: Optional[list[GuidedFlowStep]] = None
+    flow_steps: list[GuidedFlowStep] | None = None
     flow_collected: dict = field(default_factory=dict)
 
 
 # Pronouns that reference previous context
-_PRONOUNS_PT = {"esse", "essa", "isso", "este", "esta", "nesse", "nessa", "nisso", "dele", "dela", "aquele", "aquela"}
+_PRONOUNS_PT = {
+    "esse",
+    "essa",
+    "isso",
+    "este",
+    "esta",
+    "nesse",
+    "nessa",
+    "nisso",
+    "dele",
+    "dela",
+    "aquele",
+    "aquela",
+}
 _PRONOUNS_EN = {"that", "this", "it", "those", "the same", "that one"}
 _ALL_PRONOUNS = _PRONOUNS_PT | _PRONOUNS_EN
 
@@ -106,7 +128,7 @@ _ALL_PRONOUNS = _PRONOUNS_PT | _PRONOUNS_EN
 class CIOSBridge:
     """Single entry point for all UI → backend communication."""
 
-    def __init__(self, on_progress: Optional[Callable[[str, int, int], None]] = None) -> None:
+    def __init__(self, on_progress: Callable[[str, int, int], None] | None = None) -> None:
         """Initialize bridge with all subsystems.
 
         Args:
@@ -134,6 +156,7 @@ class CIOSBridge:
             on_progress("Verificando dependências…", 1, 14)
         try:
             from cios.infra.deps import check_and_install_deps
+
             missing = check_and_install_deps()
             if missing:
                 logger.warning("Missing deps after check: %s", missing)
@@ -146,6 +169,7 @@ class CIOSBridge:
         if on_progress:
             on_progress("Verificando IA local…", 2, 14)
         from cios.core.ollama_manager import ensure_ollama_running
+
         self._ollama_ok = ensure_ollama_running()
         self._boot_times["ollama_check"] = (time.monotonic() - _t_ollama) * 1000
 
@@ -154,6 +178,7 @@ class CIOSBridge:
         if on_progress:
             on_progress("Detectando sistema…", 3, 14)
         from cios.core.mcp import context
+
         context.start(on_progress=self._mcp_progress_adapter(on_progress))
         self._boot_times["mcp_start"] = (time.monotonic() - _t1) * 1000
 
@@ -167,7 +192,7 @@ class CIOSBridge:
         )
 
     @property
-    def _pending_question(self) -> Optional[PendingQuestion]:
+    def _pending_question(self) -> PendingQuestion | None:
         """Proxy to ThreadManager's pending question for backward compatibility.
 
         Tests and external code can read bridge._pending_question to inspect
@@ -180,20 +205,23 @@ class CIOSBridge:
 
     @staticmethod
     def _mcp_progress_adapter(
-        on_progress: Optional[Callable[[str, int, int], None]],
-    ) -> Optional[Callable[[str, int, int], None]]:
+        on_progress: Callable[[str, int, int], None] | None,
+    ) -> Callable[[str, int, int], None] | None:
         """Adapt MCP progress to splash progress (offset stage numbers)."""
         if not on_progress:
             return None
+
         def adapter(stage: str, current: int, total: int) -> None:
             # MCP stages are 0-7 (7 scanners), mapped to splash positions 2-9 out of 14
             on_progress(stage, 2 + current, 14)
+
         return adapter
 
     @property
     def boot_times(self) -> dict[str, float]:
         """Boot timing data (ms). Includes MCP sub-timings."""
         from cios.core.mcp import context
+
         combined = dict(self._boot_times)
         for k, v in context.boot_times.items():
             combined[f"mcp.{k}"] = v
@@ -213,7 +241,13 @@ class CIOSBridge:
         try:
             return self._process(command, confirmed)
         except _CancelledError:
-            return {"steps": [], "result": "Cancelado", "status": "success", "confirm": None, "voice_mode": "full"}
+            return {
+                "steps": [],
+                "result": "Cancelado",
+                "status": "success",
+                "confirm": None,
+                "voice_mode": "full",
+            }
         except Exception as e:
             logger.exception("Unhandled error in execute_command")
             return self._graceful_error(e)
@@ -226,7 +260,7 @@ class CIOSBridge:
         self,
         command: str,
         confirmed: bool = False,
-        on_step: Optional[Callable[[str, int, int], None]] = None,
+        on_step: Callable[[str, int, int], None] | None = None,
     ) -> dict:
         """Execute a command with real-time step streaming."""
         command = command.strip()
@@ -245,7 +279,7 @@ class CIOSBridge:
 
     def _process(self, user_input: str, confirmed: bool) -> dict:
         from cios.core.mcp import context
-        from cios.ui.topbar import signal_topbar_processing, signal_topbar_idle
+        from cios.ui.topbar import signal_topbar_idle, signal_topbar_processing
 
         # ThreadManager handles routing (replaces manual _pending_question check)
         decision = self._thread_manager.route_input(user_input)
@@ -262,10 +296,15 @@ class CIOSBridge:
         # LLM fallback for unknown intents — hybrid model:
         # 1. Try lightweight classifier (cache + LLM classification)
         # 2. Fall back to full resolve_unknown_intent only if classifier fails
+        # 3. If still unknown, try external API for execution plan
         if intent.type == IntentType.UNKNOWN:
             if self._cancelled:
                 raise _CancelledError()
-            from cios.core.model_router import is_any_provider_available
+            from cios.core.model_router import (
+                has_external_provider,
+                is_any_provider_available,
+                request_execution_plan,
+            )
 
             # Try classifier first (cache hit is instant, LLM call is lightweight)
             signal_topbar_processing("Classificando…")
@@ -283,11 +322,29 @@ class CIOSBridge:
                 if resolved:
                     intent = resolved
                 else:
+                    # Ollama couldn't resolve — try external API for execution plan
+                    if has_external_provider():
+                        signal_topbar_processing("Gerando plano…")
+                        plan = request_execution_plan(resolved_input)
+                        if self._cancelled:
+                            raise _CancelledError()
+                        if plan:
+                            signal_topbar_idle()
+                            return self._execution_plan_response(plan)
                     signal_topbar_idle()
                     return self._unknown_intent_response()
             else:
+                # No local LLM available — check if external API can help
+                if has_external_provider():
+                    signal_topbar_processing("Gerando plano…")
+                    plan = request_execution_plan(resolved_input)
+                    if self._cancelled:
+                        raise _CancelledError()
+                    if plan:
+                        signal_topbar_idle()
+                        return self._execution_plan_response(plan)
                 signal_topbar_idle()
-                return self._unknown_intent_response()
+                return self._no_provider_response()
 
         # (#75) Check if intent needs clarification
         clarification = self._needs_clarification(intent)
@@ -328,7 +385,7 @@ class CIOSBridge:
         self,
         user_input: str,
         confirmed: bool,
-        on_step: Optional[Callable[[str, int, int], None]],
+        on_step: Callable[[str, int, int], None] | None,
     ) -> dict:
         """Process with real-time step callbacks.
 
@@ -338,7 +395,7 @@ class CIOSBridge:
         early-exit paths (unknown intent, clarification, confirmation).
         """
         from cios.core.mcp import context
-        from cios.ui.topbar import signal_topbar_processing, signal_topbar_idle
+        from cios.ui.topbar import signal_topbar_idle, signal_topbar_processing
 
         signal_topbar_processing("Entendendo…")
         if on_step:
@@ -483,7 +540,7 @@ class CIOSBridge:
         """Record a conversation turn for context. Delegates to ThreadManager."""
         self._thread_manager.record_turn(user_input, intent, result)
 
-    def _get_last_turn(self) -> Optional[ConversationTurn]:
+    def _get_last_turn(self) -> ConversationTurn | None:
         """Get the most recent conversation turn."""
         context_turns = self._thread_manager.get_conversation_context()
         return context_turns[-1] if context_turns else None
@@ -492,7 +549,7 @@ class CIOSBridge:
     #  CLARIFICATION QUESTIONS (#75)
     # ═══════════════════════════════════════════════════════════════════
 
-    def _needs_clarification(self, intent: Intent) -> Optional[dict]:
+    def _needs_clarification(self, intent: Intent) -> dict | None:
         """Check if intent is missing required info and ask for it.
 
         For multi-step scenarios (e.g. network connect without SSID and
@@ -505,8 +562,9 @@ class CIOSBridge:
         if intent.type == IntentType.NETWORK:
             action = intent.params.get("action", "")
             if action == "connect" and not intent.params.get("ssid"):
-                from cios.skills import network as net_skill
                 from cios.core.mcp import context as mcp
+                from cios.skills import network as net_skill
+
                 # Check if already connected
                 if mcp.wifi.connected:
                     return None  # MCO will handle "already connected"
@@ -515,8 +573,6 @@ class CIOSBridge:
                 if networks:
                     options = [n.ssid for n in networks[:8]]
                     lines = [f"  {n.ssid} — {n.signal}%" for n in networks[:8]]
-                    known = [n.lower() for n in mcp.known_networks]
-
                     # Build guided flow: step 1 = pick SSID, step 2 = password (if needed)
                     flow_steps = [
                         GuidedFlowStep(
@@ -533,14 +589,16 @@ class CIOSBridge:
                         ),
                     ]
 
-                    self._thread_manager.set_pending_question(PendingQuestion(
-                        intent=intent,
-                        question_type="ssid",
-                        options=options,
-                        timestamp=time.time(),
-                        flow_steps=flow_steps,
-                        flow_collected={},
-                    ))
+                    self._thread_manager.set_pending_question(
+                        PendingQuestion(
+                            intent=intent,
+                            question_type="ssid",
+                            options=options,
+                            timestamp=time.time(),
+                            flow_steps=flow_steps,
+                            flow_collected={},
+                        )
+                    )
                     return {
                         "steps": ["Scanning networks"],
                         "result": flow_steps[0].question,
@@ -552,11 +610,13 @@ class CIOSBridge:
         # APP_LAUNCH: no app specified
         if intent.type == IntentType.APP_LAUNCH:
             if not intent.params.get("app"):
-                self._thread_manager.set_pending_question(PendingQuestion(
-                    intent=intent,
-                    question_type="app",
-                    timestamp=time.time(),
-                ))
+                self._thread_manager.set_pending_question(
+                    PendingQuestion(
+                        intent=intent,
+                        question_type="app",
+                        timestamp=time.time(),
+                    )
+                )
                 return {
                     "steps": [],
                     "result": "Qual app você quer abrir?",
@@ -568,11 +628,13 @@ class CIOSBridge:
         # PROCESS_CONTROL: no port
         if intent.type == IntentType.PROCESS_CONTROL:
             if intent.params.get("port") is None and intent.params.get("action") == "kill":
-                self._thread_manager.set_pending_question(PendingQuestion(
-                    intent=intent,
-                    question_type="port",
-                    timestamp=time.time(),
-                ))
+                self._thread_manager.set_pending_question(
+                    PendingQuestion(
+                        intent=intent,
+                        question_type="port",
+                        timestamp=time.time(),
+                    )
+                )
                 return {
                     "steps": [],
                     "result": "Qual porta?",
@@ -584,12 +646,14 @@ class CIOSBridge:
         # FILE_ORGANIZE: no target
         if intent.type == IntentType.FILE_ORGANIZE:
             if not intent.params.get("target"):
-                self._thread_manager.set_pending_question(PendingQuestion(
-                    intent=intent,
-                    question_type="target",
-                    options=["downloads", "desktop", "documentos"],
-                    timestamp=time.time(),
-                ))
+                self._thread_manager.set_pending_question(
+                    PendingQuestion(
+                        intent=intent,
+                        question_type="target",
+                        options=["downloads", "desktop", "documentos"],
+                        timestamp=time.time(),
+                    )
+                )
                 return {
                     "steps": [],
                     "result": "Qual pasta? (downloads, desktop, documentos)",
@@ -703,14 +767,17 @@ class CIOSBridge:
             if ssid and not intent.params.get("password"):
                 # Check if it's a known network (no password needed)
                 from cios.core.mcp import context as mcp
+
                 known = [n.lower() for n in mcp.known_networks]
                 if ssid.lower() not in known:
                     # Ask for password
-                    self._thread_manager.set_pending_question(PendingQuestion(
-                        intent=intent,
-                        question_type="password",
-                        timestamp=time.time(),
-                    ))
+                    self._thread_manager.set_pending_question(
+                        PendingQuestion(
+                            intent=intent,
+                            question_type="password",
+                            timestamp=time.time(),
+                        )
+                    )
                     return {
                         "steps": [],
                         "result": f"Senha para {ssid}?",
@@ -725,7 +792,10 @@ class CIOSBridge:
         return result
 
     def _advance_guided_flow(
-        self, question: PendingQuestion, answer: str, confirmed: bool,
+        self,
+        question: PendingQuestion,
+        answer: str,
+        confirmed: bool,
     ) -> dict:
         """Advance through a multi-step guided flow, collecting one param per step.
 
@@ -763,9 +833,7 @@ class CIOSBridge:
             else:
                 matched = self._fuzzy_match_option(answer, current_step.options)
                 collected[current_step.param_key] = matched or answer
-        elif current_step.question_type == "password":
-            collected[current_step.param_key] = answer
-        elif current_step.question_type == "text":
+        elif current_step.question_type == "password" or current_step.question_type == "text":
             collected[current_step.param_key] = answer
 
         # Check remaining steps — skip steps that are no longer needed
@@ -782,14 +850,16 @@ class CIOSBridge:
             next_step = flow_steps[next_idx]
             # Interpolate collected values into the question text
             question_text = next_step.question.format(**collected)
-            self._thread_manager.set_pending_question(PendingQuestion(
-                intent=intent,
-                question_type=next_step.param_key,
-                options=next_step.options,
-                timestamp=time.time(),
-                flow_steps=flow_steps,
-                flow_collected=collected,
-            ))
+            self._thread_manager.set_pending_question(
+                PendingQuestion(
+                    intent=intent,
+                    question_type=next_step.param_key,
+                    options=next_step.options,
+                    timestamp=time.time(),
+                    flow_steps=flow_steps,
+                    flow_collected=collected,
+                )
+            )
             return {
                 "steps": [],
                 "result": question_text,
@@ -807,7 +877,10 @@ class CIOSBridge:
         return result
 
     def _should_skip_flow_step(
-        self, step: GuidedFlowStep, intent: Intent, collected: dict,
+        self,
+        step: GuidedFlowStep,
+        intent: Intent,
+        collected: dict,
     ) -> bool:
         """Determine if a guided flow step should be skipped.
 
@@ -818,6 +891,7 @@ class CIOSBridge:
             ssid = collected.get("ssid", "")
             if ssid:
                 from cios.core.mcp import context as mcp
+
                 known = [n.lower() for n in mcp.known_networks]
                 if ssid.lower() in known:
                     return True  # Known network — skip password
@@ -827,7 +901,7 @@ class CIOSBridge:
     #  SUDO PASSWORD (#sudo)
     # ═══════════════════════════════════════════════════════════════════
 
-    def _needs_sudo_password(self, intent: Intent) -> Optional[dict]:
+    def _needs_sudo_password(self, intent: Intent) -> dict | None:
         """Check if intent needs sudo and password isn't provided yet.
 
         Called BEFORE confirmation. Entering the password serves as
@@ -839,7 +913,12 @@ class CIOSBridge:
 
         needs_sudo = False
         if intent.type == IntentType.PACKAGE:
-            needs_sudo = intent.params.get("action", "") in ("install", "remove", "update", "upgrade")
+            needs_sudo = intent.params.get("action", "") in (
+                "install",
+                "remove",
+                "update",
+                "upgrade",
+            )
         elif intent.type == IntentType.SELF_UPDATE:
             needs_sudo = intent.params.get("action", "") == "update"
 
@@ -847,6 +926,7 @@ class CIOSBridge:
             return None
 
         from cios.skills.package_manager import needs_sudo_password
+
         if not needs_sudo_password():
             return None  # NOPASSWD configured, no need to ask
 
@@ -864,11 +944,13 @@ class CIOSBridge:
         elif intent.type == IntentType.SELF_UPDATE:
             action_desc = "Para atualizar o CIOS, "
 
-        self._thread_manager.set_pending_question(PendingQuestion(
-            intent=intent,
-            question_type="sudo_password",
-            timestamp=time.time(),
-        ))
+        self._thread_manager.set_pending_question(
+            PendingQuestion(
+                intent=intent,
+                question_type="sudo_password",
+                timestamp=time.time(),
+            )
+        )
         return {
             "steps": [],
             "result": f"{action_desc}digite a senha de administrador:",
@@ -878,7 +960,7 @@ class CIOSBridge:
             "password_prompt": True,
         }
 
-    def _fuzzy_match_option(self, answer: str, options: list[str]) -> Optional[str]:
+    def _fuzzy_match_option(self, answer: str, options: list[str]) -> str | None:
         """Fuzzy match user answer against available options."""
         answer_lower = answer.lower()
         # Exact match
@@ -920,7 +1002,7 @@ class CIOSBridge:
         result = user_input
         for pronoun in _ALL_PRONOUNS:
             # Word boundary replacement
-            pattern = re.compile(r'\b' + re.escape(pronoun) + r'\b', re.IGNORECASE)
+            pattern = re.compile(r"\b" + re.escape(pronoun) + r"\b", re.IGNORECASE)
             if pattern.search(result):
                 result = pattern.sub(obj, result, count=1)
                 logger.debug("Pronoun resolved: '%s' → '%s' (object: %s)", user_input, result, obj)
@@ -928,7 +1010,7 @@ class CIOSBridge:
 
         return result
 
-    def _extract_object(self, turn: ConversationTurn) -> Optional[str]:
+    def _extract_object(self, turn: ConversationTurn) -> str | None:
         """Extract the main object/target from a conversation turn."""
         params = turn.params
 
@@ -1032,7 +1114,13 @@ class CIOSBridge:
     # ═══════════════════════════════════════════════════════════════════
 
     def _empty_response(self) -> dict:
-        return {"steps": [], "result": "", "status": "success", "confirm": None, "voice_mode": "full"}
+        return {
+            "steps": [],
+            "result": "",
+            "status": "success",
+            "confirm": None,
+            "voice_mode": "full",
+        }
 
     def _unknown_intent_response(self) -> dict:
         return {
@@ -1043,14 +1131,57 @@ class CIOSBridge:
             "voice_mode": "full",
         }
 
+    def _no_provider_response(self) -> dict:
+        """Shown when no external API is configured and local can't resolve."""
+        from cios.core.model_router import get_no_provider_message
+
+        return {
+            "steps": [],
+            "result": get_no_provider_message(),
+            "status": "info",
+            "confirm": None,
+            "voice_mode": "full",
+        }
+
+    def _execution_plan_response(self, plan: dict) -> dict:
+        """Shown when external API returns an execution plan.
+
+        The plan has: explanation, steps (shell commands), confirm (bool).
+        If confirm=True, we ask the user before executing.
+        If confirm=False, we could auto-execute (but for safety, always confirm).
+        """
+        explanation = plan.get("explanation", "")
+        steps = plan.get("steps", [])
+        steps_display = "\n".join(f"  $ {s}" for s in steps)
+
+        result_text = f"{explanation}\n\n{steps_display}"
+
+        return {
+            "steps": [],
+            "result": result_text,
+            "status": "success",
+            "confirm": {
+                "message": f"{explanation}\n\nExecutar {len(steps)} comando(s)?",
+                "action": "execution_plan",
+                "data": {"steps": steps},
+            },
+            "voice_mode": "full",
+        }
+
     def _confirm_response(self, msg: str) -> dict:
-        return {"steps": [], "result": "", "status": "success", "confirm": msg, "voice_mode": "full"}
+        return {
+            "steps": [],
+            "result": "",
+            "status": "success",
+            "confirm": msg,
+            "voice_mode": "full",
+        }
 
     # ═══════════════════════════════════════════════════════════════════
     #  CONFIRMATION
     # ═══════════════════════════════════════════════════════════════════
 
-    def _needs_confirmation(self, intent) -> Optional[str]:
+    def _needs_confirmation(self, intent) -> str | None:
         if intent.type == IntentType.FILE_ORGANIZE:
             target = intent.params.get("target", "folder")
             return f"Organize files in {target}? This will move files into folders by type."
@@ -1058,7 +1189,8 @@ class CIOSBridge:
             if intent.params.get("action") == "clean":
                 return "Clean cache and trash? This will free up disk space."
         if intent.type == IntentType.SESSION:
-            from cios.skills.session_control import is_destructive, get_session_action
+            from cios.skills.session_control import get_session_action, is_destructive
+
             action_name = intent.params.get("action", "")
             if is_destructive(action_name):
                 action = get_session_action(action_name)
@@ -1089,6 +1221,7 @@ class CIOSBridge:
 
     def close(self) -> None:
         from cios.core.mcp import context
+
         context.stop()
         self._memory.close()
         # Close thread manager and store
@@ -1101,12 +1234,14 @@ class CIOSBridge:
         Uses MCP cached state for instant response. Falls back to
         direct psutil only for fields MCP doesn't track.
         """
-        import psutil
-        import platform
         import os
+        import platform
+
+        import psutil
 
         # Use MCP cache for fast reads (no subprocess, no blocking)
         from cios.core.mcp import context
+
         state = context.snapshot()
 
         # Only call psutil for net counters (not cached in MCP)
@@ -1134,17 +1269,20 @@ class CIOSBridge:
         Includes thread info when available.
         """
         import time as _time
+
         records = self._memory.recent(5)
         items = []
         for r in records:
             t = _time.strftime("%H:%M", _time.localtime(r.timestamp))
             icon = "✓" if r.outcome == "success" else ("⟳" if r.outcome == "recovered" else "✗")
-            items.append({
-                "time": t,
-                "text": r.user_input[:50],
-                "outcome": r.outcome,
-                "icon": icon,
-            })
+            items.append(
+                {
+                    "time": t,
+                    "text": r.user_input[:50],
+                    "outcome": r.outcome,
+                    "icon": icon,
+                }
+            )
 
         # Include recent thread summaries if available
         try:
@@ -1152,16 +1290,20 @@ class CIOSBridge:
             for thread in recent_threads:
                 if thread.summary:
                     t = _time.strftime("%H:%M", _time.localtime(thread.created_at))
-                    icon = "✓" if thread.outcome == "success" else (
-                        "⟳" if thread.outcome == "recovered" else "✗"
+                    icon = (
+                        "✓"
+                        if thread.outcome == "success"
+                        else ("⟳" if thread.outcome == "recovered" else "✗")
                     )
-                    items.append({
-                        "time": t,
-                        "text": thread.summary[:50],
-                        "outcome": thread.outcome,
-                        "icon": icon,
-                        "thread_id": thread.id,
-                    })
+                    items.append(
+                        {
+                            "time": t,
+                            "text": thread.summary[:50],
+                            "outcome": thread.outcome,
+                            "icon": icon,
+                            "thread_id": thread.id,
+                        }
+                    )
         except Exception:
             pass  # Thread info is optional, don't break activity feed
 

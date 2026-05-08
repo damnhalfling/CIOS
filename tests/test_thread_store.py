@@ -11,9 +11,9 @@ import json
 import threading
 import time
 import urllib.error
+from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
-from unittest.mock import patch, MagicMock, PropertyMock
 
 from cios.core.thread_manager import (
     ConversationTurn,
@@ -66,8 +66,7 @@ def _wait_for_sync_thread(timeout=2.0):
     deadline = time.time() + timeout
     while time.time() < deadline:
         sync_threads = [
-            t for t in threading.enumerate()
-            if t.daemon and t.is_alive() and t.name != "MainThread"
+            t for t in threading.enumerate() if t.daemon and t.is_alive() and t.name != "MainThread"
         ]
         if not sync_threads:
             return
@@ -89,8 +88,10 @@ class TestSyncNotTriggeredWhenNotLoggedIn:
 
         store.save_thread(sample_thread)
 
-        with patch("cios.core.intelligence.intelligence", mock_intelligence), \
-             patch("urllib.request.urlopen") as mock_urlopen:
+        with (
+            patch("cios.core.intelligence.intelligence", mock_intelligence),
+            patch("urllib.request.urlopen") as mock_urlopen,
+        ):
             store.sync_to_cloud(sample_thread)
             # Give a moment for any thread to start (it shouldn't)
             time.sleep(0.1)
@@ -107,8 +108,10 @@ class TestSyncNotTriggeredWhenNotLoggedIn:
 
         store.save_thread(sample_thread)
 
-        with patch("cios.core.intelligence.intelligence", mock_intelligence), \
-             patch("urllib.request.urlopen") as mock_urlopen:
+        with (
+            patch("cios.core.intelligence.intelligence", mock_intelligence),
+            patch("urllib.request.urlopen") as mock_urlopen,
+        ):
             store.sync_to_cloud(sample_thread)
             time.sleep(0.1)
             mock_urlopen.assert_not_called()
@@ -121,8 +124,10 @@ class TestSyncNotTriggeredWhenNotLoggedIn:
 
         store.save_thread(sample_thread)
 
-        with patch("cios.core.intelligence.intelligence", mock_intelligence), \
-             patch("urllib.request.urlopen") as mock_urlopen:
+        with (
+            patch("cios.core.intelligence.intelligence", mock_intelligence),
+            patch("urllib.request.urlopen") as mock_urlopen,
+        ):
             store.sync_to_cloud(sample_thread)
             time.sleep(0.1)
             mock_urlopen.assert_not_called()
@@ -153,8 +158,10 @@ class TestSyncSuccess:
         mock_response.__enter__ = MagicMock(return_value=mock_response)
         mock_response.__exit__ = MagicMock(return_value=False)
 
-        with patch("cios.core.intelligence.intelligence", mock_intelligence), \
-             patch("urllib.request.urlopen", return_value=mock_response) as mock_urlopen:
+        with (
+            patch("cios.core.intelligence.intelligence", mock_intelligence),
+            patch("urllib.request.urlopen", return_value=mock_response) as mock_urlopen,
+        ):
             store.sync_to_cloud(sample_thread)
             _wait_for_sync_thread()
 
@@ -191,8 +198,10 @@ class TestSyncSuccess:
         mock_response.__enter__ = MagicMock(return_value=mock_response)
         mock_response.__exit__ = MagicMock(return_value=False)
 
-        with patch("cios.core.intelligence.intelligence", mock_intelligence), \
-             patch("urllib.request.urlopen", return_value=mock_response) as mock_urlopen:
+        with (
+            patch("cios.core.intelligence.intelligence", mock_intelligence),
+            patch("urllib.request.urlopen", return_value=mock_response) as mock_urlopen,
+        ):
             store.sync_to_cloud(sample_thread)
             _wait_for_sync_thread()
 
@@ -241,8 +250,10 @@ class TestSyncSuccess:
             mock_resp.__exit__ = MagicMock(return_value=False)
             return mock_resp
 
-        with patch("cios.core.intelligence.intelligence", mock_intelligence), \
-             patch("urllib.request.urlopen", side_effect=slow_urlopen):
+        with (
+            patch("cios.core.intelligence.intelligence", mock_intelligence),
+            patch("urllib.request.urlopen", side_effect=slow_urlopen),
+        ):
             # sync_to_cloud should return immediately (non-blocking)
             start = time.time()
             store.sync_to_cloud(sample_thread)
@@ -277,11 +288,13 @@ class TestSyncFailureSilentlyCaught:
 
         store.save_thread(sample_thread)
 
-        with patch("cios.core.intelligence.intelligence", mock_intelligence), \
-             patch(
+        with (
+            patch("cios.core.intelligence.intelligence", mock_intelligence),
+            patch(
                 "urllib.request.urlopen",
                 side_effect=urllib.error.URLError("Network unreachable"),
-             ):
+            ),
+        ):
             store.sync_to_cloud(sample_thread)
             _wait_for_sync_thread()
 
@@ -302,8 +315,9 @@ class TestSyncFailureSilentlyCaught:
 
         store.save_thread(sample_thread)
 
-        with patch("cios.core.intelligence.intelligence", mock_intelligence), \
-             patch(
+        with (
+            patch("cios.core.intelligence.intelligence", mock_intelligence),
+            patch(
                 "urllib.request.urlopen",
                 side_effect=urllib.error.HTTPError(
                     url="https://api.cios-ia.com/threads",
@@ -312,7 +326,8 @@ class TestSyncFailureSilentlyCaught:
                     hdrs={},
                     fp=None,
                 ),
-             ):
+            ),
+        ):
             store.sync_to_cloud(sample_thread)
             _wait_for_sync_thread()
 
@@ -332,13 +347,13 @@ class TestSyncFailureSilentlyCaught:
 
         store.save_thread(sample_thread)
 
-        import socket
-
-        with patch("cios.core.intelligence.intelligence", mock_intelligence), \
-             patch(
+        with (
+            patch("cios.core.intelligence.intelligence", mock_intelligence),
+            patch(
                 "urllib.request.urlopen",
-                side_effect=socket.timeout("Connection timed out"),
-             ):
+                side_effect=TimeoutError("Connection timed out"),
+            ),
+        ):
             store.sync_to_cloud(sample_thread)
             _wait_for_sync_thread()
 
@@ -358,11 +373,13 @@ class TestSyncFailureSilentlyCaught:
 
         store.save_thread(sample_thread)
 
-        with patch("cios.core.intelligence.intelligence", mock_intelligence), \
-             patch(
+        with (
+            patch("cios.core.intelligence.intelligence", mock_intelligence),
+            patch(
                 "urllib.request.urlopen",
                 side_effect=RuntimeError("Unexpected error"),
-             ):
+            ),
+        ):
             store.sync_to_cloud(sample_thread)
             _wait_for_sync_thread()
 
@@ -382,11 +399,13 @@ class TestSyncFailureSilentlyCaught:
 
         store.save_thread(sample_thread)
 
-        with patch("cios.core.intelligence.intelligence", mock_intelligence), \
-             patch(
+        with (
+            patch("cios.core.intelligence.intelligence", mock_intelligence),
+            patch(
                 "urllib.request.urlopen",
                 side_effect=urllib.error.URLError("DNS resolution failed"),
-             ):
+            ),
+        ):
             # This should NOT raise any exception
             try:
                 store.sync_to_cloud(sample_thread)

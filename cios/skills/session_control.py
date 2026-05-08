@@ -4,20 +4,19 @@ Handles: shutdown, reboot, suspend, hibernate, logout, lock screen.
 All actions require confirmation (enforced by the planner/bridge).
 """
 
-import subprocess
 import logging
+import subprocess
 from dataclasses import dataclass
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class SessionAction:
-    action: str          # "shutdown" | "reboot" | "suspend" | "hibernate" | "logout" | "lock"
-    command: str         # comando real a executar
-    description: str     # descrição humana
-    destructive: bool    # requer confirmação?
+    action: str  # "shutdown" | "reboot" | "suspend" | "hibernate" | "logout" | "lock"
+    command: str  # comando real a executar
+    description: str  # descrição humana
+    destructive: bool  # requer confirmação?
 
 
 # Mapeamento de ações disponíveis
@@ -96,7 +95,7 @@ def _find_lock_command() -> str:
     return "loginctl lock-session"  # absolute fallback
 
 
-def get_session_action(action_name: str) -> Optional[SessionAction]:
+def get_session_action(action_name: str) -> SessionAction | None:
     """Get a session action by name."""
     action = _ACTIONS.get(action_name)
     if action and action.action == "lock" and not action.command:
@@ -104,7 +103,7 @@ def get_session_action(action_name: str) -> Optional[SessionAction]:
     return action
 
 
-def execute_session_action(action_name: str) -> tuple[list[str], bool, Optional[str]]:
+def execute_session_action(action_name: str) -> tuple[list[str], bool, str | None]:
     """Execute a session action.
 
     Returns:
@@ -118,6 +117,7 @@ def execute_session_action(action_name: str) -> tuple[list[str], bool, Optional[
 
     try:
         import os
+
         cmd = action.command
 
         # Expandir variáveis de ambiente no comando
@@ -151,12 +151,13 @@ def execute_session_action(action_name: str) -> tuple[list[str], bool, Optional[
             if result.returncode != 0:
                 # Lock command failed — suggest installing a locker
                 error_hint = result.stderr.strip()[:100] if result.stderr else ""
-                logger.warning("Lock failed (cmd=%s, rc=%d): %s", cmd, result.returncode, error_hint)
+                logger.warning(
+                    "Lock failed (cmd=%s, rc=%d): %s", cmd, result.returncode, error_hint
+                )
                 return (
                     plan_steps,
                     False,
-                    "Nenhum bloqueador de tela encontrado. "
-                    "Instale um com: instalar i3lock",
+                    "Nenhum bloqueador de tela encontrado. " "Instale um com: instalar i3lock",
                 )
             plan_steps.append(f"{action.description} — executado")
             return plan_steps, True, None

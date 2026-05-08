@@ -7,9 +7,8 @@ Designed to answer "onde está o contrato?" → actionable file list.
 import logging
 import os
 import subprocess
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -19,45 +18,63 @@ _MAX_RESULTS = 15
 _SEARCH_TIMEOUT = 10
 # Directories to search by default
 _SEARCH_DIRS = [
-    "~/Documents", "~/Downloads", "~/Desktop",
-    "~/Pictures", "~/Videos", "~/Music",
+    "~/Documents",
+    "~/Downloads",
+    "~/Desktop",
+    "~/Pictures",
+    "~/Videos",
+    "~/Music",
     "~",
 ]
 # Directories to skip
 _SKIP_DIRS = {
-    ".git", ".cache", ".local", ".config", ".npm", ".cargo",
-    "node_modules", "__pycache__", ".venv", "venv", ".tox",
-    "snap", ".snap", ".mozilla", ".thunderbird",
+    ".git",
+    ".cache",
+    ".local",
+    ".config",
+    ".npm",
+    ".cargo",
+    "node_modules",
+    "__pycache__",
+    ".venv",
+    "venv",
+    ".tox",
+    "snap",
+    ".snap",
+    ".mozilla",
+    ".thunderbird",
 }
 
 
 @dataclass
 class FileResult:
     """A single file search result."""
+
     path: str
     name: str
     size_human: str
-    modified: str       # human-readable date
-    file_type: str      # "document", "image", "video", "audio", "code", "archive", "other"
-    match_type: str     # "name", "content"
+    modified: str  # human-readable date
+    file_type: str  # "document", "image", "video", "audio", "code", "archive", "other"
+    match_type: str  # "name", "content"
 
 
 @dataclass
 class SearchReport:
     """Result of a file search."""
+
     plan_steps: list[str]
     results: list[FileResult]
     query: str
     searched_dirs: list[str]
     success: bool
-    error: Optional[str] = None
+    error: str | None = None
 
 
 def _size_human(b: int) -> str:
     """Convert bytes to human-readable string."""
-    if b >= 1024 ** 3:
+    if b >= 1024**3:
         return f"{b / (1024 ** 3):.1f}GB"
-    if b >= 1024 ** 2:
+    if b >= 1024**2:
         return f"{b / (1024 ** 2):.1f}MB"
     if b >= 1024:
         return f"{b / 1024:.0f}KB"
@@ -68,11 +85,56 @@ def _file_type(name: str) -> str:
     """Classify file by extension."""
     ext = Path(name).suffix.lower()
     _TYPES = {
-        "document": {".pdf", ".doc", ".docx", ".odt", ".txt", ".rtf", ".xls", ".xlsx", ".ppt", ".pptx", ".csv", ".ods"},
-        "image": {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg", ".webp", ".ico", ".tiff", ".heic"},
+        "document": {
+            ".pdf",
+            ".doc",
+            ".docx",
+            ".odt",
+            ".txt",
+            ".rtf",
+            ".xls",
+            ".xlsx",
+            ".ppt",
+            ".pptx",
+            ".csv",
+            ".ods",
+        },
+        "image": {
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".gif",
+            ".bmp",
+            ".svg",
+            ".webp",
+            ".ico",
+            ".tiff",
+            ".heic",
+        },
         "video": {".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm"},
         "audio": {".mp3", ".wav", ".flac", ".aac", ".ogg", ".wma", ".m4a"},
-        "code": {".py", ".js", ".ts", ".java", ".c", ".cpp", ".h", ".go", ".rs", ".rb", ".php", ".sh", ".html", ".css", ".json", ".xml", ".yaml", ".yml", ".toml", ".md"},
+        "code": {
+            ".py",
+            ".js",
+            ".ts",
+            ".java",
+            ".c",
+            ".cpp",
+            ".h",
+            ".go",
+            ".rs",
+            ".rb",
+            ".php",
+            ".sh",
+            ".html",
+            ".css",
+            ".json",
+            ".xml",
+            ".yaml",
+            ".yml",
+            ".toml",
+            ".md",
+        },
         "archive": {".zip", ".tar", ".gz", ".rar", ".7z", ".bz2", ".xz", ".deb"},
     }
     for ftype, exts in _TYPES.items():
@@ -84,6 +146,7 @@ def _file_type(name: str) -> str:
 def _modified_human(timestamp: float) -> str:
     """Convert timestamp to human-readable date."""
     import time
+
     now = time.time()
     diff = now - timestamp
 
@@ -114,7 +177,7 @@ def _build_prune_args() -> list[str]:
     return parts
 
 
-def search_files(query: str, search_dirs: Optional[list[str]] = None) -> SearchReport:
+def search_files(query: str, search_dirs: list[str] | None = None) -> SearchReport:
     """Search for files by name.
 
     Args:
@@ -129,8 +192,13 @@ def search_files(query: str, search_dirs: Optional[list[str]] = None) -> SearchR
 
     if not query:
         return SearchReport(
-            plan_steps=plan_steps, results=[], query=query,
-            searched_dirs=[], success=False, error="No search query")
+            plan_steps=plan_steps,
+            results=[],
+            query=query,
+            searched_dirs=[],
+            success=False,
+            error="No search query",
+        )
 
     dirs = search_dirs or _SEARCH_DIRS
     resolved_dirs = []
@@ -141,21 +209,35 @@ def search_files(query: str, search_dirs: Optional[list[str]] = None) -> SearchR
 
     if not resolved_dirs:
         return SearchReport(
-            plan_steps=plan_steps, results=[], query=query,
-            searched_dirs=dirs, success=False, error="No searchable directories found")
+            plan_steps=plan_steps,
+            results=[],
+            query=query,
+            searched_dirs=dirs,
+            success=False,
+            error="No searchable directories found",
+        )
 
     plan_steps.append(f"Scanning {len(resolved_dirs)} directories")
 
     # Use find for name search (fast, no index needed)
     try:
         prune_args = _build_prune_args()
-        cmd = ["find"] + resolved_dirs + prune_args + [
-            "-iname", f"*{query}*",
-            "-type", "f",
-            "-print",
-        ]
+        cmd = (
+            ["find"]
+            + resolved_dirs
+            + prune_args
+            + [
+                "-iname",
+                f"*{query}*",
+                "-type",
+                "f",
+                "-print",
+            ]
+        )
         result = subprocess.run(
-            cmd, capture_output=True, text=True,
+            cmd,
+            capture_output=True,
+            text=True,
             timeout=_SEARCH_TIMEOUT,
         )
 
@@ -166,14 +248,16 @@ def search_files(query: str, search_dirs: Optional[list[str]] = None) -> SearchR
                     continue
                 try:
                     stat = os.stat(path)
-                    results.append(FileResult(
-                        path=path,
-                        name=os.path.basename(path),
-                        size_human=_size_human(stat.st_size),
-                        modified=_modified_human(stat.st_mtime),
-                        file_type=_file_type(path),
-                        match_type="name",
-                    ))
+                    results.append(
+                        FileResult(
+                            path=path,
+                            name=os.path.basename(path),
+                            size_human=_size_human(stat.st_size),
+                            modified=_modified_human(stat.st_mtime),
+                            file_type=_file_type(path),
+                            match_type="name",
+                        )
+                    )
                 except OSError:
                     continue
 
@@ -181,9 +265,13 @@ def search_files(query: str, search_dirs: Optional[list[str]] = None) -> SearchR
         plan_steps.append("Search timed out — showing partial results")
     except FileNotFoundError:
         return SearchReport(
-            plan_steps=plan_steps, results=[], query=query,
-            searched_dirs=dirs, success=False,
-            error="find command not available")
+            plan_steps=plan_steps,
+            results=[],
+            query=query,
+            searched_dirs=dirs,
+            success=False,
+            error="find command not available",
+        )
     except Exception as e:
         logger.debug("File search error: %s", e)
 
@@ -192,13 +280,21 @@ def search_files(query: str, search_dirs: Optional[list[str]] = None) -> SearchR
         plan_steps.append("Searching file contents")
         try:
             cmd = [
-                "grep", "-rl", "--include=*.txt", "--include=*.md",
-                "--include=*.pdf", "--include=*.doc", "--include=*.csv",
-                "-i", query,
+                "grep",
+                "-rl",
+                "--include=*.txt",
+                "--include=*.md",
+                "--include=*.pdf",
+                "--include=*.doc",
+                "--include=*.csv",
+                "-i",
+                query,
             ] + resolved_dirs[:3]  # limit dirs for content search
 
             result = subprocess.run(
-                cmd, capture_output=True, text=True,
+                cmd,
+                capture_output=True,
+                text=True,
                 timeout=_SEARCH_TIMEOUT,
             )
 
@@ -209,14 +305,16 @@ def search_files(query: str, search_dirs: Optional[list[str]] = None) -> SearchR
                         continue
                     try:
                         stat = os.stat(path)
-                        results.append(FileResult(
-                            path=path,
-                            name=os.path.basename(path),
-                            size_human=_size_human(stat.st_size),
-                            modified=_modified_human(stat.st_mtime),
-                            file_type=_file_type(path),
-                            match_type="content",
-                        ))
+                        results.append(
+                            FileResult(
+                                path=path,
+                                name=os.path.basename(path),
+                                size_human=_size_human(stat.st_size),
+                                modified=_modified_human(stat.st_mtime),
+                                file_type=_file_type(path),
+                                match_type="content",
+                            )
+                        )
                     except OSError:
                         continue
         except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
@@ -231,7 +329,7 @@ def search_files(query: str, search_dirs: Optional[list[str]] = None) -> SearchR
     )
 
 
-def open_file(path: str) -> tuple[list[str], bool, Optional[str]]:
+def open_file(path: str) -> tuple[list[str], bool, str | None]:
     """Open a file with the default application.
 
     Returns:
@@ -258,7 +356,7 @@ def open_file(path: str) -> tuple[list[str], bool, Optional[str]]:
         return plan_steps, False, str(e)
 
 
-def find_and_open(query: str) -> tuple[list[str], bool, Optional[str]]:
+def find_and_open(query: str) -> tuple[list[str], bool, str | None]:
     """Search for a file and open the best match.
 
     Returns:

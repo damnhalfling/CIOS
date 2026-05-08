@@ -15,14 +15,19 @@ import os
 import subprocess
 import threading
 import time
-from typing import Optional
 
 from cios.ui.theme import (
-    BG, FG, FG_SEC, FG_DIM,
-    ACCENT, ACCENT_LT, ACCENT_DK,
-    SUCCESS, WARNING, ERROR, CYAN,
-    BAR_HEIGHT, T_RING,
-    hex2rgb, rgb2hex, lerp,
+    ACCENT,
+    ACCENT_LT,
+    BAR_HEIGHT,
+    CYAN,
+    ERROR,
+    FG,
+    FG_DIM,
+    FG_SEC,
+    SUCCESS,
+    T_RING,
+    WARNING,
 )
 
 logger = logging.getLogger(__name__)
@@ -45,7 +50,7 @@ _CYAN = CYAN
 
 _CLOCK_MS = 1000
 _STATUS_MS = 2000
-_GLOW_MS = T_RING          # processing glow animation frame rate
+_GLOW_MS = T_RING  # processing glow animation frame rate
 
 # Shared activity state file — written by bridge, read by topbar
 _ACTIVITY_FILE = os.path.expanduser("~/.cios/.topbar_activity")
@@ -80,6 +85,7 @@ class TopBar:
 
         # Position topbar on primary monitor
         from cios.infra.monitors import get_primary_monitor
+
         _primary = get_primary_monitor()
         if _primary:
             screen_w = _primary.width
@@ -103,6 +109,7 @@ class TopBar:
 
         # Logo image (small, ~18px for topbar)
         from cios.core.config import get_logo_path
+
         logo_path = get_logo_path()
         self._logo_img = None
         if logo_path:
@@ -115,16 +122,21 @@ class TopBar:
                 self._logo_img = None
 
         self._labels["brand"] = tk.Label(
-            left, text="CIOS" if self._logo_img else "✦ CIOS",
+            left,
+            text="CIOS" if self._logo_img else "✦ CIOS",
             font=("Inter", 9, "bold"),
-            fg=_ACCENT, bg=_BG,
+            fg=_ACCENT,
+            bg=_BG,
         )
         self._labels["brand"].pack(side=tk.LEFT, padx=(0, 8))
 
         # Activity text (shows what's happening: "Conectando…", "Instalando…")
         self._labels["activity"] = tk.Label(
-            left, text="", font=("Inter", 8),
-            fg=_DIM, bg=_BG,
+            left,
+            text="",
+            font=("Inter", 8),
+            fg=_DIM,
+            bg=_BG,
         )
         self._labels["activity"].pack(side=tk.LEFT, padx=(0, 0))
 
@@ -134,50 +146,71 @@ class TopBar:
 
         # Clock (rightmost)
         self._labels["clock"] = tk.Label(
-            right, text="--:--", font=("Inter", 9, "bold"),
-            fg=_FG_BRIGHT, bg=_BG,
+            right,
+            text="--:--",
+            font=("Inter", 9, "bold"),
+            fg=_FG_BRIGHT,
+            bg=_BG,
         )
         self._labels["clock"].pack(side=tk.RIGHT, padx=(12, 0))
 
         # Battery
         self._labels["battery"] = tk.Label(
-            right, text="🔋 --", font=("Inter", 9),
-            fg=_FG, bg=_BG,
+            right,
+            text="🔋 --",
+            font=("Inter", 9),
+            fg=_FG,
+            bg=_BG,
         )
         self._labels["battery"].pack(side=tk.RIGHT, padx=(12, 0))
 
         # Mic indicator
         self._labels["mic"] = tk.Label(
-            right, text="", font=("Inter", 9),
-            fg=_RED, bg=_BG,
+            right,
+            text="",
+            font=("Inter", 9),
+            fg=_RED,
+            bg=_BG,
         )
         self._labels["mic"].pack(side=tk.RIGHT, padx=(8, 0))
 
         # Volume
         self._labels["volume"] = tk.Label(
-            right, text="🔊 --", font=("Inter", 9),
-            fg=_FG, bg=_BG,
+            right,
+            text="🔊 --",
+            font=("Inter", 9),
+            fg=_FG,
+            bg=_BG,
         )
         self._labels["volume"].pack(side=tk.RIGHT, padx=(12, 0))
 
         # Wi-Fi
         self._labels["wifi"] = tk.Label(
-            right, text="📶 --", font=("Inter", 9),
-            fg=_FG, bg=_BG,
+            right,
+            text="📶 --",
+            font=("Inter", 9),
+            fg=_FG,
+            bg=_BG,
         )
         self._labels["wifi"].pack(side=tk.RIGHT, padx=(12, 0))
 
         # CPU
         self._labels["cpu"] = tk.Label(
-            right, text="⚡ --", font=("Inter", 9),
-            fg=_DIM, bg=_BG,
+            right,
+            text="⚡ --",
+            font=("Inter", 9),
+            fg=_DIM,
+            bg=_BG,
         )
         self._labels["cpu"].pack(side=tk.RIGHT, padx=(12, 0))
 
         # AI status (Ollama)
         self._labels["ai"] = tk.Label(
-            right, text="🧠 --", font=("Inter", 9),
-            fg=_DIM, bg=_BG,
+            right,
+            text="🧠 --",
+            font=("Inter", 9),
+            fg=_DIM,
+            bg=_BG,
         )
         self._labels["ai"].pack(side=tk.RIGHT, padx=(12, 0))
 
@@ -198,6 +231,7 @@ class TopBar:
         """Initialize MCP and subscribe to change events for instant updates."""
         try:
             from cios.core.mcp import context
+
             if not context._running:
                 context.start()
             self._mcp_available = True
@@ -226,6 +260,7 @@ class TopBar:
             return None
         try:
             from cios.core.mcp import context
+
             return context.snapshot()
         except Exception:
             return None
@@ -273,7 +308,7 @@ class TopBar:
 
         try:
             if os.path.exists(_ACTIVITY_FILE):
-                with open(_ACTIVITY_FILE, "r") as f:
+                with open(_ACTIVITY_FILE) as f:
                     data = f.read().strip()
                 # Format: "processing|activity_text" or "idle" or "mic"
                 if data.startswith("processing|"):
@@ -397,13 +432,17 @@ class TopBar:
 
     def _update_fallback(self) -> None:
         import psutil
+
         self._update_cpu(psutil.cpu_percent(interval=0))
         bat = psutil.sensors_battery()
         if bat:
             from cios.core.mcp import BatteryState
-            self._update_battery(BatteryState(
-                present=True, percent=int(bat.percent),
-                charging=bat.power_plugged or False))
+
+            self._update_battery(
+                BatteryState(
+                    present=True, percent=int(bat.percent), charging=bat.power_plugged or False
+                )
+            )
         else:
             self._labels["battery"].config(text="⚡ AC", fg=_FG)
         self._labels["volume"].config(text="🔊 --", fg=_DIM)
@@ -431,8 +470,8 @@ class TopBar:
 
         # Fallback: show Ollama status
         try:
-            from cios.core.ollama_manager import get_ollama_status
             from cios.core.config import get
+            from cios.core.ollama_manager import get_ollama_status
 
             provider = get("llm_provider")
             if provider != "ollama":
@@ -460,14 +499,35 @@ class TopBar:
             self._root.update_idletasks()
             wid = self._root.winfo_id()
             subprocess.Popen(
-                ["xprop", "-id", str(wid), "-f", "_NET_WM_STRUT_PARTIAL", "32c",
-                 "-set", "_NET_WM_STRUT_PARTIAL",
-                 f"0, 0, {_BAR_HEIGHT}, 0, 0, 0, 0, 0, 0, {screen_w}, 0, 0"],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                [
+                    "xprop",
+                    "-id",
+                    str(wid),
+                    "-f",
+                    "_NET_WM_STRUT_PARTIAL",
+                    "32c",
+                    "-set",
+                    "_NET_WM_STRUT_PARTIAL",
+                    f"0, 0, {_BAR_HEIGHT}, 0, 0, 0, 0, 0, 0, {screen_w}, 0, 0",
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
             subprocess.Popen(
-                ["xprop", "-id", str(wid), "-f", "_NET_WM_WINDOW_TYPE", "32a",
-                 "-set", "_NET_WM_WINDOW_TYPE", "_NET_WM_WINDOW_TYPE_DOCK"],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                [
+                    "xprop",
+                    "-id",
+                    str(wid),
+                    "-f",
+                    "_NET_WM_WINDOW_TYPE",
+                    "32a",
+                    "-set",
+                    "_NET_WM_WINDOW_TYPE",
+                    "_NET_WM_WINDOW_TYPE_DOCK",
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
         except Exception as e:
             logger.debug("Could not set strut: %s", e)
 
@@ -487,6 +547,7 @@ class TopBar:
 # ═══════════════════════════════════════════════════════════════════════════
 #  ACTIVITY SIGNALING (called by bridge/GUI to update topbar)
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def signal_topbar_processing(activity: str = "") -> None:
     """Signal the topbar that the system is processing a command."""
@@ -521,6 +582,7 @@ def signal_topbar_idle() -> None:
 #  COLOR UTILITY
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def _lerp_color(c1: str, c2: str, t: float) -> str:
     """Linear interpolation between two hex colors."""
     r1, g1, b1 = int(c1[1:3], 16), int(c1[3:5], 16), int(c1[5:7], 16)
@@ -534,6 +596,7 @@ def _lerp_color(c1: str, c2: str, t: float) -> str:
 # ═══════════════════════════════════════════════════════════════════════════
 #  ENTRY POINTS
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def run_topbar() -> None:
     bar = TopBar()

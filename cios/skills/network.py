@@ -4,11 +4,9 @@ All execution is direct (no LLM). Deterministic and fast.
 Consults MCP for context-aware decisions.
 """
 
-import re
-import subprocess
 import logging
+import subprocess
 from dataclasses import dataclass
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -16,8 +14,8 @@ logger = logging.getLogger(__name__)
 @dataclass
 class WifiNetwork:
     ssid: str
-    signal: int       # 0-100
-    security: str     # "WPA2", "WPA3", "Open", etc.
+    signal: int  # 0-100
+    security: str  # "WPA2", "WPA3", "Open", etc.
     active: bool = False
 
 
@@ -26,7 +24,9 @@ def _run_nmcli(*args: str, timeout: int = 10) -> tuple[bool, str, str]:
     try:
         result = subprocess.run(
             ["nmcli"] + list(args),
-            capture_output=True, text=True, timeout=timeout,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
         )
         return result.returncode == 0, result.stdout.strip(), result.stderr.strip()
     except FileNotFoundError:
@@ -46,8 +46,14 @@ def is_available() -> bool:
 def list_networks() -> list[WifiNetwork]:
     """List available Wi-Fi networks."""
     ok, stdout, _ = _run_nmcli(
-        "-t", "-f", "ACTIVE,SSID,SIGNAL,SECURITY", "dev", "wifi", "list",
-        "--rescan", "auto",
+        "-t",
+        "-f",
+        "ACTIVE,SSID,SIGNAL,SECURITY",
+        "dev",
+        "wifi",
+        "list",
+        "--rescan",
+        "auto",
     )
     if not ok:
         return []
@@ -61,22 +67,29 @@ def list_networks() -> list[WifiNetwork]:
             if not ssid or ssid in seen:
                 continue
             seen.add(ssid)
-            networks.append(WifiNetwork(
-                ssid=ssid,
-                signal=int(parts[2]) if parts[2].isdigit() else 0,
-                security=parts[3] if parts[3] else "Open",
-                active=parts[0].lower() in ("yes", "sim"),
-            ))
+            networks.append(
+                WifiNetwork(
+                    ssid=ssid,
+                    signal=int(parts[2]) if parts[2].isdigit() else 0,
+                    security=parts[3] if parts[3] else "Open",
+                    active=parts[0].lower() in ("yes", "sim"),
+                )
+            )
 
     # Sort by signal strength (strongest first)
     networks.sort(key=lambda n: (-n.active, -n.signal))
     return networks
 
 
-def get_current_connection() -> Optional[dict]:
+def get_current_connection() -> dict | None:
     """Get current Wi-Fi connection info."""
     ok, stdout, _ = _run_nmcli(
-        "-t", "-f", "NAME,TYPE,DEVICE", "con", "show", "--active",
+        "-t",
+        "-f",
+        "NAME,TYPE,DEVICE",
+        "con",
+        "show",
+        "--active",
     )
     if not ok:
         return None
@@ -87,7 +100,12 @@ def get_current_connection() -> Optional[dict]:
             device = parts[2]
             # Get IP
             ip_ok, ip_out, _ = _run_nmcli(
-                "-t", "-f", "IP4.ADDRESS", "dev", "show", device,
+                "-t",
+                "-f",
+                "IP4.ADDRESS",
+                "dev",
+                "show",
+                device,
             )
             ip = ""
             if ip_ok:
@@ -109,13 +127,21 @@ def connect(ssid: str, password: str = "") -> tuple[list[str], bool, str]:
 
     if password:
         ok, stdout, stderr = _run_nmcli(
-            "dev", "wifi", "connect", ssid, "password", password,
+            "dev",
+            "wifi",
+            "connect",
+            ssid,
+            "password",
+            password,
             timeout=30,
         )
     else:
         # Try connecting without password (saved or open network)
         ok, stdout, stderr = _run_nmcli(
-            "dev", "wifi", "connect", ssid,
+            "dev",
+            "wifi",
+            "connect",
+            ssid,
             timeout=30,
         )
 

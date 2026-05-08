@@ -6,16 +6,15 @@ Property 12: All skill handlers produce at least one feedback message
 Validates: Requirements 7.4
 """
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from cios.core.executor import Executor, ExecResult
+from cios.core.executor import ExecResult, Executor
 from cios.core.intent_parser import Intent, IntentType
 from cios.core.memory import Memory
 from cios.core.planner import Planner, PlanResult
-
 
 # ── All IntentType values that have registered handlers in the Planner ───
 
@@ -92,14 +91,22 @@ def _make_mock_executor() -> MagicMock:
     """Create a mock Executor that returns successful results."""
     executor = MagicMock(spec=Executor)
     executor.run.return_value = ExecResult(
-        command="mock", returncode=0, stdout="ok", stderr="", duration=0.1,
+        command="mock",
+        returncode=0,
+        stdout="ok",
+        stderr="",
+        duration=0.1,
     )
     mock_proc = MagicMock()
     mock_proc.pid = 42
     mock_proc.poll.return_value = None
     executor.run_background.return_value = mock_proc
     executor.kill_by_port.return_value = ExecResult(
-        command="kill", returncode=0, stdout="", stderr="", duration=0.1,
+        command="kill",
+        returncode=0,
+        stdout="",
+        stderr="",
+        duration=0.1,
     )
     return executor
 
@@ -156,16 +163,27 @@ def _make_mock_mcp():
 
     # Snapshot
     from cios.core.mcp import (
-        ContextSnapshot, WifiState, AudioState, BatteryState,
-        SystemState, BluetoothState,
+        AudioState,
+        BatteryState,
+        BluetoothState,
+        ContextSnapshot,
+        SystemState,
+        WifiState,
     )
+
     mock_mcp.snapshot.return_value = ContextSnapshot(
         wifi=WifiState(connected=False),
         audio=AudioState(volume=50, muted=False),
         battery=BatteryState(present=True, percent=75),
-        system=SystemState(cpu_percent=15.0, cpu_cores=4, mem_percent=45.0,
-                           mem_used_gb=3.6, mem_total_gb=8.0,
-                           disk_percent=55.0, disk_free_gb=100.0),
+        system=SystemState(
+            cpu_percent=15.0,
+            cpu_cores=4,
+            mem_percent=45.0,
+            mem_used_gb=3.6,
+            mem_total_gb=8.0,
+            disk_percent=55.0,
+            disk_free_gb=100.0,
+        ),
         bluetooth=BluetoothState(available=False, powered=False),
     )
 
@@ -191,8 +209,12 @@ def _execute_handler(intent_type: IntentType) -> PlanResult:
     from cios.skills.dev_start import ProjectInfo
 
     mock_project = ProjectInfo(
-        type="node", root="/tmp/test", start_command="npm run dev",
-        install_command="npm install", port=3000, package_manager="npm",
+        type="node",
+        root="/tmp/test",
+        start_command="npm run dev",
+        install_command="npm install",
+        port=3000,
+        package_manager="npm",
     )
 
     # Mock insight for log analysis
@@ -242,16 +264,24 @@ def _execute_handler(intent_type: IntentType) -> PlanResult:
         "cios.core.handlers.system.mcp": mock_mcp,
         "cios.core.planner.mcp": mock_mcp,
         "cios.core.handlers.dev.detect_project": MagicMock(return_value=mock_project),
-        "cios.core.handlers.dev.execute_dev_start": MagicMock(return_value=(
-            ["Detecting project", "Starting server", "Server running on :3000"],
-            [ExecResult(command="npm run dev", returncode=0, stdout="", stderr="", duration=0.5)],
-            42,
-        )),
+        "cios.core.handlers.dev.execute_dev_start": MagicMock(
+            return_value=(
+                ["Detecting project", "Starting server", "Server running on :3000"],
+                [
+                    ExecResult(
+                        command="npm run dev", returncode=0, stdout="", stderr="", duration=0.5
+                    )
+                ],
+                42,
+            )
+        ),
         "cios.core.handlers.process.find_process_on_port": MagicMock(return_value=None),
-        "cios.core.handlers.process.kill_process_on_port": MagicMock(return_value=(
-            ["Killing process on port 3000"],
-            ExecResult(command="kill", returncode=0, stdout="", stderr="", duration=0.1),
-        )),
+        "cios.core.handlers.process.kill_process_on_port": MagicMock(
+            return_value=(
+                ["Killing process on port 3000"],
+                ExecResult(command="kill", returncode=0, stdout="", stderr="", duration=0.1),
+            )
+        ),
         "cios.core.handlers.process.list_listening_ports": MagicMock(return_value=[]),
         "cios.core.handlers.logs.analyze_text": MagicMock(return_value=mock_insight),
         "cios.core.handlers.dev.analyze_text": MagicMock(return_value=mock_insight),
@@ -263,14 +293,22 @@ def _execute_handler(intent_type: IntentType) -> PlanResult:
         "cios.core.handlers.dev.launch_app": MagicMock(return_value=(["Launching"], True, "")),
         "cios.core.handlers.media.find_app": MagicMock(return_value=None),
         "cios.core.handlers.media.launch_app": MagicMock(return_value=(["Launching"], True, "")),
-        "cios.core.handlers.system.execute_session_action": MagicMock(return_value=(["Locking screen"], True, "")),
+        "cios.core.handlers.system.execute_session_action": MagicMock(
+            return_value=(["Locking screen"], True, "")
+        ),
         "cios.core.handlers.system.get_session_action": MagicMock(return_value=mock_action),
         "cios.core.handlers.disk.analyze_disk": MagicMock(return_value=mock_disk_report),
         "cios.core.handlers.disk.clean_safe": MagicMock(return_value=(["Cleaning"], 0, [])),
-        "cios.core.handlers.apps.format_capabilities": MagicMock(return_value=(["Listing capabilities"], "I can help with many things")),
-        "cios.core.handlers.apps.list_installed_apps_grouped": MagicMock(return_value=(["Listing apps"], "Apps: Firefox, Code")),
+        "cios.core.handlers.apps.format_capabilities": MagicMock(
+            return_value=(["Listing capabilities"], "I can help with many things")
+        ),
+        "cios.core.handlers.apps.list_installed_apps_grouped": MagicMock(
+            return_value=(["Listing apps"], "Apps: Firefox, Code")
+        ),
         "cios.core.handlers.files.search_files": MagicMock(return_value=mock_search_report),
-        "cios.core.handlers.files.find_and_open": MagicMock(return_value=(["Searching for file"], False, "File not found")),
+        "cios.core.handlers.files.find_and_open": MagicMock(
+            return_value=(["Searching for file"], False, "File not found")
+        ),
         "cios.core.handlers.dev._scan_project_dirs": MagicMock(return_value=[]),
         "cios.core.handlers.dev._find_project": MagicMock(return_value=None),
         "cios.core.handlers.dev._is_port_in_use": MagicMock(return_value=False),
@@ -297,7 +335,11 @@ def _execute_handler(intent_type: IntentType) -> PlanResult:
     mock_power.get_brightness.return_value = 70
     mock_power.change_brightness.return_value = (["Adjusting brightness"], True, "Brightness: 80%")
     mock_power.set_brightness.return_value = (["Setting brightness"], True, "Brightness: 50%")
-    mock_power.enable_power_saving.return_value = (["Enabling power saving"], True, "Power saving enabled")
+    mock_power.enable_power_saving.return_value = (
+        ["Enabling power saving"],
+        True,
+        "Power saving enabled",
+    )
     patches["cios.core.handlers.system.power_skill"] = mock_power
 
     mock_pkg = MagicMock()
@@ -347,6 +389,7 @@ def _execute_handler(intent_type: IntentType) -> PlanResult:
 
 
 # ── Property Test ────────────────────────────────────────────────────────
+
 
 class TestAllSkillHandlersFeedback:
     """Property 12: All skill handlers produce at least one feedback message.

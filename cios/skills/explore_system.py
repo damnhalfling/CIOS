@@ -7,8 +7,7 @@ No LLM. Pure static knowledge about the system's own skills.
 """
 
 import logging
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
 
 from cios.skills.app_launcher import get_installed_apps
 
@@ -18,8 +17,9 @@ logger = logging.getLogger(__name__)
 @dataclass
 class Capability:
     """A single thing CIOS can do."""
-    category: str       # "sistema", "apps", "arquivos", etc.
-    icon: str           # emoji
+
+    category: str  # "sistema", "apps", "arquivos", etc.
+    icon: str  # emoji
     examples_pt: list[str]
     examples_en: list[str]
     description_pt: str
@@ -213,11 +213,63 @@ def list_installed_apps_grouped(lang: str = "pt") -> tuple[list[str], str]:
             "📦 Other": [],
         }
 
-    _INTERNET_KW = {"browser", "chrome", "firefox", "chromium", "thunderbird", "telegram", "discord", "slack", "web"}
-    _DEV_KW = {"code", "editor", "terminal", "git", "vim", "emacs", "ide", "studio", "konsole", "alacritty", "kitty"}
-    _OFFICE_KW = {"libreoffice", "writer", "calc", "impress", "draw", "office", "evince", "pdf", "okular"}
-    _MEDIA_KW = {"vlc", "spotify", "rhythmbox", "audacious", "totem", "mpv", "gimp", "inkscape", "shotwell", "cheese"}
-    _SYSTEM_KW = {"settings", "monitor", "task", "disk", "update", "software", "synaptic", "gparted"}
+    _INTERNET_KW = {
+        "browser",
+        "chrome",
+        "firefox",
+        "chromium",
+        "thunderbird",
+        "telegram",
+        "discord",
+        "slack",
+        "web",
+    }
+    _DEV_KW = {
+        "code",
+        "editor",
+        "terminal",
+        "git",
+        "vim",
+        "emacs",
+        "ide",
+        "studio",
+        "konsole",
+        "alacritty",
+        "kitty",
+    }
+    _OFFICE_KW = {
+        "libreoffice",
+        "writer",
+        "calc",
+        "impress",
+        "draw",
+        "office",
+        "evince",
+        "pdf",
+        "okular",
+    }
+    _MEDIA_KW = {
+        "vlc",
+        "spotify",
+        "rhythmbox",
+        "audacious",
+        "totem",
+        "mpv",
+        "gimp",
+        "inkscape",
+        "shotwell",
+        "cheese",
+    }
+    _SYSTEM_KW = {
+        "settings",
+        "monitor",
+        "task",
+        "disk",
+        "update",
+        "software",
+        "synaptic",
+        "gparted",
+    }
     _GAMES_KW = {"game", "steam", "lutris", "wine"}
     _FILES_KW = {"nautilus", "thunar", "nemo", "dolphin", "pcmanfm", "file", "archive", "compress"}
 
@@ -259,7 +311,9 @@ def list_installed_apps_grouped(lang: str = "pt") -> tuple[list[str], str]:
             more = f"mais {extra}" if lang == "pt" else f"{extra} more"
             lines.append(f"  ...{more}")
 
-    header = f"{total} aplicativos instalados:" if lang == "pt" else f"{total} installed applications:"
+    header = (
+        f"{total} aplicativos instalados:" if lang == "pt" else f"{total} installed applications:"
+    )
     tip = (
         '\nDiga "abrir [nome]" para abrir qualquer um.'
         if lang == "pt"

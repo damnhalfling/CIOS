@@ -1,23 +1,26 @@
 """Model router — routes LLM calls to the configured provider.
 
-Supports:
-- Ollama (local, free, fast)
-- OpenAI (GPT-4o-mini, GPT-4o)
-- Anthropic (Claude direct API)
-- AWS Bedrock (Claude via AWS)
+Resolution chain:
+1. Intent Parser (regex hardcoded, 180+ patterns) — handles 80%+
+2. Ollama (local LLM) — classifies intent + resolves local commands
+3. External API (only when local can't resolve) — generates execution plans
+   - OpenAI (client's own key)
+   - Anthropic (client's own key)
+   - CIOS API (paid service, Bedrock behind the scenes)
 
-The provider is configured in ~/.cios/settings.json.
-Pattern matching handles 80%+ of intents without any LLM.
+The external API is ONLY called when:
+- The intent requires knowledge the local model doesn't have
+- Example: installing software that needs external sources, complex configs
 
-Fallback chain: primary → all configured providers → graceful error.
 Retry with exponential backoff on transient failures.
 Circuit breaker prevents hammering dead providers.
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import time
-from typing import Optional
 
 from cios.core import config
 from cios.core.intent_parser import Intent, IntentType
@@ -34,7 +37,7 @@ _PROVIDER_TIMEOUTS = {
     "ollama": 15,
     "openai": 15,
     "anthropic": 15,
-    "bedrock": 15,
+    "cios_api": 15,
 }
 
 # Transient errors worth retrying
@@ -66,10 +69,8 @@ def _circuit_is_open(provider: str) -> bool:
     state = _circuit_state.get(provider)
     if not state or not state.get("open"):
         return False
-    # Check if enough time has passed to retry
     elapsed = time.time() - state.get("last_failure", 0)
     if elapsed >= _CIRCUIT_BREAKER_RESET_TIME:
-        # Half-open: allow one attempt
         state["open"] = False
         state["failures"] = 0
         logger.info("Circuit breaker for %s reset (%.0fs elapsed)", provider, elapsed)
@@ -84,8 +85,9 @@ def _circuit_record_failure(provider: str) -> None:
     state["last_failure"] = time.time()
     if state["failures"] >= _CIRCUIT_BREAKER_THRESHOLD:
         state["open"] = True
-        logger.warning("Circuit breaker OPEN for %s (%d consecutive failures)",
-                       provider, state["failures"])
+        logger.warning(
+            "Circuit breaker OPEN for %s (%d consecutive failures)", provider, state["failures"]
+        )
 
 
 def _circuit_record_success(provider: str) -> None:
@@ -100,7 +102,7 @@ def _is_transient(error: str) -> bool:
     return any(t in lower for t in _TRANSIENT_ERRORS)
 
 
-def _retry_call(fn, prompt: str, system: str, provider_name: str) -> Optional[str]:
+def _retry_call(fn, prompt: str, system: str, provider_name: str) -> str | None:
     """Call a provider function with retry + exponential backoff."""
     last_error = ""
     for attempt in range(_MAX_RETRIES + 1):
@@ -111,18 +113,26 @@ def _retry_call(fn, prompt: str, system: str, provider_name: str) -> Optional[st
                     logger.info("Provider %s succeeded on attempt %d", provider_name, attempt + 1)
                 _circuit_record_success(provider_name)
                 return result
-            # None result = provider not configured or empty response
             return None
         except Exception as e:
             last_error = str(e)
             if attempt < _MAX_RETRIES and _is_transient(last_error):
                 wait = _RETRY_BACKOFF[min(attempt, len(_RETRY_BACKOFF) - 1)]
-                logger.info("Provider %s attempt %d failed (%s), retrying in %.1fs",
-                            provider_name, attempt + 1, last_error[:80], wait)
+                logger.info(
+                    "Provider %s attempt %d failed (%s), retrying in %.1fs",
+                    provider_name,
+                    attempt + 1,
+                    last_error[:80],
+                    wait,
+                )
                 time.sleep(wait)
             else:
-                logger.warning("Provider %s failed after %d attempts: %s",
-                               provider_name, attempt + 1, last_error[:120])
+                logger.warning(
+                    "Provider %s failed after %d attempts: %s",
+                    provider_name,
+                    attempt + 1,
+                    last_error[:120],
+                )
                 _circuit_record_failure(provider_name)
                 return None
     _circuit_record_failure(provider_name)
@@ -133,22 +143,25 @@ def _retry_call(fn, prompt: str, system: str, provider_name: str) -> Optional[st
 #  PROVIDER IMPLEMENTATIONS
 # ═══════════════════════════════════════════════════════════════════════════
 
-def _call_ollama(prompt: str, system: str = "") -> Optional[str]:
+
+def _call_ollama(prompt: str, system: str = "") -> str | None:
     """Call local Ollama model."""
-    import urllib.request
     import urllib.error
+    import urllib.request
 
     url = config.get("ollama_url")
     model = config.get("ollama_model")
     timeout = _PROVIDER_TIMEOUTS["ollama"]
 
-    payload = json.dumps({
-        "model": model,
-        "prompt": prompt,
-        "system": system,
-        "stream": False,
-        "options": {"temperature": 0.1, "num_predict": 256},
-    }).encode()
+    payload = json.dumps(
+        {
+            "model": model,
+            "prompt": prompt,
+            "system": system,
+            "stream": False,
+            "options": {"temperature": 0.1, "num_predict": 256},
+        }
+    ).encode()
 
     req = urllib.request.Request(
         f"{url}/api/generate",
@@ -166,10 +179,10 @@ def _call_ollama(prompt: str, system: str = "") -> Optional[str]:
         raise TimeoutError(f"Ollama timed out after {timeout}s") from None
 
 
-def _call_openai(prompt: str, system: str = "") -> Optional[str]:
-    """Call OpenAI API (GPT-4o-mini, GPT-4o, etc.)."""
-    import urllib.request
+def _call_openai(prompt: str, system: str = "") -> str | None:
+    """Call OpenAI API (client's own key)."""
     import urllib.error
+    import urllib.request
 
     api_key = config.get("openai_api_key")
     if not api_key:
@@ -182,12 +195,14 @@ def _call_openai(prompt: str, system: str = "") -> Optional[str]:
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
 
-    payload = json.dumps({
-        "model": model,
-        "messages": messages,
-        "temperature": 0.1,
-        "max_tokens": 512,
-    }).encode()
+    payload = json.dumps(
+        {
+            "model": model,
+            "messages": messages,
+            "temperature": 0.1,
+            "max_tokens": 512,
+        }
+    ).encode()
 
     req = urllib.request.Request(
         "https://api.openai.com/v1/chat/completions",
@@ -210,10 +225,10 @@ def _call_openai(prompt: str, system: str = "") -> Optional[str]:
         raise TimeoutError(f"OpenAI timed out after {timeout}s") from None
 
 
-def _call_anthropic(prompt: str, system: str = "") -> Optional[str]:
-    """Call Anthropic API directly (not via Bedrock)."""
-    import urllib.request
+def _call_anthropic(prompt: str, system: str = "") -> str | None:
+    """Call Anthropic API (client's own key)."""
     import urllib.error
+    import urllib.request
 
     api_key = config.get("anthropic_api_key")
     if not api_key:
@@ -222,13 +237,15 @@ def _call_anthropic(prompt: str, system: str = "") -> Optional[str]:
     model = config.get("anthropic_model")
     timeout = _PROVIDER_TIMEOUTS["anthropic"]
 
-    payload = json.dumps({
-        "model": model,
-        "max_tokens": 512,
-        "temperature": 0.1,
-        "system": system,
-        "messages": [{"role": "user", "content": prompt}],
-    }).encode()
+    payload = json.dumps(
+        {
+            "model": model,
+            "max_tokens": 512,
+            "temperature": 0.1,
+            "system": system,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+    ).encode()
 
     req = urllib.request.Request(
         "https://api.anthropic.com/v1/messages",
@@ -252,58 +269,81 @@ def _call_anthropic(prompt: str, system: str = "") -> Optional[str]:
         raise TimeoutError(f"Anthropic timed out after {timeout}s") from None
 
 
-def _call_bedrock(prompt: str, system: str = "") -> Optional[str]:
-    """Call Amazon Bedrock (Claude via AWS credentials)."""
-    import boto3
-    from botocore.exceptions import ClientError, ReadTimeoutError, ConnectTimeoutError
+def _call_cios_api(prompt: str, system: str = "") -> str | None:
+    """Call CIOS API (paid service — powered by Bedrock behind the scenes).
 
-    region = config.get("bedrock_region")
-    model_id = config.get("bedrock_model_id")
-    timeout = _PROVIDER_TIMEOUTS["bedrock"]
+    This is the official CIOS cloud API. Users subscribe at ciosia.com
+    and get an API key. No AWS credentials needed on their end.
+    """
+    import urllib.error
+    import urllib.request
 
-    # Use explicit credentials if configured, otherwise boto3 default chain
-    aws_key = config.get("aws_access_key_id")
-    aws_secret = config.get("aws_secret_access_key")
+    api_key = config.get("cios_api_key")
+    if not api_key:
+        return None
 
-    boto_config = boto3.session.Config(
-        read_timeout=timeout,
-        connect_timeout=10,
-        retries={"max_attempts": 0},  # we handle retries ourselves
+    api_url = config.get("cios_api_url")
+    timeout = _PROVIDER_TIMEOUTS["cios_api"]
+
+    payload = json.dumps(
+        {
+            "prompt": prompt,
+            "system": system,
+            "max_tokens": 512,
+            "temperature": 0.1,
+        }
+    ).encode()
+
+    req = urllib.request.Request(
+        f"{api_url}/v1/completions",
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read())
+            return data.get("content", "").strip() or None
+    except urllib.error.HTTPError as e:
+        raise ConnectionError(f"CIOS API HTTP {e.code}: {e.reason}") from e
+    except urllib.error.URLError as e:
+        raise ConnectionError(f"CIOS API connection failed: {e}") from e
+    except TimeoutError:
+        raise TimeoutError(f"CIOS API timed out after {timeout}s") from None
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  EXTERNAL API AVAILABILITY CHECK
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def has_external_provider() -> bool:
+    """Check if any external API provider is configured."""
+    return bool(
+        config.get("openai_api_key")
+        or config.get("anthropic_api_key")
+        or config.get("cios_api_key")
     )
 
-    if aws_key and aws_secret:
-        client = boto3.client(
-            "bedrock-runtime",
-            region_name=region,
-            aws_access_key_id=aws_key,
-            aws_secret_access_key=aws_secret,
-            config=boto_config,
-        )
-    else:
-        client = boto3.client("bedrock-runtime", region_name=region, config=boto_config)
 
-    body = json.dumps({
-        "anthropic_version": "bedrock-2023-05-31",
-        "max_tokens": 512,
-        "temperature": 0.1,
-        "system": system,
-        "messages": [{"role": "user", "content": prompt}],
-    })
+def get_no_provider_message() -> str:
+    """Return a user-friendly message when no external API is configured.
 
-    try:
-        response = client.invoke_model(
-            modelId=model_id,
-            body=body,
-            contentType="application/json",
-            accept="application/json",
-        )
-        result = json.loads(response["body"].read())
-        return result["content"][0]["text"].strip() or None
-    except (ReadTimeoutError, ConnectTimeoutError):
-        raise TimeoutError(f"Bedrock timed out after {timeout}s") from None
-    except ClientError as e:
-        code = e.response.get("Error", {}).get("Code", "")
-        raise ConnectionError(f"Bedrock error ({code}): {e}") from e
+    This is shown when the system needs external knowledge (e.g., how to
+    install something that requires adding sources, complex configurations).
+    """
+    return (
+        "Preciso de acesso a uma API externa para resolver isso, "
+        "mas nenhuma está configurada.\n\n"
+        "Opções:\n"
+        "  1. CIOS API (assinatura em ciosia.com) — mais simples\n"
+        "  2. Sua própria chave OpenAI ou Anthropic\n\n"
+        "Configure com: cios --setup\n"
+        "Ou defina a variável: CIOS_API_KEY, OPENAI_API_KEY ou ANTHROPIC_API_KEY"
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -314,11 +354,11 @@ _PROVIDERS = {
     "ollama": _call_ollama,
     "openai": _call_openai,
     "anthropic": _call_anthropic,
-    "bedrock": _call_bedrock,
+    "cios_api": _call_cios_api,
 }
 
-# System prompt for intent resolution
-_SYSTEM = (
+# System prompt for intent resolution (Ollama — local classification)
+_SYSTEM_CLASSIFY = (
     "You are the reasoning engine of CIOS. "
     "Given a user request and optional context (logs, errors, memory), "
     "respond ONLY with a JSON object: "
@@ -328,45 +368,53 @@ _SYSTEM = (
     "Keep plans to 2-5 steps max. Be precise."
 )
 
+# System prompt for execution plan (External API — complex tasks)
+_SYSTEM_PLAN = (
+    "You are the execution planner of CIOS, a Linux intent-based OS. "
+    "The user needs something that requires external knowledge (installing "
+    "software, adding repositories, complex configurations). "
+    "Respond ONLY with a JSON object:\n"
+    '{"explanation": "brief explanation of what will be done", '
+    '"steps": ["shell command 1", "shell command 2", ...], '
+    '"confirm": true}\n'
+    "Rules:\n"
+    "- Use apt, snap, flatpak, or curl as appropriate for the distro (Debian/Ubuntu)\n"
+    "- Include adding GPG keys and sources when needed\n"
+    "- Always use -y flag for non-interactive installs\n"
+    "- If unsure, set confirm: true so the user approves\n"
+    "- Keep explanations short (1-2 sentences, Portuguese)\n"
+    "- Never include dangerous commands (rm -rf /, dd, etc.)\n"
+    "- Max 10 steps"
+)
 
-def _call_provider(prompt: str, system: str = "") -> Optional[str]:
-    """Call the configured provider with retry + full fallback chain.
 
-    Chain: primary provider (with retry) → each other configured provider → None.
-    Circuit breaker prevents hammering dead providers.
+def _call_local(prompt: str, system: str = "") -> str | None:
+    """Call Ollama (local LLM). First choice after regex."""
+    if _circuit_is_open("ollama"):
+        return None
+    return _retry_call(_call_ollama, prompt, system, "ollama")
+
+
+def _call_external(prompt: str, system: str = "") -> str | None:
+    """Call external API provider (only when local can't resolve).
+
+    Priority: client's own key first, CIOS API as fallback.
+    Returns None if no provider is configured (caller should show message).
     """
-    provider = config.get("llm_provider")
-    call_fn = _PROVIDERS.get(provider)
+    # Priority order for external providers
+    _EXTERNAL_ORDER = ["openai", "anthropic", "cios_api"]
 
-    # 1. Try primary provider with retry (if circuit is closed)
-    if call_fn and not _circuit_is_open(provider):
+    for provider in _EXTERNAL_ORDER:
+        if _circuit_is_open(provider):
+            continue
+        if not _provider_is_configured(provider):
+            continue
+        call_fn = _PROVIDERS[provider]
         result = _retry_call(call_fn, prompt, system, provider)
         if result:
-            return result
-        logger.info("Primary provider '%s' failed, trying fallback chain", provider)
-    elif _circuit_is_open(provider):
-        logger.info("Primary provider '%s' circuit is open, skipping to fallback", provider)
-
-    # 2. Fallback chain: try all other providers in priority order
-    _FALLBACK_ORDER = ["ollama", "openai", "anthropic", "bedrock"]
-    for fallback in _FALLBACK_ORDER:
-        if fallback == provider:
-            continue  # already tried
-        if _circuit_is_open(fallback):
-            continue  # circuit open, skip
-        fallback_fn = _PROVIDERS.get(fallback)
-        if not fallback_fn:
-            continue
-        # Check if provider is configured (has credentials or is ollama)
-        if fallback != "ollama" and not _provider_is_configured(fallback):
-            continue
-        result = _retry_call(fallback_fn, prompt, system, fallback)
-        if result:
-            logger.info("Fallback provider '%s' succeeded", fallback)
+            logger.info("External provider '%s' resolved the request", provider)
             return result
 
-    # 3. All providers exhausted
-    logger.warning("All LLM providers failed for prompt: %s", prompt[:80])
     return None
 
 
@@ -378,9 +426,8 @@ def _provider_is_configured(provider: str) -> bool:
         return bool(config.get("openai_api_key"))
     if provider == "anthropic":
         return bool(config.get("anthropic_api_key"))
-    if provider == "bedrock":
-        # Bedrock uses AWS credential chain, consider configured if region is set
-        return bool(config.get("bedrock_region"))
+    if provider == "cios_api":
+        return bool(config.get("cios_api_key"))
     return False
 
 
@@ -394,8 +441,9 @@ def _ollama_is_reachable() -> bool:
     if now - _ollama_cache["checked_at"] < 30:
         return _ollama_cache["reachable"]
 
-    import urllib.request
     import urllib.error
+    import urllib.request
+
     url = config.get("ollama_url")
     try:
         req = urllib.request.Request(f"{url}/api/tags", method="GET")
@@ -407,53 +455,55 @@ def _ollama_is_reachable() -> bool:
         return False
 
 
-def route_to_llm(prompt: str, complex: bool = False) -> Optional[dict]:
-    """Route a prompt to the LLM and parse the JSON response."""
-    raw = _call_provider(prompt, system=_SYSTEM)
+# ═══════════════════════════════════════════════════════════════════════════
+#  PUBLIC API
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def route_to_llm(prompt: str, complex: bool = False) -> dict | None:
+    """Route a prompt to the local LLM and parse the JSON response.
+
+    This is for intent classification — always uses Ollama first.
+    """
+    raw = _call_local(prompt, system=_SYSTEM_CLASSIFY)
 
     if raw is None:
         return None
 
-    # Extract JSON from response
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
-        import re
-        match = re.search(r"\{.*\}", raw, re.DOTALL)
-        if match:
-            try:
-                return json.loads(match.group())
-            except json.JSONDecodeError:
-                pass
-
-    logger.warning("Could not parse LLM response: %s", raw[:200])
-    return None
+    return _parse_json_response(raw)
 
 
-def is_any_provider_available() -> bool:
-    """Quick check if any LLM provider is likely available (no network call).
+def request_execution_plan(user_input: str, context: str = "") -> dict | None:
+    """Request an execution plan from an external API.
 
-    Returns True if at least one provider is configured and its circuit is closed.
-    This avoids waiting 30s for a timeout when no LLM is set up.
+    Called when the local LLM can't resolve something that needs
+    external knowledge (e.g., installing software with custom sources).
+
+    Returns:
+        {"explanation": str, "steps": [str], "confirm": bool}
+        or None if no external provider is available.
     """
-    primary = config.get("llm_provider")
+    if not has_external_provider():
+        return None
 
-    # Check primary first
-    if primary and _provider_is_configured(primary) and not _circuit_is_open(primary):
-        return True
+    prompt = f'User request: "{user_input}"\n'
+    if context:
+        prompt += f"System context: {context}\n"
+    prompt += "Generate an execution plan."
 
-    # Check fallbacks
-    for name in _PROVIDERS:
-        if name == primary:
-            continue
-        if _provider_is_configured(name) and not _circuit_is_open(name):
-            return True
+    raw = _call_external(prompt, system=_SYSTEM_PLAN)
+    if raw is None:
+        return None
 
-    return False
+    return _parse_json_response(raw)
 
 
-def resolve_unknown_intent(user_input: str, context: str = "") -> Optional[Intent]:
-    """Use LLM to resolve an intent that pattern matching couldn't handle."""
+def resolve_unknown_intent(user_input: str, context: str = "") -> Intent | None:
+    """Use local LLM to resolve an intent that pattern matching couldn't handle.
+
+    Only uses Ollama. If Ollama can't resolve, returns None.
+    The caller decides whether to escalate to external API.
+    """
     prompt = f'User said: "{user_input}"\n'
     if context:
         prompt += f"Context: {context}\n"
@@ -474,29 +524,34 @@ def resolve_unknown_intent(user_input: str, context: str = "") -> Optional[Inten
     return None
 
 
+def is_any_provider_available() -> bool:
+    """Quick check if any LLM provider is likely available (no network call).
+
+    Returns True if Ollama or any external provider is configured.
+    """
+    if _provider_is_configured("ollama") and not _circuit_is_open("ollama"):
+        return True
+    return has_external_provider()
+
+
 def check_provider(provider: str) -> tuple[bool, str]:
     """Check if a provider is reachable. Returns (success, message)."""
     call_fn = _PROVIDERS.get(provider)
     if not call_fn:
         return False, f"Unknown provider: {provider}"
 
-    result = call_fn("Say 'ok' and nothing else.", system="Respond with exactly 'ok'.")
-    if result:
-        _circuit_record_success(provider)
-        return True, f"{provider} is working"
+    try:
+        result = call_fn("Say 'ok' and nothing else.", system="Respond with exactly 'ok'.")
+        if result:
+            _circuit_record_success(provider)
+            return True, f"{provider} is working"
+    except Exception as e:
+        return False, f"{provider} error: {e}"
     return False, f"{provider} is not reachable"
 
 
 def get_fallback_status() -> dict:
-    """Return the health status of all providers for diagnostics.
-
-    Returns:
-        {
-            "primary": str,
-            "providers": {name: {"configured": bool, "circuit_open": bool, "failures": int}}
-        }
-    """
-    primary = config.get("llm_provider")
+    """Return the health status of all providers for diagnostics."""
     providers = {}
     for name in _PROVIDERS:
         state = _circuit_state.get(name, {})
@@ -504,9 +559,8 @@ def get_fallback_status() -> dict:
             "configured": _provider_is_configured(name),
             "circuit_open": _circuit_is_open(name),
             "failures": state.get("failures", 0),
-            "is_primary": name == primary,
         }
-    return {"primary": primary, "providers": providers}
+    return {"providers": providers}
 
 
 def reset_circuit_breaker(provider: str = "") -> None:
@@ -518,3 +572,21 @@ def reset_circuit_breaker(provider: str = "") -> None:
     else:
         _circuit_state.clear()
         logger.info("All circuit breakers reset")
+
+
+def _parse_json_response(raw: str) -> dict | None:
+    """Extract JSON from an LLM response."""
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        import re
+
+        match = re.search(r"\{.*\}", raw, re.DOTALL)
+        if match:
+            try:
+                return json.loads(match.group())
+            except json.JSONDecodeError:
+                pass
+
+    logger.warning("Could not parse LLM response: %s", raw[:200])
+    return None

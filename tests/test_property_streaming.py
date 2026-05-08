@@ -3,13 +3,12 @@
 Feature: produto-percebido, Property 6: Streaming execution invokes step callbacks
 """
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from cios.core.bridge import CIOSBridge
-
 
 # --- Strategies ---
 
@@ -36,6 +35,7 @@ def _make_bridge() -> CIOSBridge:
         mock_ctx.force_update_audio = MagicMock()
         mock_ctx.force_update = MagicMock()
         from cios.core.mcp import ContextSnapshot, SystemState
+
         mock_snapshot = ContextSnapshot(
             system=SystemState(
                 cpu_percent=15.0,
@@ -53,12 +53,14 @@ def _make_bridge() -> CIOSBridge:
 
 
 # Phase labels emitted by execute_streaming before actual plan steps
-_PHASE_LABELS = frozenset({
-    "Entendendo…",
-    "Executando…",
-    "Classificando…",
-    "Consultando IA…",
-})
+_PHASE_LABELS = frozenset(
+    {
+        "Entendendo…",
+        "Executando…",
+        "Classificando…",
+        "Consultando IA…",
+    }
+)
 
 
 class TestStreamingCallbacksProperty:
@@ -84,7 +86,9 @@ class TestStreamingCallbacksProperty:
                 steps_received.append((text, index, total))
 
             result = bridge.execute_streaming(
-                command, confirmed=True, on_step=on_step,
+                command,
+                confirmed=True,
+                on_step=on_step,
             )
 
             # The result should be successful for echo commands
@@ -94,9 +98,7 @@ class TestStreamingCallbacksProperty:
             )
 
             # on_step must have been called at least once
-            assert len(steps_received) >= 1, (
-                f"on_step was never called for command '{command}'"
-            )
+            assert len(steps_received) >= 1, f"on_step was never called for command '{command}'"
 
             # Filter to plan steps only (not phase callbacks)
             plan_steps = [s for s in steps_received if s[0] not in _PHASE_LABELS]

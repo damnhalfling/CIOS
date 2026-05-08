@@ -17,11 +17,11 @@ import logging
 import os
 import threading
 import time
-import urllib.request
 import urllib.error
-from dataclasses import dataclass, field
+import urllib.request
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Callable
 
 from cios.core.config import CIOS_HOME
 
@@ -42,9 +42,11 @@ _TIMEOUT = 15  # seconds
 #  DATA STRUCTURES
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class UserProfile:
     """Logged-in user profile."""
+
     id: int = 0
     email: str = ""
     name: str = ""
@@ -56,6 +58,7 @@ class UserProfile:
 @dataclass
 class UsageInfo:
     """Current usage state."""
+
     used_today: int = 0
     limit_today: int = 5
     plan: str = "free"
@@ -65,6 +68,7 @@ class UsageInfo:
 @dataclass
 class IntelligenceResult:
     """Result from an Intelligence API call."""
+
     success: bool = False
     text: str = ""
     error: str = ""
@@ -76,14 +80,15 @@ class IntelligenceResult:
 #  TOKEN OPTIMIZER
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def _compress_input(text: str) -> str:
     """Compress verbose user input using local Ollama.
 
     Reduces ~300 tokens to ~50 tokens before sending to cloud API.
     If Ollama is unavailable, returns original text (graceful degradation).
     """
-    from cios.core.ollama_manager import is_ollama_healthy
     from cios.core.config import get
+    from cios.core.ollama_manager import is_ollama_healthy
 
     if not is_ollama_healthy():
         return text
@@ -103,12 +108,14 @@ def _compress_input(text: str) -> str:
         f"Compressed:"
     )
 
-    payload = json.dumps({
-        "model": model,
-        "prompt": prompt,
-        "stream": False,
-        "options": {"temperature": 0.1, "num_predict": 60},
-    }).encode()
+    payload = json.dumps(
+        {
+            "model": model,
+            "prompt": prompt,
+            "stream": False,
+            "options": {"temperature": 0.1, "num_predict": 60},
+        }
+    ).encode()
 
     try:
         req = urllib.request.Request(
@@ -133,11 +140,12 @@ def _compress_input(text: str) -> str:
 #  INTELLIGENCE CLIENT
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class IntelligenceClient:
     """Client for the CIOS Intelligence API."""
 
     def __init__(self) -> None:
-        self._user: Optional[UserProfile] = None
+        self._user: UserProfile | None = None
         self._usage = UsageInfo()
         self._lock = threading.Lock()
         self._load_auth()
@@ -149,7 +157,7 @@ class IntelligenceClient:
         return self._user is not None and bool(self._user.token)
 
     @property
-    def user(self) -> Optional[UserProfile]:
+    def user(self) -> UserProfile | None:
         return self._user
 
     @property
@@ -191,14 +199,19 @@ class IntelligenceClient:
 
         # Save to disk
         AUTH_FILE.parent.mkdir(parents=True, exist_ok=True)
-        AUTH_FILE.write_text(json.dumps({
-            "id": self._user.id,
-            "email": self._user.email,
-            "name": self._user.name,
-            "picture": self._user.picture,
-            "plan": self._user.plan,
-            "token": token,
-        }, indent=2))
+        AUTH_FILE.write_text(
+            json.dumps(
+                {
+                    "id": self._user.id,
+                    "email": self._user.email,
+                    "name": self._user.name,
+                    "picture": self._user.picture,
+                    "plan": self._user.plan,
+                    "token": token,
+                },
+                indent=2,
+            )
+        )
         # Restrict permissions (contains JWT)
         os.chmod(AUTH_FILE, 0o600)
 
@@ -258,7 +271,7 @@ class IntelligenceClient:
                 success=False,
                 error="rate_limited",
                 text=f"Limite diário atingido ({self._usage.limit_today} consultas). "
-                     f"Renova amanhã ou faça upgrade.",
+                f"Renova amanhã ou faça upgrade.",
             )
 
         # Compress input
@@ -275,10 +288,12 @@ class IntelligenceClient:
 
     def _call_api(self, message: str, intent: str) -> IntelligenceResult:
         """Make the actual API call."""
-        payload = json.dumps({
-            "message": message,
-            "intent": intent,
-        }).encode()
+        payload = json.dumps(
+            {
+                "message": message,
+                "intent": intent,
+            }
+        ).encode()
 
         headers = {
             "Content-Type": "application/json",
@@ -368,7 +383,8 @@ class IntelligenceClient:
 #  AUTH FLOW (Google OAuth via local HTTP callback)
 # ═══════════════════════════════════════════════════════════════════════════
 
-def start_auth_flow(on_complete: Optional[Callable[[bool, str], None]] = None) -> None:
+
+def start_auth_flow(on_complete: Callable[[bool, str], None] | None = None) -> None:
     """Start the Google OAuth flow.
 
     1. Opens browser to api.cios-ia.com/auth/google
@@ -377,7 +393,7 @@ def start_auth_flow(on_complete: Optional[Callable[[bool, str], None]] = None) -
     4. Calls on_complete(success, message)
     """
     import webbrowser
-    from http.server import HTTPServer, BaseHTTPRequestHandler
+    from http.server import BaseHTTPRequestHandler, HTTPServer
 
     auth_url = f"{API_BASE}/auth/google?state=cios&redirect_uri=http://localhost:7778/callback"
 
@@ -385,7 +401,8 @@ def start_auth_flow(on_complete: Optional[Callable[[bool, str], None]] = None) -
 
     class CallbackHandler(BaseHTTPRequestHandler):
         def do_GET(self):
-            from urllib.parse import urlparse, parse_qs
+            from urllib.parse import parse_qs, urlparse
+
             parsed = urlparse(self.path)
 
             if parsed.path == "/callback":
@@ -452,6 +469,7 @@ def start_auth_flow(on_complete: Optional[Callable[[bool, str], None]] = None) -
 # ═══════════════════════════════════════════════════════════════════════════
 #  HELPERS
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def _plan_limit(plan: str) -> int:
     """Get daily request limit for a plan."""

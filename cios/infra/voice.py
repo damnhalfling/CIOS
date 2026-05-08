@@ -21,8 +21,6 @@ import shutil
 import subprocess
 import tempfile
 import threading
-from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +39,7 @@ class VoiceManager:
         self._stt_available = self._check_stt()
         self._speaking = False
         self._listening = False
-        self._tts_process: Optional[subprocess.Popen] = None
+        self._tts_process: subprocess.Popen | None = None
         self._lang = self._detect_lang()
 
         if self._tts_available:
@@ -60,8 +58,7 @@ class VoiceManager:
     def _check_stt(self) -> bool:
         """Check if whisper CLI is available."""
         # Check for whisper.cpp CLI or openai-whisper
-        return (shutil.which("whisper-cpp") is not None or
-                shutil.which("whisper") is not None)
+        return shutil.which("whisper-cpp") is not None or shutil.which("whisper") is not None
 
     def _detect_lang(self) -> str:
         for var in ("LANG", "LC_MESSAGES", "LC_ALL"):
@@ -113,9 +110,7 @@ class VoiceManager:
             return
 
         # Speak in background thread
-        threading.Thread(
-            target=self._speak_sync, args=(to_say,), daemon=True
-        ).start()
+        threading.Thread(target=self._speak_sync, args=(to_say,), daemon=True).start()
 
     def _speak_sync(self, text: str) -> None:
         """Synchronous TTS execution."""
@@ -159,21 +154,22 @@ class VoiceManager:
     def _clean_for_speech(self, text: str) -> str:
         """Clean text for natural speech output."""
         import re
+
         # Remove emojis and special symbols
-        text = re.sub(r'[⚠✓✗🧹💡→🔇⚡•]', '', text)
+        text = re.sub(r"[⚠✓✗🧹💡→🔇⚡•]", "", text)
         # Remove markdown-like formatting
-        text = re.sub(r'[*_`#]', '', text)
+        text = re.sub(r"[*_`#]", "", text)
         # Collapse whitespace
-        text = re.sub(r'\s+', ' ', text).strip()
+        text = re.sub(r"\s+", " ", text).strip()
         # Remove paths
-        text = re.sub(r'/[\w/.-]+', '', text)
+        text = re.sub(r"/[\w/.-]+", "", text)
         return text
 
     # ═══════════════════════════════════════════════════════════════════════
     #  STT (Speech → Text)
     # ═══════════════════════════════════════════════════════════════════════
 
-    def listen(self, duration: float = 5.0) -> Optional[str]:
+    def listen(self, duration: float = 5.0) -> str | None:
         """Record audio and transcribe to text.
 
         Args:
@@ -191,7 +187,7 @@ class VoiceManager:
         finally:
             self._listening = False
 
-    def _listen_sync(self, duration: float) -> Optional[str]:
+    def _listen_sync(self, duration: float) -> str | None:
         """Synchronous STT: record + transcribe."""
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
             wav_path = tmp.name
@@ -199,8 +195,19 @@ class VoiceManager:
         try:
             # Record audio using arecord
             rec = subprocess.run(
-                ["arecord", "-d", str(int(duration)), "-f", "S16_LE",
-                 "-r", "16000", "-c", "1", "-q", wav_path],
+                [
+                    "arecord",
+                    "-d",
+                    str(int(duration)),
+                    "-f",
+                    "S16_LE",
+                    "-r",
+                    "16000",
+                    "-c",
+                    "1",
+                    "-q",
+                    wav_path,
+                ],
                 timeout=duration + 3,
                 capture_output=True,
             )
@@ -210,16 +217,35 @@ class VoiceManager:
             # Transcribe with whisper
             if shutil.which("whisper-cpp"):
                 result = subprocess.run(
-                    ["whisper-cpp", "-m",
-                     "/usr/share/whisper-cpp/models/ggml-base.bin",
-                     "-f", wav_path, "--no-timestamps", "-l", "auto"],
-                    capture_output=True, text=True, timeout=30,
+                    [
+                        "whisper-cpp",
+                        "-m",
+                        "/usr/share/whisper-cpp/models/ggml-base.bin",
+                        "-f",
+                        wav_path,
+                        "--no-timestamps",
+                        "-l",
+                        "auto",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
                 )
             elif shutil.which("whisper"):
                 result = subprocess.run(
-                    ["whisper", wav_path, "--model", "base",
-                     "--language", "auto", "--output_format", "txt"],
-                    capture_output=True, text=True, timeout=30,
+                    [
+                        "whisper",
+                        wav_path,
+                        "--model",
+                        "base",
+                        "--language",
+                        "auto",
+                        "--output_format",
+                        "txt",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
                 )
             else:
                 return None
@@ -247,6 +273,7 @@ class VoiceManager:
             callback: function(text: Optional[str]) called when done
             duration: max recording time
         """
+
         def run():
             text = self.listen(duration)
             callback(text)

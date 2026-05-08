@@ -1,26 +1,26 @@
 """Handlers for development workflow intents: dev_start, workflow_start, continue_project."""
 
+import logging
 import os
 import shutil
 import subprocess
 import time
-import logging
 
 from cios.core.executor import Executor
+from cios.core.handlers._common import PlanResult, resilient_call, sanitize_error
 from cios.core.intent_parser import Intent
 from cios.core.memory import Memory
-from cios.core.handlers._common import PlanResult, sanitize_error, resilient_call
+from cios.skills.app_launcher import find_app, launch_app
 from cios.skills.dev_start import (
+    _detect_editor,
+    _is_port_in_use,
+    _open_browser,
+    _open_editor,
     detect_project,
     execute_dev_start,
-    _is_port_in_use,
-    _detect_editor,
-    _open_editor,
-    _open_browser,
 )
-from cios.skills.process_control import kill_process_on_port
 from cios.skills.log_analysis import analyze_text
-from cios.skills.app_launcher import find_app, launch_app
+from cios.skills.process_control import kill_process_on_port
 
 logger = logging.getLogger(__name__)
 
@@ -29,20 +29,39 @@ logger = logging.getLogger(__name__)
 #  PROJECT SCANNING (for workflow_start)
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def _scan_project_dirs() -> list[str]:
     """Scan common directories for projects."""
     home = os.path.expanduser("~")
     search_roots = [
-        os.path.join(home, d) for d in
-        ("projetos", "projects", "dev", "code", "src", "workspace",
-         "repos", "github", "Development", "Code")
+        os.path.join(home, d)
+        for d in (
+            "projetos",
+            "projects",
+            "dev",
+            "code",
+            "src",
+            "workspace",
+            "repos",
+            "github",
+            "Development",
+            "Code",
+        )
     ]
     search_roots.append(home)
 
     markers = {
-        "package.json", "pyproject.toml", "Cargo.toml", "go.mod",
-        "pom.xml", "build.gradle", "Makefile", "CMakeLists.txt",
-        "Gemfile", "composer.json", ".git",
+        "package.json",
+        "pyproject.toml",
+        "Cargo.toml",
+        "go.mod",
+        "pom.xml",
+        "build.gradle",
+        "Makefile",
+        "CMakeLists.txt",
+        "Gemfile",
+        "composer.json",
+        ".git",
     }
 
     projects: list[str] = []
@@ -98,7 +117,9 @@ def handle_dev_start(intent: Intent, executor: Executor, memory: Memory) -> Plan
     """Start a development server for the current/specified project."""
     project = detect_project(intent.params.get("directory", "."))
     plan_steps, results, pid = execute_dev_start(
-        executor, project=project, memory=memory,
+        executor,
+        project=project,
+        memory=memory,
     )
 
     failed = [r for r in results if not r.success]
@@ -110,7 +131,9 @@ def handle_dev_start(intent: Intent, executor: Executor, memory: Memory) -> Plan
             kill_plan, kill_result = kill_process_on_port(executor, project.port)
             time.sleep(1)
             retry_plan, retry_results, retry_pid = execute_dev_start(
-                executor, project=project, memory=memory,
+                executor,
+                project=project,
+                memory=memory,
             )
             if retry_pid:
                 return PlanResult(
@@ -142,9 +165,11 @@ def handle_workflow_start(intent: Intent, executor: Executor, memory: Memory) ->
     project_query = intent.params.get("project", "")
     if not project_query:
         return PlanResult(
-            plan_steps=["No project specified"], results=[],
+            plan_steps=["No project specified"],
+            results=[],
             outcome="failure",
-            summary="Which project? e.g., 'quero trabalhar no meu-app'")
+            summary="Which project? e.g., 'quero trabalhar no meu-app'",
+        )
 
     plan_steps = ["Searching for project"]
     project_dirs = _scan_project_dirs()
@@ -170,9 +195,11 @@ def handle_workflow_start(intent: Intent, executor: Executor, memory: Memory) ->
             os.makedirs(project_path, exist_ok=True)
         except OSError:
             return PlanResult(
-                plan_steps=plan_steps, results=[],
+                plan_steps=plan_steps,
+                results=[],
                 outcome="failure",
-                summary=f"Não consegui criar o projeto '{project_query}'")
+                summary=f"Não consegui criar o projeto '{project_query}'",
+            )
 
         readme_path = os.path.join(project_path, "README.md")
         if not os.path.exists(readme_path):
@@ -185,8 +212,10 @@ def handle_workflow_start(intent: Intent, executor: Executor, memory: Memory) ->
         if shutil.which("git") and not os.path.exists(os.path.join(project_path, ".git")):
             try:
                 subprocess.run(
-                    ["git", "init"], cwd=project_path,
-                    capture_output=True, timeout=10,
+                    ["git", "init"],
+                    cwd=project_path,
+                    capture_output=True,
+                    timeout=10,
                 )
                 plan_steps.append("Git initialized")
             except Exception:
@@ -198,9 +227,11 @@ def handle_workflow_start(intent: Intent, executor: Executor, memory: Memory) ->
             _open_editor(editor_cmd, project_path)
 
         return PlanResult(
-            plan_steps=plan_steps, results=[],
+            plan_steps=plan_steps,
+            results=[],
             outcome="success",
-            summary=f"Projeto '{project_query}' criado e aberto no editor")
+            summary=f"Projeto '{project_query}' criado e aberto no editor",
+        )
 
     plan_steps.append(f"Found: {os.path.basename(match)}")
     project = detect_project(match)
@@ -214,7 +245,8 @@ def handle_workflow_start(intent: Intent, executor: Executor, memory: Memory) ->
         try:
             subprocess.Popen(
                 [editor_app.exec_command.split()[0], match],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
                 start_new_session=True,
             )
             editor_opened = True
@@ -229,7 +261,8 @@ def handle_workflow_start(intent: Intent, executor: Executor, memory: Memory) ->
             try:
                 subprocess.Popen(
                     [browser_app.exec_command.split()[0], f"http://localhost:{project.port}"],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
                     start_new_session=True,
                 )
                 browser_opened = True
@@ -243,16 +276,15 @@ def handle_workflow_start(intent: Intent, executor: Executor, memory: Memory) ->
         parts.append(f"Browser on localhost:{project.port}")
 
     from cios.skills.auto_learn import AutoLearner
+
     learner = AutoLearner()
     learner.record_execution(
-        intent.raw_input, "workflow_start",
-        {"project": project_query, "path": match},
-        "success")
+        intent.raw_input, "workflow_start", {"project": project_query, "path": match}, "success"
+    )
 
     return PlanResult(
-        plan_steps=plan_steps, results=[],
-        outcome="success",
-        summary="\n".join(parts))
+        plan_steps=plan_steps, results=[], outcome="success", summary="\n".join(parts)
+    )
 
 
 def handle_continue_project(intent: Intent, executor: Executor, memory: Memory) -> PlanResult:
@@ -264,7 +296,8 @@ def handle_continue_project(intent: Intent, executor: Executor, memory: Memory) 
         if latest is None:
             return PlanResult(
                 plan_steps=["Looking for recent project"],
-                results=[], outcome="failure",
+                results=[],
+                outcome="failure",
                 summary="No recent projects found. Start a project first.",
                 error="No sessions in memory",
             )
@@ -284,14 +317,15 @@ def handle_continue_project(intent: Intent, executor: Executor, memory: Memory) 
                 names = [f"  📁 {s.project_name}" for s in all_sessions[:8]]
                 return PlanResult(
                     plan_steps=["Searching for project"],
-                    results=[], outcome="failure",
-                    summary="Projeto não encontrado.\n\nProjetos disponíveis:\n"
-                            + "\n".join(names),
+                    results=[],
+                    outcome="failure",
+                    summary="Projeto não encontrado.\n\nProjetos disponíveis:\n" + "\n".join(names),
                     error="Project not found in sessions",
                 )
             return PlanResult(
                 plan_steps=["Searching for project"],
-                results=[], outcome="failure",
+                results=[],
+                outcome="failure",
                 summary="Projeto não encontrado. Nenhum projeto salvo.",
                 error="No sessions in memory",
             )
@@ -309,13 +343,14 @@ def handle_continue_project(intent: Intent, executor: Executor, memory: Memory) 
         if suggestions:
             msg += "\n\nProjetos disponíveis:\n" + "\n".join(suggestions[:8])
         return PlanResult(
-            plan_steps=plan_steps, results=[], outcome="failure",
-            summary=msg, error="Project path does not exist",
+            plan_steps=plan_steps,
+            results=[],
+            outcome="failure",
+            summary=msg,
+            error="Project path does not exist",
         )
 
-    server_running = (
-        session.server_port > 0 and _is_port_in_use(session.server_port)
-    )
+    server_running = session.server_port > 0 and _is_port_in_use(session.server_port)
 
     if server_running:
         plan_steps.append(f"Server already running on port {session.server_port}")
@@ -329,21 +364,26 @@ def handle_continue_project(intent: Intent, executor: Executor, memory: Memory) 
         plan_steps.append(f"Browser opened ({browser_url})")
 
         return PlanResult(
-            plan_steps=plan_steps, results=[], outcome="success",
+            plan_steps=plan_steps,
+            results=[],
+            outcome="success",
             summary=f"Workspace restored: {session.project_name}. Server already running.",
         )
     else:
         plan_steps.append("Server not running — starting full Dev Start")
         project = detect_project(session.project_path)
         dev_plan, dev_results, pid = execute_dev_start(
-            executor, project=project, memory=memory,
+            executor,
+            project=project,
+            memory=memory,
         )
         plan_steps.extend(dev_plan)
 
         failed = [r for r in dev_results if not r.success]
         if failed:
             return PlanResult(
-                plan_steps=plan_steps, results=dev_results,
+                plan_steps=plan_steps,
+                results=dev_results,
                 outcome="failure",
                 summary=f"Failed to restart project {session.project_name}.",
                 error=sanitize_error(
@@ -353,7 +393,8 @@ def handle_continue_project(intent: Intent, executor: Executor, memory: Memory) 
             )
 
         return PlanResult(
-            plan_steps=plan_steps, results=dev_results,
+            plan_steps=plan_steps,
+            results=dev_results,
             outcome="success",
             summary=f"Workspace restored: {session.project_name}. Server restarted.",
         )

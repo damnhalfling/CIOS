@@ -6,7 +6,6 @@ No LLM. Direct execution via /sys and brightnessctl.
 import logging
 import os
 import subprocess
-from typing import Optional
 
 import psutil
 
@@ -17,6 +16,7 @@ logger = logging.getLogger(__name__)
 #  BATTERY
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def get_battery() -> dict:
     """Get battery status.
 
@@ -24,8 +24,13 @@ def get_battery() -> dict:
     """
     battery = psutil.sensors_battery()
     if not battery:
-        return {"present": False, "percent": 100, "charging": False,
-                "time_remaining": "", "plugged": True}
+        return {
+            "present": False,
+            "percent": 100,
+            "charging": False,
+            "time_remaining": "",
+            "plugged": True,
+        }
 
     time_str = ""
     if battery.secsleft > 0 and not battery.power_plugged:
@@ -74,12 +79,15 @@ def battery_summary() -> tuple[list[str], str]:
 #  BRIGHTNESS
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def _run_brightness(*args: str) -> tuple[bool, str, str]:
     """Run brightnessctl command."""
     try:
         result = subprocess.run(
             ["brightnessctl"] + list(args),
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         return result.returncode == 0, result.stdout.strip(), result.stderr.strip()
     except FileNotFoundError:
@@ -103,6 +111,7 @@ def get_brightness() -> int:
     for line in stdout.splitlines():
         if "%" in line:
             import re
+
             match = re.search(r"\((\d+)%\)", line)
             if match:
                 return int(match.group(1))
@@ -135,6 +144,7 @@ def change_brightness(delta: int) -> tuple[list[str], bool, str]:
 #  POWER SAVING
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def enable_power_saving() -> tuple[list[str], bool, str]:
     """Enable power saving mode: reduce brightness + set CPU to powersave."""
     steps = ["Enabling power saving mode"]
@@ -153,7 +163,10 @@ def enable_power_saving() -> tuple[list[str], bool, str]:
         if os.path.exists(gov_path):
             subprocess.run(
                 ["sudo", "-n", "tee", gov_path],
-                input="powersave", capture_output=True, text=True, timeout=5,
+                input="powersave",
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             steps.append("CPU set to power saving mode")
     except Exception:

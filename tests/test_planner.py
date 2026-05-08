@@ -1,14 +1,14 @@
 """Tests for the Planner module."""
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
-from cios.core.executor import Executor, ExecResult
+from cios.core.executor import Executor
 from cios.core.intent_parser import Intent, IntentType
+from cios.core.mcp import AudioState, BatteryState, ContextSnapshot, WifiState
 from cios.core.memory import Memory
-from cios.core.mcp import ContextSnapshot, WifiState, AudioState, BatteryState
-from cios.core.planner import Planner, PlanResult
+from cios.core.planner import Planner
 
 
 @pytest.fixture
@@ -17,8 +17,10 @@ def planner(tmp_path):
     from unittest.mock import patch as _patch
 
     db_path = tmp_path / "test_planner.db"
-    with _patch("cios.core.config.DB_PATH", db_path), \
-         _patch("cios.core.config.ensure_dirs", lambda: None):
+    with (
+        _patch("cios.core.config.DB_PATH", db_path),
+        _patch("cios.core.config.ensure_dirs", lambda: None),
+    ):
         executor = Executor()
         memory = Memory()
         p = Planner(executor, memory)
@@ -65,7 +67,10 @@ class TestMCOPrecheck:
         mock_snap = ContextSnapshot(
             audio=AudioState(volume=75, muted=False),
         )
-        with patch("cios.core.planner.mcp") as mock_mcp,              patch("cios.core.handlers.audio.mcp") as mock_mcp2:
+        with (
+            patch("cios.core.planner.mcp") as mock_mcp,
+            patch("cios.core.handlers.audio.mcp") as mock_mcp2,
+        ):
             mock_mcp.snapshot.return_value = mock_snap
             mock_mcp.audio = mock_snap.audio
             mock_mcp2.audio = mock_snap.audio
@@ -94,7 +99,10 @@ class TestMCOPrecheck:
         mock_snap = ContextSnapshot(
             wifi=WifiState(connected=True, ssid="Casa", signal=90, ip="192.168.1.5"),
         )
-        with patch("cios.core.planner.mcp") as mock_mcp,              patch("cios.core.handlers.network.mcp") as mock_mcp2:
+        with (
+            patch("cios.core.planner.mcp") as mock_mcp,
+            patch("cios.core.handlers.network.mcp") as mock_mcp2,
+        ):
             mock_mcp.snapshot.return_value = mock_snap
             mock_mcp.wifi = mock_snap.wifi
             mock_mcp2.wifi = mock_snap.wifi
@@ -109,13 +117,17 @@ class TestMCOPrecheck:
         mock_snap = ContextSnapshot(
             wifi=WifiState(connected=True, ssid="Casa", signal=90),
         )
-        with patch("cios.core.planner.mcp") as mock_mcp,              patch("cios.core.handlers.network.mcp") as mock_mcp2:
+        with (
+            patch("cios.core.planner.mcp") as mock_mcp,
+            patch("cios.core.handlers.network.mcp") as mock_mcp2,
+        ):
             mock_mcp.snapshot.return_value = mock_snap
             mock_mcp.wifi = mock_snap.wifi
             mock_mcp2.wifi = mock_snap.wifi
 
             intent = Intent(
-                type=IntentType.NETWORK, confidence=0.9,
+                type=IntentType.NETWORK,
+                confidence=0.9,
                 params={"action": "connect", "ssid": "Casa"},
             )
             result = planner.execute(intent)
@@ -128,7 +140,8 @@ class TestPlannerCommandExec:
 
     def test_command_exec_success(self, planner):
         intent = Intent(
-            type=IntentType.COMMAND_EXEC, confidence=0.9,
+            type=IntentType.COMMAND_EXEC,
+            confidence=0.9,
             params={"command": "echo hello world"},
             raw_input="run echo hello world",
         )
@@ -138,7 +151,8 @@ class TestPlannerCommandExec:
 
     def test_command_exec_failure(self, planner):
         intent = Intent(
-            type=IntentType.COMMAND_EXEC, confidence=0.9,
+            type=IntentType.COMMAND_EXEC,
+            confidence=0.9,
             params={"command": "false"},
             raw_input="run false",
         )
@@ -153,13 +167,17 @@ class TestPlannerPower:
         mock_snap = ContextSnapshot(
             battery=BatteryState(present=False),
         )
-        with patch("cios.core.planner.mcp") as mock_mcp,              patch("cios.core.handlers.system.mcp") as mock_mcp2:
+        with (
+            patch("cios.core.planner.mcp") as mock_mcp,
+            patch("cios.core.handlers.system.mcp") as mock_mcp2,
+        ):
             mock_mcp.snapshot.return_value = mock_snap
             mock_mcp.battery = mock_snap.battery
             mock_mcp2.battery = mock_snap.battery
 
             intent = Intent(
-                type=IntentType.POWER, confidence=0.9,
+                type=IntentType.POWER,
+                confidence=0.9,
                 params={"action": "battery_status"},
                 raw_input="quanta bateria",
             )
@@ -171,13 +189,17 @@ class TestPlannerPower:
         mock_snap = ContextSnapshot(
             battery=BatteryState(present=True, percent=10, charging=False, time_remaining="0h30m"),
         )
-        with patch("cios.core.planner.mcp") as mock_mcp,              patch("cios.core.handlers.system.mcp") as mock_mcp2:
+        with (
+            patch("cios.core.planner.mcp") as mock_mcp,
+            patch("cios.core.handlers.system.mcp") as mock_mcp2,
+        ):
             mock_mcp.snapshot.return_value = mock_snap
             mock_mcp.battery = mock_snap.battery
             mock_mcp2.battery = mock_snap.battery
 
             intent = Intent(
-                type=IntentType.POWER, confidence=0.9,
+                type=IntentType.POWER,
+                confidence=0.9,
                 params={"action": "battery_status"},
                 raw_input="battery status",
             )
@@ -192,7 +214,8 @@ class TestPlannerMemoryIntegration:
 
     def test_stores_success_in_memory(self, planner):
         intent = Intent(
-            type=IntentType.COMMAND_EXEC, confidence=0.9,
+            type=IntentType.COMMAND_EXEC,
+            confidence=0.9,
             params={"command": "echo test"},
             raw_input="run echo test",
         )
@@ -205,7 +228,8 @@ class TestPlannerMemoryIntegration:
 
     def test_stores_failure_in_memory(self, planner):
         intent = Intent(
-            type=IntentType.COMMAND_EXEC, confidence=0.9,
+            type=IntentType.COMMAND_EXEC,
+            confidence=0.9,
             params={"command": "exit 1"},
             raw_input="run exit 1",
         )
@@ -230,28 +254,32 @@ class TestContinueProjectHandler:
         from cios.core.memory import SessionContext
 
         # Save two sessions with different timestamps — "beta" is more recent
-        planner.memory.save_session(SessionContext(
-            project_name="alpha",
-            project_path="/tmp/alpha",
-            project_type="node",
-            editor_command="code",
-            server_pid=1000,
-            server_port=3000,
-            browser_url="http://localhost:3000",
-            start_command="npm run dev",
-            timestamp=100.0,
-        ))
-        planner.memory.save_session(SessionContext(
-            project_name="beta",
-            project_path="/tmp/beta",
-            project_type="node",
-            editor_command="code",
-            server_pid=2000,
-            server_port=4000,
-            browser_url="http://localhost:4000",
-            start_command="npm run dev",
-            timestamp=200.0,
-        ))
+        planner.memory.save_session(
+            SessionContext(
+                project_name="alpha",
+                project_path="/tmp/alpha",
+                project_type="node",
+                editor_command="code",
+                server_pid=1000,
+                server_port=3000,
+                browser_url="http://localhost:3000",
+                start_command="npm run dev",
+                timestamp=100.0,
+            )
+        )
+        planner.memory.save_session(
+            SessionContext(
+                project_name="beta",
+                project_path="/tmp/beta",
+                project_type="node",
+                editor_command="code",
+                server_pid=2000,
+                server_port=4000,
+                browser_url="http://localhost:4000",
+                start_command="npm run dev",
+                timestamp=200.0,
+            )
+        )
 
         intent = Intent(
             type=IntentType.CONTINUE_PROJECT,
@@ -260,12 +288,13 @@ class TestContinueProjectHandler:
             raw_input="continuar",
         )
 
-        with patch("cios.core.handlers.dev._is_port_in_use", return_value=True), \
-             patch("cios.core.handlers.dev._detect_editor", return_value="code"), \
-             patch("cios.core.handlers.dev._open_editor") as mock_editor, \
-             patch("cios.core.handlers.dev._open_browser") as mock_browser, \
-             patch("os.path.exists", return_value=True):
-
+        with (
+            patch("cios.core.handlers.dev._is_port_in_use", return_value=True),
+            patch("cios.core.handlers.dev._detect_editor", return_value="code"),
+            patch("cios.core.handlers.dev._open_editor") as mock_editor,
+            patch("cios.core.handlers.dev._open_browser") as mock_browser,
+            patch("os.path.exists", return_value=True),
+        ):
             result = planner._handle_continue_project(intent)
 
         assert result.outcome == "success"
@@ -281,17 +310,19 @@ class TestContinueProjectHandler:
         """
         from cios.core.memory import SessionContext
 
-        planner.memory.save_session(SessionContext(
-            project_name="fidelidade",
-            project_path="/tmp/fidelidade",
-            project_type="node",
-            editor_command="code",
-            server_pid=5000,
-            server_port=3001,
-            browser_url="http://localhost:3001",
-            start_command="npm run dev",
-            timestamp=300.0,
-        ))
+        planner.memory.save_session(
+            SessionContext(
+                project_name="fidelidade",
+                project_path="/tmp/fidelidade",
+                project_type="node",
+                editor_command="code",
+                server_pid=5000,
+                server_port=3001,
+                browser_url="http://localhost:3001",
+                start_command="npm run dev",
+                timestamp=300.0,
+            )
+        )
 
         intent = Intent(
             type=IntentType.CONTINUE_PROJECT,
@@ -300,12 +331,13 @@ class TestContinueProjectHandler:
             raw_input="continuar projeto fidelidade",
         )
 
-        with patch("cios.core.handlers.dev._is_port_in_use", return_value=True), \
-             patch("cios.core.handlers.dev._detect_editor", return_value="code"), \
-             patch("cios.core.handlers.dev._open_editor") as mock_editor, \
-             patch("cios.core.handlers.dev._open_browser") as mock_browser, \
-             patch("os.path.exists", return_value=True):
-
+        with (
+            patch("cios.core.handlers.dev._is_port_in_use", return_value=True),
+            patch("cios.core.handlers.dev._detect_editor", return_value="code"),
+            patch("cios.core.handlers.dev._open_editor") as mock_editor,
+            patch("cios.core.handlers.dev._open_browser") as mock_browser,
+            patch("os.path.exists", return_value=True),
+        ):
             result = planner._handle_continue_project(intent)
 
         assert result.outcome == "success"
@@ -320,26 +352,30 @@ class TestContinueProjectHandler:
         """
         from cios.core.memory import SessionContext
 
-        planner.memory.save_session(SessionContext(
-            project_name="deleted-app",
-            project_path="/tmp/deleted-app",
-            project_type="node",
-            editor_command="code",
-            server_port=3000,
-            browser_url="http://localhost:3000",
-            start_command="npm run dev",
-            timestamp=100.0,
-        ))
-        planner.memory.save_session(SessionContext(
-            project_name="other-project",
-            project_path="/tmp/other-project",
-            project_type="python",
-            editor_command="code",
-            server_port=8000,
-            browser_url="http://localhost:8000",
-            start_command="python manage.py runserver",
-            timestamp=200.0,
-        ))
+        planner.memory.save_session(
+            SessionContext(
+                project_name="deleted-app",
+                project_path="/tmp/deleted-app",
+                project_type="node",
+                editor_command="code",
+                server_port=3000,
+                browser_url="http://localhost:3000",
+                start_command="npm run dev",
+                timestamp=100.0,
+            )
+        )
+        planner.memory.save_session(
+            SessionContext(
+                project_name="other-project",
+                project_path="/tmp/other-project",
+                project_type="python",
+                editor_command="code",
+                server_port=8000,
+                browser_url="http://localhost:8000",
+                start_command="python manage.py runserver",
+                timestamp=200.0,
+            )
+        )
 
         intent = Intent(
             type=IntentType.CONTINUE_PROJECT,
@@ -350,9 +386,7 @@ class TestContinueProjectHandler:
 
         def fake_exists(path):
             # deleted-app path doesn't exist, other-project does
-            if "deleted-app" in str(path):
-                return False
-            return True
+            return "deleted-app" not in str(path)
 
         with patch("os.path.exists", side_effect=fake_exists):
             result = planner._handle_continue_project(intent)
@@ -386,26 +420,30 @@ class TestContinueProjectHandler:
         """
         from cios.core.memory import SessionContext
 
-        planner.memory.save_session(SessionContext(
-            project_name="webapp",
-            project_path="/tmp/webapp",
-            project_type="node",
-            editor_command="code",
-            server_port=3000,
-            browser_url="http://localhost:3000",
-            start_command="npm run dev",
-            timestamp=100.0,
-        ))
-        planner.memory.save_session(SessionContext(
-            project_name="api-service",
-            project_path="/tmp/api-service",
-            project_type="python",
-            editor_command="code",
-            server_port=8000,
-            browser_url="http://localhost:8000",
-            start_command="python manage.py runserver",
-            timestamp=200.0,
-        ))
+        planner.memory.save_session(
+            SessionContext(
+                project_name="webapp",
+                project_path="/tmp/webapp",
+                project_type="node",
+                editor_command="code",
+                server_port=3000,
+                browser_url="http://localhost:3000",
+                start_command="npm run dev",
+                timestamp=100.0,
+            )
+        )
+        planner.memory.save_session(
+            SessionContext(
+                project_name="api-service",
+                project_path="/tmp/api-service",
+                project_type="python",
+                editor_command="code",
+                server_port=8000,
+                browser_url="http://localhost:8000",
+                start_command="python manage.py runserver",
+                timestamp=200.0,
+            )
+        )
 
         intent = Intent(
             type=IntentType.CONTINUE_PROJECT,

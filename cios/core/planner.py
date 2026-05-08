@@ -4,34 +4,48 @@ Keeps plans to 2-5 steps. Handles one retry on failure.
 Delegates execution to domain-specific handlers in cios.core.handlers/.
 """
 
-import time
 import logging
-from typing import Optional
+import time
 
 from cios.core.executor import Executor
-from cios.core.intent_parser import Intent, IntentType
-from cios.core.memory import Memory, MemoryRecord
-from cios.core.mcp import context as mcp
 
 # Re-export PlanResult for backward compatibility
-from cios.core.handlers._common import PlanResult, sanitize_error as _sanitize_error, resilient_call as _resilient_call
+from cios.core.handlers._common import PlanResult
+from cios.core.handlers.apps import handle_app_launch, handle_explore_system, handle_list_apps
+from cios.core.handlers.audio import handle_audio
 
 # Import all handlers
-from cios.core.handlers.dev import handle_dev_start, handle_workflow_start, handle_continue_project
-from cios.core.handlers.process import handle_process_control, handle_status
-from cios.core.handlers.logs import handle_log_analysis, handle_fix_last_error
-from cios.core.handlers.system import handle_system_health, handle_session, handle_power
-from cios.core.handlers.files import handle_file_organize, handle_files_search, handle_files_open
-from cios.core.handlers.network import handle_network
-from cios.core.handlers.audio import handle_audio
+from cios.core.handlers.dev import (  # noqa: F401
+    _find_project,
+    _scan_project_dirs,
+    handle_continue_project,
+    handle_dev_start,
+    handle_workflow_start,
+)
 from cios.core.handlers.disk import handle_disk
-from cios.core.handlers.apps import handle_app_launch, handle_list_apps, handle_explore_system
+from cios.core.handlers.files import handle_file_organize, handle_files_open, handle_files_search
+from cios.core.handlers.gallery import handle_gallery_manage
+from cios.core.handlers.logs import handle_fix_last_error, handle_log_analysis
+from cios.core.handlers.media import handle_intent_browse, handle_intent_media, handle_intent_write
+from cios.core.handlers.misc import handle_command_exec, handle_intelligence, handle_self_update
+from cios.core.handlers.network import handle_network
 from cios.core.handlers.packages import handle_package
 from cios.core.handlers.peripherals import handle_bluetooth, handle_clipboard, handle_window
-from cios.core.handlers.media import handle_intent_media, handle_intent_browse, handle_intent_write
-from cios.core.handlers.gallery import handle_gallery_manage
+from cios.core.handlers.process import handle_process_control, handle_status
 from cios.core.handlers.screen_capture import handle_screen_capture
-from cios.core.handlers.misc import handle_command_exec, handle_self_update, handle_intelligence
+from cios.core.handlers.system import handle_power, handle_session, handle_system_health
+from cios.core.intent_parser import Intent, IntentType
+from cios.core.mcp import context as mcp
+from cios.core.memory import Memory, MemoryRecord
+from cios.skills import audio as audio_skill  # noqa: F401
+from cios.skills import bluetooth as bt_skill  # noqa: F401
+from cios.skills import clipboard as clipboard_skill  # noqa: F401
+from cios.skills import network as network_skill  # noqa: F401
+from cios.skills import package_manager as pkg_skill  # noqa: F401
+from cios.skills import power as power_skill  # noqa: F401
+from cios.skills import self_update as update_skill  # noqa: F401
+from cios.skills import window_control as window_skill  # noqa: F401
+from cios.skills.app_launcher import find_app, launch_app  # noqa: F401
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  BACKWARD-COMPATIBLE RE-EXPORTS
@@ -39,38 +53,31 @@ from cios.core.handlers.misc import handle_command_exec, handle_self_update, han
 #  that handlers use. This keeps existing tests working without changes.
 # ═══════════════════════════════════════════════════════════════════════════
 from cios.skills.dev_start import (  # noqa: F401
+    _detect_editor,
+    _is_port_in_use,
+    _open_browser,
+    _open_editor,
     detect_project,
     execute_dev_start,
-    _is_port_in_use,
-    _detect_editor,
-    _open_editor,
-    _open_browser,
 )
+from cios.skills.disk_analysis import analyze_disk, clean_safe  # noqa: F401
+from cios.skills.explore_system import (  # noqa: F401
+    format_capabilities,
+    list_installed_apps_grouped,
+)
+from cios.skills.file_organize import organize_directory  # noqa: F401
+from cios.skills.file_search import find_and_open, search_files  # noqa: F401
+from cios.skills.log_analysis import analyze_text  # noqa: F401
 from cios.skills.process_control import (  # noqa: F401
     find_process_on_port,
     kill_process_on_port,
     list_listening_ports,
 )
-from cios.skills.log_analysis import analyze_text  # noqa: F401
-from cios.skills.file_organize import organize_directory  # noqa: F401
-from cios.skills.system_health import check_system_health  # noqa: F401
-from cios.skills.app_launcher import find_app, launch_app  # noqa: F401
 from cios.skills.session_control import (  # noqa: F401
     execute_session_action,
     get_session_action,
 )
-from cios.skills import network as network_skill  # noqa: F401
-from cios.skills import audio as audio_skill  # noqa: F401
-from cios.skills.disk_analysis import analyze_disk, clean_safe  # noqa: F401
-from cios.skills import power as power_skill  # noqa: F401
-from cios.skills import package_manager as pkg_skill  # noqa: F401
-from cios.skills import clipboard as clipboard_skill  # noqa: F401
-from cios.skills import window_control as window_skill  # noqa: F401
-from cios.skills import self_update as update_skill  # noqa: F401
-from cios.skills import bluetooth as bt_skill  # noqa: F401
-from cios.skills.explore_system import format_capabilities, list_installed_apps_grouped  # noqa: F401
-from cios.skills.file_search import search_files, find_and_open  # noqa: F401
-from cios.core.handlers.dev import _scan_project_dirs, _find_project  # noqa: F401
+from cios.skills.system_health import check_system_health  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -146,11 +153,18 @@ class Planner:
         # MCO: context-aware pre-check
         mco_result = self._mco_precheck(intent)
         if mco_result:
-            self.memory.store(MemoryRecord(
-                timestamp=time.time(), user_input=intent.raw_input,
-                intent=intent.type.value, plan=mco_result.plan_steps,
-                commands=[], outcome=mco_result.outcome,
-                error=mco_result.error, context=intent.params))
+            self.memory.store(
+                MemoryRecord(
+                    timestamp=time.time(),
+                    user_input=intent.raw_input,
+                    intent=intent.type.value,
+                    plan=mco_result.plan_steps,
+                    commands=[],
+                    outcome=mco_result.outcome,
+                    error=mco_result.error,
+                    context=intent.params,
+                )
+            )
             return mco_result
 
         # Delegate to the appropriate handler
@@ -172,7 +186,7 @@ class Planner:
 
         return result
 
-    def _mco_precheck(self, intent: Intent) -> Optional[PlanResult]:
+    def _mco_precheck(self, intent: Intent) -> PlanResult | None:
         """MCO: context-aware decision layer.
 
         Consults MCP before execution. Returns a PlanResult if the MCO
@@ -192,13 +206,17 @@ class Planner:
             if action == "mute" and state.audio.muted:
                 return PlanResult(
                     plan_steps=["Checking volume"],
-                    results=[], outcome="success",
-                    summary=f"Already muted (volume at {state.audio.volume}%)")
+                    results=[],
+                    outcome="success",
+                    summary=f"Already muted (volume at {state.audio.volume}%)",
+                )
             if action == "unmute" and not state.audio.muted:
                 return PlanResult(
                     plan_steps=["Checking volume"],
-                    results=[], outcome="success",
-                    summary=f"Already unmuted (volume at {state.audio.volume}%)")
+                    results=[],
+                    outcome="success",
+                    summary=f"Already unmuted (volume at {state.audio.volume}%)",
+                )
 
         # NETWORK: already connected short-circuit
         if intent.type == IntentType.NETWORK:
@@ -206,8 +224,10 @@ class Planner:
             if action == "disconnect" and not state.wifi.connected:
                 return PlanResult(
                     plan_steps=["Checking Wi-Fi"],
-                    results=[], outcome="success",
-                    summary="Already disconnected")
+                    results=[],
+                    outcome="success",
+                    summary="Already disconnected",
+                )
 
         # BLUETOOTH: power already in desired state
         if intent.type == IntentType.BLUETOOTH:
@@ -215,13 +235,17 @@ class Planner:
             if action == "power_on" and state.bluetooth_powered:
                 return PlanResult(
                     plan_steps=["Checking Bluetooth"],
-                    results=[], outcome="success",
-                    summary="Bluetooth is already on")
+                    results=[],
+                    outcome="success",
+                    summary="Bluetooth is already on",
+                )
             if action == "power_off" and not state.bluetooth_powered:
                 return PlanResult(
                     plan_steps=["Checking Bluetooth"],
-                    results=[], outcome="success",
-                    summary="Bluetooth is already off")
+                    results=[],
+                    outcome="success",
+                    summary="Bluetooth is already off",
+                )
 
         return None
 

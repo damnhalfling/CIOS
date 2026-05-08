@@ -4,11 +4,10 @@ Supports both PulseAudio (pactl) and PipeWire (wpctl).
 Auto-detects which is available. All execution is direct (no LLM).
 """
 
+import logging
 import re
 import shutil
 import subprocess
-import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +15,7 @@ logger = logging.getLogger(__name__)
 #  BACKEND DETECTION
 # ═══════════════════════════════════════════════════════════════════════════
 
-_backend: Optional[str] = None  # "pactl", "wpctl", or None
+_backend: str | None = None  # "pactl", "wpctl", or None
 
 
 def _detect_backend() -> str:
@@ -41,7 +40,9 @@ def _detect_backend() -> str:
         try:
             r = subprocess.run(
                 ["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"],
-                capture_output=True, text=True, timeout=3,
+                capture_output=True,
+                text=True,
+                timeout=3,
             )
             if r.returncode == 0:
                 _backend = "wpctl"
@@ -71,6 +72,7 @@ def _run(cmd: list[str], timeout: int = 5) -> tuple[bool, str, str]:
 # ═══════════════════════════════════════════════════════════════════════════
 #  PUBLIC API
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def is_available() -> bool:
     """Check if any audio backend is available."""
@@ -141,17 +143,14 @@ def change_volume(delta: int) -> tuple[list[str], bool, str]:
     if backend == "pactl":
         sign = "+" if delta > 0 else "-"
         amount = abs(delta)
-        ok, _, stderr = _run(
-            ["pactl", "set-sink-volume", "@DEFAULT_SINK@", f"{sign}{amount}%"])
+        ok, _, stderr = _run(["pactl", "set-sink-volume", "@DEFAULT_SINK@", f"{sign}{amount}%"])
 
     elif backend == "wpctl":
         amount = abs(delta)
         if delta > 0:
-            ok, _, stderr = _run(
-                ["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", f"{amount}%+"])
+            ok, _, stderr = _run(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", f"{amount}%+"])
         else:
-            ok, _, stderr = _run(
-                ["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", f"{amount}%-"])
+            ok, _, stderr = _run(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", f"{amount}%-"])
     else:
         return ["Adjusting volume"], False, _no_backend_msg()
 
@@ -162,7 +161,7 @@ def change_volume(delta: int) -> tuple[list[str], bool, str]:
     return ["Adjusting volume"], False, _humanize_error(stderr)
 
 
-def mute(state: Optional[bool] = None) -> tuple[list[str], bool, str]:
+def mute(state: bool | None = None) -> tuple[list[str], bool, str]:
     """Mute, unmute, or toggle mute.
 
     Args:
@@ -210,11 +209,13 @@ def list_sinks() -> list[dict]:
         for line in stdout.splitlines():
             parts = line.split("\t")
             if len(parts) >= 2:
-                sinks.append({
-                    "id": parts[0],
-                    "name": parts[1],
-                    "state": parts[4] if len(parts) > 4 else "unknown",
-                })
+                sinks.append(
+                    {
+                        "id": parts[0],
+                        "name": parts[1],
+                        "state": parts[4] if len(parts) > 4 else "unknown",
+                    }
+                )
         return sinks
 
     elif backend == "wpctl":
@@ -234,11 +235,13 @@ def list_sinks() -> list[dict]:
                 # Parse lines like " *  47. Built-in Audio Analog Stereo [vol: 0.64]"
                 match = re.match(r"\s+[*│ ]*\s*(\d+)\.\s+(.+?)(?:\s+\[|$)", line)
                 if match:
-                    sinks.append({
-                        "id": match.group(1),
-                        "name": match.group(2).strip(),
-                        "state": "active" if "*" in line else "idle",
-                    })
+                    sinks.append(
+                        {
+                            "id": match.group(1),
+                            "name": match.group(2).strip(),
+                            "state": "active" if "*" in line else "idle",
+                        }
+                    )
         return sinks
 
     return []
@@ -263,6 +266,7 @@ def set_default_sink(sink_name: str) -> tuple[list[str], bool, str]:
 # ═══════════════════════════════════════════════════════════════════════════
 #  ERROR MESSAGES
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def _no_backend_msg() -> str:
     return "Audio system not available. Install pulseaudio-utils or pipewire."

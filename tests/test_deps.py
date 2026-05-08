@@ -1,18 +1,14 @@
 """Tests for the dependency checker with graceful degradation."""
 
-from unittest.mock import patch, MagicMock
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 from cios.infra.deps import (
-    check_and_install_deps,
-    get_missing_tools,
-    get_degraded_features,
-    is_tool_available,
     DEPENDENCY_REGISTRY,
     _has_passwordless_sudo,
-    _missing_tools,
-    _degraded_features,
+    check_and_install_deps,
+    get_degraded_features,
+    get_missing_tools,
+    is_tool_available,
 )
 
 
@@ -37,9 +33,9 @@ class TestDependencyRegistry:
     def test_degraded_messages_are_humanized(self):
         """Degradation messages should be in PT-BR, not technical."""
         for dep in DEPENDENCY_REGISTRY:
-            assert "indisponível" in dep.degraded_msg or "indisponíveis" in dep.degraded_msg, (
-                f"{dep.binary} degraded_msg should contain 'indisponível': {dep.degraded_msg}"
-            )
+            assert (
+                "indisponível" in dep.degraded_msg or "indisponíveis" in dep.degraded_msg
+            ), f"{dep.binary} degraded_msg should contain 'indisponível': {dep.degraded_msg}"
 
 
 class TestCheckAndInstallDeps:
@@ -55,13 +51,16 @@ class TestCheckAndInstallDeps:
 
     def test_missing_nmcli_tracked(self):
         """Missing nmcli is tracked as degraded."""
+
         def fake_which(binary):
             if binary == "nmcli":
                 return None
             return f"/usr/bin/{binary}"
 
-        with patch("cios.infra.deps.shutil.which", side_effect=fake_which), \
-             patch("cios.infra.deps._try_install", return_value=False):
+        with (
+            patch("cios.infra.deps.shutil.which", side_effect=fake_which),
+            patch("cios.infra.deps._try_install", return_value=False),
+        ):
             result = check_and_install_deps()
             assert "nmcli" in result
             assert "nmcli" in get_missing_tools()
@@ -69,39 +68,48 @@ class TestCheckAndInstallDeps:
 
     def test_missing_pactl_tracked(self):
         """Missing pactl is tracked as degraded."""
+
         def fake_which(binary):
             if binary == "pactl":
                 return None
             return f"/usr/bin/{binary}"
 
-        with patch("cios.infra.deps.shutil.which", side_effect=fake_which), \
-             patch("cios.infra.deps._try_install", return_value=False):
+        with (
+            patch("cios.infra.deps.shutil.which", side_effect=fake_which),
+            patch("cios.infra.deps._try_install", return_value=False),
+        ):
             result = check_and_install_deps()
             assert "pactl" in result
             assert "Áudio indisponível" in get_degraded_features().values()
 
     def test_missing_bluetoothctl_tracked(self):
         """Missing bluetoothctl is tracked as degraded."""
+
         def fake_which(binary):
             if binary == "bluetoothctl":
                 return None
             return f"/usr/bin/{binary}"
 
-        with patch("cios.infra.deps.shutil.which", side_effect=fake_which), \
-             patch("cios.infra.deps._try_install", return_value=False):
+        with (
+            patch("cios.infra.deps.shutil.which", side_effect=fake_which),
+            patch("cios.infra.deps._try_install", return_value=False),
+        ):
             result = check_and_install_deps()
             assert "bluetoothctl" in result
             assert "Bluetooth indisponível" in get_degraded_features().values()
 
     def test_missing_xdotool_wmctrl_tracked(self):
         """Missing xdotool/wmctrl tracked as window control degraded."""
+
         def fake_which(binary):
             if binary in ("xdotool", "wmctrl"):
                 return None
             return f"/usr/bin/{binary}"
 
-        with patch("cios.infra.deps.shutil.which", side_effect=fake_which), \
-             patch("cios.infra.deps._try_install", return_value=False):
+        with (
+            patch("cios.infra.deps.shutil.which", side_effect=fake_which),
+            patch("cios.infra.deps._try_install", return_value=False),
+        ):
             result = check_and_install_deps()
             assert "xdotool" in result
             assert "wmctrl" in result
@@ -122,20 +130,25 @@ class TestCheckAndInstallDeps:
                 return "/usr/bin/nmcli"
             return f"/usr/bin/{binary}"
 
-        with patch("cios.infra.deps.shutil.which", side_effect=fake_which), \
-             patch("cios.infra.deps._try_install", return_value=True):
+        with (
+            patch("cios.infra.deps.shutil.which", side_effect=fake_which),
+            patch("cios.infra.deps._try_install", return_value=True),
+        ):
             result = check_and_install_deps()
             assert "nmcli" not in result
 
     def test_install_failure_logs_warning(self):
         """When install fails, tools remain in missing list."""
+
         def fake_which(binary):
             if binary == "nmcli":
                 return None
             return f"/usr/bin/{binary}"
 
-        with patch("cios.infra.deps.shutil.which", side_effect=fake_which), \
-             patch("cios.infra.deps._try_install", return_value=False):
+        with (
+            patch("cios.infra.deps.shutil.which", side_effect=fake_which),
+            patch("cios.infra.deps._try_install", return_value=False),
+        ):
             result = check_and_install_deps()
             assert "nmcli" in result
 
@@ -148,8 +161,10 @@ class TestCheckAndInstallDeps:
                 return None
             return f"/usr/bin/{binary}"
 
-        with patch("cios.infra.deps.shutil.which", side_effect=fake_which), \
-             patch("cios.infra.deps._try_install", return_value=False):
+        with (
+            patch("cios.infra.deps.shutil.which", side_effect=fake_which),
+            patch("cios.infra.deps._try_install", return_value=False),
+        ):
             result = check_and_install_deps()
             for tool in missing_set:
                 assert tool in result
@@ -157,13 +172,16 @@ class TestCheckAndInstallDeps:
 
     def test_is_tool_available_reflects_state(self):
         """is_tool_available returns correct state after check."""
+
         def fake_which(binary):
             if binary == "nmcli":
                 return None
             return f"/usr/bin/{binary}"
 
-        with patch("cios.infra.deps.shutil.which", side_effect=fake_which), \
-             patch("cios.infra.deps._try_install", return_value=False):
+        with (
+            patch("cios.infra.deps.shutil.which", side_effect=fake_which),
+            patch("cios.infra.deps._try_install", return_value=False),
+        ):
             check_and_install_deps()
             assert is_tool_available("nmcli") is False
             assert is_tool_available("pactl") is True
@@ -175,15 +193,19 @@ class TestInstallStrategies:
     def test_has_passwordless_sudo_true(self):
         mock_result = MagicMock()
         mock_result.returncode = 0
-        with patch("cios.infra.deps.shutil.which", return_value="/usr/bin/sudo"), \
-             patch("subprocess.run", return_value=mock_result):
+        with (
+            patch("cios.infra.deps.shutil.which", return_value="/usr/bin/sudo"),
+            patch("subprocess.run", return_value=mock_result),
+        ):
             assert _has_passwordless_sudo() is True
 
     def test_has_passwordless_sudo_false(self):
         mock_result = MagicMock()
         mock_result.returncode = 1
-        with patch("cios.infra.deps.shutil.which", return_value="/usr/bin/sudo"), \
-             patch("subprocess.run", return_value=mock_result):
+        with (
+            patch("cios.infra.deps.shutil.which", return_value="/usr/bin/sudo"),
+            patch("subprocess.run", return_value=mock_result),
+        ):
             assert _has_passwordless_sudo() is False
 
     def test_has_passwordless_sudo_no_sudo(self):
@@ -195,7 +217,8 @@ class TestMCPScannerGracefulDegradation:
     """Verify MCP scanners return safe defaults when tools are missing."""
 
     def test_wifi_scanner_returns_default_on_missing_nmcli(self):
-        from cios.core.mcp import _scan_wifi, WifiState
+        from cios.core.mcp import WifiState, _scan_wifi
+
         with patch("subprocess.run", side_effect=FileNotFoundError("nmcli")):
             state = _scan_wifi()
             assert isinstance(state, WifiState)
@@ -203,7 +226,8 @@ class TestMCPScannerGracefulDegradation:
             assert state.ssid == ""
 
     def test_audio_scanner_returns_default_on_missing_pactl_and_wpctl(self):
-        from cios.core.mcp import _scan_audio, AudioState
+        from cios.core.mcp import AudioState, _scan_audio
+
         with patch("subprocess.run", side_effect=FileNotFoundError("pactl")):
             state = _scan_audio()
             assert isinstance(state, AudioState)
@@ -211,7 +235,8 @@ class TestMCPScannerGracefulDegradation:
             assert state.muted is False
 
     def test_bluetooth_scanner_returns_default_on_missing_bluetoothctl(self):
-        from cios.core.mcp import _scan_bluetooth, BluetoothState
+        from cios.core.mcp import BluetoothState, _scan_bluetooth
+
         with patch("subprocess.run", side_effect=FileNotFoundError("bluetoothctl")):
             state = _scan_bluetooth()
             assert isinstance(state, BluetoothState)
@@ -220,6 +245,7 @@ class TestMCPScannerGracefulDegradation:
 
     def test_known_networks_returns_empty_on_missing_nmcli(self):
         from cios.core.mcp import _scan_known_networks
+
         with patch("subprocess.run", side_effect=FileNotFoundError("nmcli")):
             networks = _scan_known_networks()
             assert networks == []

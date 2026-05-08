@@ -9,7 +9,7 @@ Validates: Requirements 1.1, 2.2, 2.3, 4.1
 """
 
 import time
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -28,6 +28,7 @@ def bridge():
         mock_ctx.known_networks = []
         # Mock snapshot for get_system_status
         from cios.core.mcp import ContextSnapshot, SystemState
+
         mock_snapshot = ContextSnapshot(
             system=SystemState(
                 cpu_percent=15.0,
@@ -109,6 +110,7 @@ class TestPendingQuestionFlow:
     def _trigger_app_clarification(self, bridge):
         """Helper: mock parse_intent to return APP_LAUNCH without app param, triggering clarification."""
         from cios.core.intent_parser import Intent, IntentType
+
         mock_intent = Intent(type=IntentType.APP_LAUNCH, params={}, confidence=0.9)
         with patch("cios.core.bridge.parse_intent", return_value=mock_intent):
             with patch("cios.core.bridge.classify_intent", return_value=None):
@@ -117,6 +119,7 @@ class TestPendingQuestionFlow:
     def _trigger_file_organize_clarification(self, bridge):
         """Helper: mock parse_intent to return FILE_ORGANIZE without target."""
         from cios.core.intent_parser import Intent, IntentType
+
         mock_intent = Intent(type=IntentType.FILE_ORGANIZE, params={}, confidence=0.9)
         with patch("cios.core.bridge.parse_intent", return_value=mock_intent):
             with patch("cios.core.bridge.classify_intent", return_value=None):
@@ -258,7 +261,9 @@ class TestThreadTransition:
 
         # Spy on the store's save_thread to verify persistence
         with patch.object(
-            bridge._thread_manager._store, "save_thread", wraps=bridge._thread_manager._store.save_thread
+            bridge._thread_manager._store,
+            "save_thread",
+            wraps=bridge._thread_manager._store.save_thread,
         ) as mock_save:
             with patch("cios.core.bridge.CIOSBridge._execute_intent") as mock_exec:
                 mock_exec.return_value = {
@@ -331,6 +336,7 @@ class TestThreadStateIntegrity:
         """Thread manager uses a lock for state mutations."""
         # Verify the lock exists
         import threading
+
         assert hasattr(bridge._thread_manager, "_lock")
         assert isinstance(bridge._thread_manager._lock, type(threading.Lock()))
 

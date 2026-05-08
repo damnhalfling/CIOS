@@ -9,8 +9,30 @@ permissions:
   contents: write
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install ruff
+        run: pip install ruff==0.8.6
+
+      - name: Ruff check (lint)
+        run: ruff check cios/ tests/
+
+      - name: Ruff format (formatting)
+        run: ruff format --check cios/ tests/
+
   test:
     runs-on: ubuntu-latest
+    needs: lint
 
     steps:
       - name: Checkout

@@ -16,14 +16,15 @@ from cios.core.thread_manager import (
     ThreadStore,
 )
 
-
 # --- Strategies ---
 
 # Generate valid UUID4 hex strings (32 hex chars)
 _uuid_hex = st.uuids(version=4).map(lambda u: u.hex)
 
 # Generate reasonable timestamps (positive floats, not too large for SQLite)
-_timestamp = st.floats(min_value=1_000_000_000.0, max_value=2_000_000_000.0, allow_nan=False, allow_infinity=False)
+_timestamp = st.floats(
+    min_value=1_000_000_000.0, max_value=2_000_000_000.0, allow_nan=False, allow_infinity=False
+)
 
 # Generate non-empty text for user inputs and summaries
 _text = st.text(min_size=1, max_size=200, alphabet=st.characters(blacklist_categories=("Cs",)))
@@ -37,7 +38,9 @@ _outcome = st.sampled_from(["success", "error", "incomplete", ""])
 # Generate simple JSON-serializable params dicts
 _params = st.dictionaries(
     keys=st.text(min_size=1, max_size=20, alphabet=st.characters(whitelist_categories=("L", "N"))),
-    values=st.one_of(st.text(max_size=50), st.integers(min_value=-1000, max_value=1000), st.booleans()),
+    values=st.one_of(
+        st.text(max_size=50), st.integers(min_value=-1000, max_value=1000), st.booleans()
+    ),
     max_size=5,
 )
 
@@ -68,6 +71,7 @@ _thread = st.builds(
 
 # --- Property Tests ---
 
+
 # Feature: conversation-threads, Property 5: Thread persistence round-trip
 class TestThreadPersistenceRoundTrip:
     """Property 5: Thread persistence round-trip.
@@ -97,60 +101,58 @@ class TestThreadPersistenceRoundTrip:
             # Retrieve it via get_recent (which filters by status='completed')
             retrieved_threads = store.get_recent(limit=1)
 
-            assert len(retrieved_threads) == 1, (
-                f"Expected 1 thread, got {len(retrieved_threads)}"
-            )
+            assert len(retrieved_threads) == 1, f"Expected 1 thread, got {len(retrieved_threads)}"
 
             retrieved = retrieved_threads[0]
 
             # Verify all persisted fields match
-            assert retrieved.id == thread.id, (
-                f"ID mismatch: {retrieved.id!r} != {thread.id!r}"
-            )
-            assert retrieved.created_at == thread.created_at, (
-                f"created_at mismatch: {retrieved.created_at} != {thread.created_at}"
-            )
-            assert retrieved.closed_at == thread.closed_at, (
-                f"closed_at mismatch: {retrieved.closed_at} != {thread.closed_at}"
-            )
-            assert retrieved.summary == thread.summary, (
-                f"summary mismatch: {retrieved.summary!r} != {thread.summary!r}"
-            )
-            assert retrieved.status == thread.status, (
-                f"status mismatch: {retrieved.status!r} != {thread.status!r}"
-            )
-            assert retrieved.dominant_intent == thread.dominant_intent, (
-                f"dominant_intent mismatch: {retrieved.dominant_intent!r} != {thread.dominant_intent!r}"
-            )
-            assert retrieved.outcome == thread.outcome, (
-                f"outcome mismatch: {retrieved.outcome!r} != {thread.outcome!r}"
-            )
+            assert retrieved.id == thread.id, f"ID mismatch: {retrieved.id!r} != {thread.id!r}"
+            assert (
+                retrieved.created_at == thread.created_at
+            ), f"created_at mismatch: {retrieved.created_at} != {thread.created_at}"
+            assert (
+                retrieved.closed_at == thread.closed_at
+            ), f"closed_at mismatch: {retrieved.closed_at} != {thread.closed_at}"
+            assert (
+                retrieved.summary == thread.summary
+            ), f"summary mismatch: {retrieved.summary!r} != {thread.summary!r}"
+            assert (
+                retrieved.status == thread.status
+            ), f"status mismatch: {retrieved.status!r} != {thread.status!r}"
+            assert (
+                retrieved.dominant_intent == thread.dominant_intent
+            ), f"dominant_intent mismatch: {retrieved.dominant_intent!r} != {thread.dominant_intent!r}"
+            assert (
+                retrieved.outcome == thread.outcome
+            ), f"outcome mismatch: {retrieved.outcome!r} != {thread.outcome!r}"
 
             # Verify turns count
-            assert len(retrieved.turns) == len(thread.turns), (
-                f"turns count mismatch: {len(retrieved.turns)} != {len(thread.turns)}"
-            )
+            assert len(retrieved.turns) == len(
+                thread.turns
+            ), f"turns count mismatch: {len(retrieved.turns)} != {len(thread.turns)}"
 
             # Verify each turn's fields
-            for i, (orig_turn, ret_turn) in enumerate(zip(thread.turns, retrieved.turns)):
-                assert ret_turn.user_input == orig_turn.user_input, (
-                    f"Turn {i} user_input mismatch: {ret_turn.user_input!r} != {orig_turn.user_input!r}"
-                )
-                assert ret_turn.intent_type == orig_turn.intent_type, (
-                    f"Turn {i} intent_type mismatch: {ret_turn.intent_type!r} != {orig_turn.intent_type!r}"
-                )
-                assert ret_turn.params == orig_turn.params, (
-                    f"Turn {i} params mismatch: {ret_turn.params!r} != {orig_turn.params!r}"
-                )
-                assert ret_turn.result_summary == orig_turn.result_summary, (
-                    f"Turn {i} result_summary mismatch: {ret_turn.result_summary!r} != {orig_turn.result_summary!r}"
-                )
-                assert ret_turn.outcome == orig_turn.outcome, (
-                    f"Turn {i} outcome mismatch: {ret_turn.outcome!r} != {orig_turn.outcome!r}"
-                )
-                assert ret_turn.timestamp == orig_turn.timestamp, (
-                    f"Turn {i} timestamp mismatch: {ret_turn.timestamp} != {orig_turn.timestamp}"
-                )
+            for i, (orig_turn, ret_turn) in enumerate(
+                zip(thread.turns, retrieved.turns, strict=False)
+            ):
+                assert (
+                    ret_turn.user_input == orig_turn.user_input
+                ), f"Turn {i} user_input mismatch: {ret_turn.user_input!r} != {orig_turn.user_input!r}"
+                assert (
+                    ret_turn.intent_type == orig_turn.intent_type
+                ), f"Turn {i} intent_type mismatch: {ret_turn.intent_type!r} != {orig_turn.intent_type!r}"
+                assert (
+                    ret_turn.params == orig_turn.params
+                ), f"Turn {i} params mismatch: {ret_turn.params!r} != {orig_turn.params!r}"
+                assert (
+                    ret_turn.result_summary == orig_turn.result_summary
+                ), f"Turn {i} result_summary mismatch: {ret_turn.result_summary!r} != {orig_turn.result_summary!r}"
+                assert (
+                    ret_turn.outcome == orig_turn.outcome
+                ), f"Turn {i} outcome mismatch: {ret_turn.outcome!r} != {orig_turn.outcome!r}"
+                assert (
+                    ret_turn.timestamp == orig_turn.timestamp
+                ), f"Turn {i} timestamp mismatch: {ret_turn.timestamp} != {orig_turn.timestamp}"
         finally:
             store.close()
 
@@ -210,9 +212,9 @@ class TestStorageLimitInvariant:
 
             # Verify stored count does not exceed 50
             stored = store.get_by_date_range(0.0, 3_000_000_000.0)
-            assert len(stored) <= 50, (
-                f"Storage limit violated: {len(stored)} threads stored, expected <= 50"
-            )
+            assert (
+                len(stored) <= 50
+            ), f"Storage limit violated: {len(stored)} threads stored, expected <= 50"
         finally:
             store.close()
 
@@ -326,9 +328,7 @@ class TestFilterQueryCorrectness:
             surviving_ids = {t.id for t in surviving}
 
             expected_ids = {
-                t.id
-                for t in surviving
-                if t.created_at >= start and t.created_at <= end
+                t.id for t in surviving if t.created_at >= start and t.created_at <= end
             }
 
             # Property 1: All returned threads have created_at within [start, end]
@@ -389,11 +389,7 @@ class TestFilterQueryCorrectness:
             all_sorted = sorted(threads, key=lambda t: t.created_at, reverse=True)
             surviving = all_sorted[:50]
 
-            expected_ids = {
-                t.id
-                for t in surviving
-                if t.dominant_intent == filter_intent
-            }
+            expected_ids = {t.id for t in surviving if t.dominant_intent == filter_intent}
 
             # Property 1: All returned threads have matching dominant_intent
             for result in results:
@@ -428,12 +424,13 @@ class TestCloudSyncPayloadSanitization:
     # Use a distinctive prefix to avoid false positives from coincidental
     # substring matches with timestamps or other numeric fields.
     _sensitive_value = st.text(
-        min_size=8, max_size=50,
-        alphabet=st.characters(whitelist_categories=("L",))
+        min_size=8, max_size=50, alphabet=st.characters(whitelist_categories=("L",))
     ).map(lambda v: f"SECRET_{v}")
 
     _sensitive_params = st.dictionaries(
-        keys=st.sampled_from(["password", "token", "api_key", "sudo_password", "secret", "credentials", "auth_token"]),
+        keys=st.sampled_from(
+            ["password", "token", "api_key", "sudo_password", "secret", "credentials", "auth_token"]
+        ),
         values=_sensitive_value,
         min_size=1,
         max_size=5,
@@ -479,7 +476,14 @@ class TestCloudSyncPayloadSanitization:
             payload = store._build_sync_payload(thread)
 
             # Allowed top-level keys
-            allowed_top_keys = {"thread_id", "created_at", "closed_at", "summary", "outcome", "turns"}
+            allowed_top_keys = {
+                "thread_id",
+                "created_at",
+                "closed_at",
+                "summary",
+                "outcome",
+                "turns",
+            }
             actual_keys = set(payload.keys())
 
             assert actual_keys == allowed_top_keys, (
@@ -489,7 +493,13 @@ class TestCloudSyncPayloadSanitization:
             )
 
             # Verify each turn only contains allowed keys
-            allowed_turn_keys = {"user_input", "intent_type", "result_summary", "outcome", "timestamp"}
+            allowed_turn_keys = {
+                "user_input",
+                "intent_type",
+                "result_summary",
+                "outcome",
+                "timestamp",
+            }
             for i, turn_payload in enumerate(payload["turns"]):
                 turn_keys = set(turn_payload.keys())
                 assert turn_keys == allowed_turn_keys, (
@@ -500,9 +510,9 @@ class TestCloudSyncPayloadSanitization:
 
             # Verify "params" does NOT appear anywhere in the payload
             payload_json = json.dumps(payload)
-            assert '"params"' not in payload_json, (
-                "Payload contains 'params' key which should be excluded"
-            )
+            assert (
+                '"params"' not in payload_json
+            ), "Payload contains 'params' key which should be excluded"
 
             # Verify sensitive values from params do NOT appear in the serialized payload
             for turn in thread.turns:

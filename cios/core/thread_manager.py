@@ -21,7 +21,6 @@ import urllib.request
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 from cios.core import config as _config
 
@@ -32,19 +31,21 @@ logger = logging.getLogger(__name__)
 #  CONFIGURATION CONSTANTS
 # ═══════════════════════════════════════════════════════════════════════════
 
-PENDING_QUESTION_TIMEOUT = 120        # seconds before pending question expires
-THREAD_INACTIVITY_TIMEOUT = 180       # seconds before idle thread auto-closes
-MAX_LOCAL_THREADS = 50                # SQLite storage limit
-THREAD_CONTEXT_TURNS = 5             # Turns kept for pronoun resolution
-CLASSIFICATION_TEMPORAL_WINDOW = 90   # seconds for "recent enough" signal
+PENDING_QUESTION_TIMEOUT = 120  # seconds before pending question expires
+THREAD_INACTIVITY_TIMEOUT = 180  # seconds before idle thread auto-closes
+MAX_LOCAL_THREADS = 50  # SQLite storage limit
+THREAD_CONTEXT_TURNS = 5  # Turns kept for pronoun resolution
+CLASSIFICATION_TEMPORAL_WINDOW = 90  # seconds for "recent enough" signal
 
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  DATA MODELS
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class Classification(enum.Enum):
     """Result of thread classification — continue or start new."""
+
     CONTINUE = "continue"
     NEW_THREAD = "new_thread"
 
@@ -52,6 +53,7 @@ class Classification(enum.Enum):
 @dataclass
 class ConversationTurn:
     """A single turn in a conversation thread."""
+
     user_input: str
     intent_type: str
     params: dict = field(default_factory=dict)
@@ -63,6 +65,7 @@ class ConversationTurn:
 @dataclass
 class PendingQuestion:
     """A system-generated question awaiting user response within a thread."""
+
     question: str
     timestamp: float = field(default_factory=time.time)
     timeout: float = PENDING_QUESTION_TIMEOUT
@@ -71,13 +74,14 @@ class PendingQuestion:
 @dataclass
 class Thread:
     """A conversation thread — the unit of conversational continuity."""
+
     id: str = field(default_factory=lambda: uuid.uuid4().hex)
     created_at: float = field(default_factory=time.time)
-    closed_at: Optional[float] = None
+    closed_at: float | None = None
     summary: str = ""
     status: str = "active"  # "active" | "completed" | "expired"
     turns: list[ConversationTurn] = field(default_factory=list)
-    pending_question: Optional[PendingQuestion] = None
+    pending_question: PendingQuestion | None = None
     dominant_intent: str = ""
     outcome: str = ""  # "success" | "error" | "incomplete"
 
@@ -85,9 +89,10 @@ class Thread:
 @dataclass
 class RoutingDecision:
     """Result of ThreadManager.route_input()."""
+
     action: str  # "answer_pending" | "continue_thread" | "new_thread"
     thread: Thread
-    pending_question: Optional[PendingQuestion] = None
+    pending_question: PendingQuestion | None = None
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -132,7 +137,7 @@ class ThreadStore:
     never propagated to callers.
     """
 
-    def __init__(self, db_path: Optional[Path] = None) -> None:
+    def __init__(self, db_path: Path | None = None) -> None:
         """Connect to SQLite and create tables if needed."""
         _config.ensure_dirs()
         if db_path is None:
@@ -226,9 +231,7 @@ class ThreadStore:
                 ).fetchall()
                 return [self._load_thread_with_turns(row) for row in rows]
             except Exception as e:
-                logger.error(
-                    "ThreadStore: failed to get threads by date range: %s", e
-                )
+                logger.error("ThreadStore: failed to get threads by date range: %s", e)
                 return []
 
     def get_by_intent(self, intent_category: str) -> list[Thread]:
@@ -243,9 +246,7 @@ class ThreadStore:
                 ).fetchall()
                 return [self._load_thread_with_turns(row) for row in rows]
             except Exception as e:
-                logger.error(
-                    "ThreadStore: failed to get threads by intent: %s", e
-                )
+                logger.error("ThreadStore: failed to get threads by intent: %s", e)
                 return []
 
     def enforce_limit(self, max_threads: int = MAX_LOCAL_THREADS) -> None:
@@ -256,9 +257,7 @@ class ThreadStore:
     def _enforce_limit_unlocked(self, max_threads: int) -> None:
         """Internal enforce_limit — caller must hold the lock."""
         try:
-            count_row = self._conn.execute(
-                "SELECT COUNT(*) as cnt FROM threads"
-            ).fetchone()
+            count_row = self._conn.execute("SELECT COUNT(*) as cnt FROM threads").fetchone()
             count = count_row["cnt"] if count_row else 0
             if count > max_threads:
                 excess = count - max_threads
@@ -398,9 +397,18 @@ class ThreadStore:
 
 # Pronouns that reference previous context (mirrored from bridge.py)
 _PRONOUNS_PT = {
-    "esse", "essa", "isso", "este", "esta",
-    "nesse", "nessa", "nisso", "dele", "dela",
-    "aquele", "aquela",
+    "esse",
+    "essa",
+    "isso",
+    "este",
+    "esta",
+    "nesse",
+    "nessa",
+    "nisso",
+    "dele",
+    "dela",
+    "aquele",
+    "aquela",
 }
 _PRONOUNS_EN = {"that", "this", "it", "those", "the same", "that one"}
 _ALL_PRONOUNS = _PRONOUNS_PT | _PRONOUNS_EN
@@ -430,9 +438,7 @@ class ThreadClassifier:
         - No active thread → always NEW_THREAD
     """
 
-    def classify(
-        self, user_input: str, active_thread: Optional[Thread]
-    ) -> Classification:
+    def classify(self, user_input: str, active_thread: Thread | None) -> Classification:
         """Classify input as CONTINUE or NEW_THREAD.
 
         Args:
@@ -491,20 +497,15 @@ class ThreadClassifier:
     def _has_continuation_phrase(self, user_input: str) -> bool:
         """Check if input contains an explicit continuation phrase."""
         input_lower = user_input.lower()
-        for phrase in _CONTINUATION_PHRASES:
-            if phrase in input_lower:
-                return True
-        return False
+        return any(phrase in input_lower for phrase in _CONTINUATION_PHRASES)
 
-    def _has_same_intent(
-        self, user_input: str, active_thread: Thread
-    ) -> bool:
+    def _has_same_intent(self, user_input: str, active_thread: Thread) -> bool:
         """Check if the parsed intent matches the active thread's dominant intent."""
         if not active_thread.dominant_intent:
             return False
 
         try:
-            from cios.core.intent_parser import parse_intent, IntentType
+            from cios.core.intent_parser import IntentType, parse_intent
 
             intent = parse_intent(user_input)
             # Only consider it a match if the intent was actually recognized
@@ -540,12 +541,12 @@ class ThreadManager:
     def __init__(self, store: ThreadStore) -> None:
         self._store = store
         self._lock = threading.Lock()
-        self._active_thread: Optional[Thread] = None
+        self._active_thread: Thread | None = None
         self._classifier = ThreadClassifier()
-        self._inactivity_timer: Optional[threading.Timer] = None
+        self._inactivity_timer: threading.Timer | None = None
         # Monotonic timestamps for duration checks
         self._last_activity_mono: float = time.monotonic()
-        self._pending_question_mono: Optional[float] = None
+        self._pending_question_mono: float | None = None
 
     def route_input(self, user_input: str) -> RoutingDecision:
         """Determine how to handle user input relative to thread state.
@@ -565,10 +566,7 @@ class ThreadManager:
             self._check_inactivity_unlocked()
 
             # If there's an active thread with a pending question, route as answer
-            if (
-                self._active_thread is not None
-                and self._active_thread.pending_question is not None
-            ):
+            if self._active_thread is not None and self._active_thread.pending_question is not None:
                 pq = self._active_thread.pending_question
                 self._update_activity_unlocked()
                 return RoutingDecision(
@@ -578,9 +576,7 @@ class ThreadManager:
                 )
 
             # Delegate to classifier
-            classification = self._classifier.classify(
-                user_input, self._active_thread
-            )
+            classification = self._classifier.classify(user_input, self._active_thread)
 
             if classification == Classification.CONTINUE and self._active_thread is not None:
                 self._update_activity_unlocked()
@@ -601,9 +597,7 @@ class ThreadManager:
                 thread=new_thread,
             )
 
-    def record_turn(
-        self, user_input: str, intent, result: dict
-    ) -> None:
+    def record_turn(self, user_input: str, intent, result: dict) -> None:
         """Record a completed turn in the active thread.
 
         Args:
@@ -659,7 +653,7 @@ class ThreadManager:
             self._active_thread.pending_question = question
             self._pending_question_mono = time.monotonic()
 
-    def clear_pending_question(self) -> Optional[PendingQuestion]:
+    def clear_pending_question(self) -> PendingQuestion | None:
         """Atomically read and clear the pending question.
 
         Returns the PendingQuestion if one was set, or None.
@@ -689,9 +683,7 @@ class ThreadManager:
         with self._lock:
             if self._active_thread is None:
                 return []
-            return list(
-                self._active_thread.turns[-THREAD_CONTEXT_TURNS:]
-            )
+            return list(self._active_thread.turns[-THREAD_CONTEXT_TURNS:])
 
     def get_recent_threads(self, limit: int = 10) -> list[Thread]:
         """Get completed threads for UI display. Delegates to store."""
@@ -782,5 +774,6 @@ class ThreadManager:
                 intent_counts[it] = intent_counts.get(it, 0) + 1
         if intent_counts:
             self._active_thread.dominant_intent = max(
-                intent_counts, key=intent_counts.get  # type: ignore[arg-type]
+                intent_counts,
+                key=intent_counts.get,  # type: ignore[arg-type]
             )

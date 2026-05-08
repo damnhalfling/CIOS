@@ -6,7 +6,6 @@ EXIF info panel, and basic editing controls (rotate, flip, brightness).
 
 import os
 import tkinter as tk
-from typing import Optional
 
 from PIL import Image
 
@@ -16,10 +15,15 @@ except ImportError:
     ImageTk = None  # type: ignore[assignment,misc]
 
 from cios.ui.theme import (
-    BG, BG_CARD, BG_HOVER,
-    FG, FG_SEC, FG_DIM,
-    SP_COMPACT, SP_TIGHT, SP_MICRO,
-    ACCENT_LT, WARNING, ERROR,
+    ACCENT_LT,
+    BG,
+    BG_CARD,
+    BG_HOVER,
+    FG_SEC,
+    SP_COMPACT,
+    SP_MICRO,
+    SP_TIGHT,
+    WARNING,
 )
 
 
@@ -33,7 +37,7 @@ class ImageViewer:
         start_index: int,
         root: tk.Tk,
         fonts: dict,
-        on_close: Optional[callable] = None,
+        on_close: callable | None = None,
     ):
         """
         Args:
@@ -52,7 +56,7 @@ class ImageViewer:
         self._on_close = on_close
 
         # Keep PhotoImage reference alive to prevent GC
-        self._current_photo: Optional[ImageTk.PhotoImage] = None
+        self._current_photo: ImageTk.PhotoImage | None = None
 
         # Key binding IDs for cleanup
         self._bind_ids: list[str] = []
@@ -61,7 +65,7 @@ class ImageViewer:
         self._slideshow_active: bool = False
         self._slideshow_paused: bool = False
         self._slideshow_interval: int = 5000  # ms (Requirement 4.2)
-        self._slideshow_after_id: Optional[str] = None
+        self._slideshow_after_id: str | None = None
 
         # Build overlay
         self._overlay = tk.Frame(parent, bg=BG)
@@ -99,7 +103,7 @@ class ImageViewer:
 
         # Info panel (hidden by default, toggled with 'i' key)
         self._info_visible: bool = False
-        self._info_frame: Optional[tk.Frame] = None
+        self._info_frame: tk.Frame | None = None
 
         # Edit toolbar at the top
         self._toolbar = tk.Frame(self._overlay, bg=BG_CARD)
@@ -180,9 +184,7 @@ class ImageViewer:
             return
         if not self._slideshow_paused:
             self.navigate(+1)
-        self._slideshow_after_id = self._root.after(
-            self._slideshow_interval, self._slideshow_tick
-        )
+        self._slideshow_after_id = self._root.after(self._slideshow_interval, self._slideshow_tick)
 
     def stop_slideshow(self) -> None:
         """Exit slideshow mode (Requirement 4.4)."""
@@ -261,7 +263,7 @@ class ImageViewer:
             self._current_photo = ImageTk.PhotoImage(img)
             self._image_label.configure(image=self._current_photo)
 
-        except (OSError, IOError):
+        except OSError:
             # Handle corrupt or unreadable images
             self._current_photo = None
             self._image_label.configure(image="", text="⚠ Cannot load image", fg=FG_SEC)
@@ -323,6 +325,7 @@ class ImageViewer:
     def _rotate_cw(self) -> None:
         """Rotate current image 90° clockwise."""
         from cios.skills.image_edit import rotate_image
+
         path = self._current_file_path()
         if path and rotate_image(path, degrees=90):
             self._show_image(self._current_index)
@@ -330,6 +333,7 @@ class ImageViewer:
     def _rotate_ccw(self) -> None:
         """Rotate current image 90° counter-clockwise."""
         from cios.skills.image_edit import rotate_image
+
         path = self._current_file_path()
         if path and rotate_image(path, degrees=-90):
             self._show_image(self._current_index)
@@ -337,6 +341,7 @@ class ImageViewer:
     def _flip_h(self) -> None:
         """Flip current image horizontally."""
         from cios.skills.image_edit import flip_image
+
         path = self._current_file_path()
         if path and flip_image(path, direction="horizontal"):
             self._show_image(self._current_index)
@@ -344,6 +349,7 @@ class ImageViewer:
     def _flip_v(self) -> None:
         """Flip current image vertically."""
         from cios.skills.image_edit import flip_image
+
         path = self._current_file_path()
         if path and flip_image(path, direction="vertical"):
             self._show_image(self._current_index)
@@ -351,6 +357,7 @@ class ImageViewer:
     def _brightness_up(self) -> None:
         """Increase brightness by 10%."""
         from cios.skills.image_edit import adjust_image
+
         path = self._current_file_path()
         if path:
             adjust_image(path, brightness=1.1)
@@ -359,6 +366,7 @@ class ImageViewer:
     def _brightness_down(self) -> None:
         """Decrease brightness by 10%."""
         from cios.skills.image_edit import adjust_image
+
         path = self._current_file_path()
         if path:
             adjust_image(path, brightness=0.9)
@@ -367,6 +375,7 @@ class ImageViewer:
     def _share(self) -> None:
         """Share current image via xdg-open."""
         from cios.skills.image_edit import share_file
+
         path = self._current_file_path()
         if path:
             share_file(path)
@@ -382,7 +391,7 @@ class ImageViewer:
 
     def _show_info_panel(self) -> None:
         """Show EXIF metadata panel on the right side."""
-        from cios.skills.image_edit import get_metadata, format_metadata
+        from cios.skills.image_edit import format_metadata, get_metadata
 
         if self._info_frame and self._info_frame.winfo_exists():
             self._info_frame.destroy()
@@ -416,7 +425,7 @@ class ImageViewer:
             self._info_frame.destroy()
         self._info_frame = None
 
-    def _current_file_path(self) -> Optional[str]:
+    def _current_file_path(self) -> str | None:
         """Get the file path of the currently displayed image."""
         if not self._files or self._current_index >= len(self._files):
             return None

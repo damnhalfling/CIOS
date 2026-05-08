@@ -4,13 +4,12 @@ Scans .desktop files, builds a cache of installed apps, and launches them
 via subprocess. The user never sees commands or paths.
 """
 
+import logging
 import os
 import re
 import subprocess
-import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +81,7 @@ def _scan_desktop_files() -> list[AppInfo]:
         if not d.is_dir():
             continue
         for f in d.iterdir():
-            if not f.suffix == ".desktop" or not f.is_file():
+            if f.suffix != ".desktop" or not f.is_file():
                 continue
             try:
                 app = _parse_desktop_file(f)
@@ -96,7 +95,7 @@ def _scan_desktop_files() -> list[AppInfo]:
     return apps
 
 
-def _parse_desktop_file(path: Path) -> Optional[AppInfo]:
+def _parse_desktop_file(path: Path) -> AppInfo | None:
     """Parse a single .desktop file into AppInfo."""
     try:
         content = path.read_text(encoding="utf-8", errors="ignore")
@@ -170,11 +169,18 @@ def _normalize(text: str) -> str:
     text = text.lower().strip()
     # Remover acentos comuns do português
     replacements = {
-        "á": "a", "à": "a", "ã": "a", "â": "a",
-        "é": "e", "ê": "e",
+        "á": "a",
+        "à": "a",
+        "ã": "a",
+        "â": "a",
+        "é": "e",
+        "ê": "e",
         "í": "i",
-        "ó": "o", "ô": "o", "õ": "o",
-        "ú": "u", "ü": "u",
+        "ó": "o",
+        "ô": "o",
+        "õ": "o",
+        "ú": "u",
+        "ü": "u",
         "ç": "c",
     }
     for old, new in replacements.items():
@@ -182,7 +188,7 @@ def _normalize(text: str) -> str:
     return text
 
 
-def find_app(query: str) -> Optional[AppInfo]:
+def find_app(query: str) -> AppInfo | None:
     """Find the best matching app for a user query.
 
     Search order:
@@ -203,12 +209,14 @@ def find_app(query: str) -> Optional[AppInfo]:
         for alias_target in _ALIASES[q]:
             for app in apps:
                 app_name_norm = _normalize(app.name)
-                exec_base = os.path.basename(app.exec_command.split()[0]).lower() if app.exec_command else ""
+                exec_base = (
+                    os.path.basename(app.exec_command.split()[0]).lower()
+                    if app.exec_command
+                    else ""
+                )
                 desktop_stem = Path(app.desktop_file).stem.lower()
 
-                if (alias_target == exec_base or
-                    alias_target == desktop_stem or
-                    alias_target == app_name_norm):
+                if alias_target in (exec_base, desktop_stem, app_name_norm):
                     return app
 
     # 2. Exact name match
@@ -218,7 +226,9 @@ def find_app(query: str) -> Optional[AppInfo]:
 
     # 3. Exec basename match
     for app in apps:
-        exec_base = os.path.basename(app.exec_command.split()[0]).lower() if app.exec_command else ""
+        exec_base = (
+            os.path.basename(app.exec_command.split()[0]).lower() if app.exec_command else ""
+        )
         if exec_base == q:
             return app
 
@@ -247,7 +257,7 @@ def find_app(query: str) -> Optional[AppInfo]:
     return None
 
 
-def launch_app(app: AppInfo) -> tuple[list[str], bool, Optional[str]]:
+def launch_app(app: AppInfo) -> tuple[list[str], bool, str | None]:
     """Launch an application.
 
     Returns:

@@ -15,7 +15,6 @@ from cios.core.thread_manager import (
     ThreadStore,
 )
 
-
 # --- Strategies ---
 
 # Generate arbitrary user input text (any non-surrogate text)
@@ -146,14 +145,10 @@ class TestAbsenceOfSignalsProducesNewThread:
                 blacklist_categories=("Cs",),
             ),
         ),
-        safe_words=st.lists(
-            st.sampled_from(_SAFE_WORDS), min_size=1, max_size=5
-        ),
+        safe_words=st.lists(st.sampled_from(_SAFE_WORDS), min_size=1, max_size=5),
     )
     @settings(max_examples=30, deadline=None)
-    def test_no_signals_produces_new_thread(
-        self, initial_input: str, safe_words: list[str]
-    ):
+    def test_no_signals_produces_new_thread(self, initial_input: str, safe_words: list[str]):
         """When no continuation signals are present and temporal proximity
         has expired, route_input SHALL close the active thread and return
         action='new_thread' with a different thread ID.
@@ -180,9 +175,7 @@ class TestAbsenceOfSignalsProducesNewThread:
             old_thread_id = decision1.thread.id
 
             # Record a turn so the classifier doesn't short-circuit on empty turns
-            manager.record_turn(
-                initial_input, "general", {"response": "ok", "status": "success"}
-            )
+            manager.record_turn(initial_input, "general", {"response": "ok", "status": "success"})
 
             # Manipulate temporal proximity: set the last turn's timestamp
             # to >90s ago so temporal proximity signal is NOT active
@@ -236,7 +229,6 @@ class TestThreadCreationInvariants:
         **Validates: Requirements 3.1**
         """
         import re
-        import time as _time
 
         with tempfile.NamedTemporaryFile(suffix=".db", delete=True) as tmp:
             db_path = Path(tmp.name)
@@ -252,12 +244,12 @@ class TestThreadCreationInvariants:
 
             # Verify the thread ID is a valid UUID4 hex (32 hex characters)
             thread_id = decision.thread.id
-            assert len(thread_id) == 32, (
-                f"Expected 32-char hex ID, got {len(thread_id)} chars: {thread_id!r}"
-            )
-            assert re.fullmatch(r"[0-9a-f]{32}", thread_id), (
-                f"Expected valid hex string, got: {thread_id!r}"
-            )
+            assert (
+                len(thread_id) == 32
+            ), f"Expected 32-char hex ID, got {len(thread_id)} chars: {thread_id!r}"
+            assert re.fullmatch(
+                r"[0-9a-f]{32}", thread_id
+            ), f"Expected valid hex string, got: {thread_id!r}"
         finally:
             store.close()
 
@@ -287,8 +279,7 @@ class TestThreadCreationInvariants:
             # Verify created_at is within 1 second of current time
             created_at = decision.thread.created_at
             assert before - 1 <= created_at <= after + 1, (
-                f"Expected created_at between {before - 1} and {after + 1}, "
-                f"got {created_at}"
+                f"Expected created_at between {before - 1} and {after + 1}, " f"got {created_at}"
             )
         finally:
             store.close()
@@ -341,11 +332,7 @@ class TestThreadCreationInvariants:
         finally:
             store.close()
 
-    @given(
-        user_inputs=st.lists(
-            _user_input, min_size=2, max_size=10, unique=True
-        )
-    )
+    @given(user_inputs=st.lists(_user_input, min_size=2, max_size=10, unique=True))
     @settings(max_examples=30, deadline=None)
     def test_multiple_threads_have_unique_ids(self, user_inputs: list[str]):
         """Multiple newly created threads SHALL have unique IDs (no
@@ -353,7 +340,6 @@ class TestThreadCreationInvariants:
 
         **Validates: Requirements 3.1**
         """
-        import time as _time
 
         thread_ids = []
 
@@ -371,6 +357,6 @@ class TestThreadCreationInvariants:
                 store.close()
 
         # Verify all IDs are unique
-        assert len(thread_ids) == len(set(thread_ids)), (
-            f"Expected all unique IDs, but found duplicates in: {thread_ids}"
-        )
+        assert len(thread_ids) == len(
+            set(thread_ids)
+        ), f"Expected all unique IDs, but found duplicates in: {thread_ids}"

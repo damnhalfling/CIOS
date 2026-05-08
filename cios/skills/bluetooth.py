@@ -6,24 +6,23 @@ Handles: scan, pair, connect, disconnect, list, remove, trust.
 Uses bluetoothctl (BlueZ) which is standard on Debian/Ubuntu.
 """
 
+import logging
 import re
 import subprocess
-import logging
 import time
 from dataclasses import dataclass
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class BluetoothDevice:
-    address: str        # MAC address (XX:XX:XX:XX:XX:XX)
-    name: str           # Human-readable name
+    address: str  # MAC address (XX:XX:XX:XX:XX:XX)
+    name: str  # Human-readable name
     paired: bool = False
     connected: bool = False
     trusted: bool = False
-    icon: str = ""      # device type: audio-headset, phone, computer, etc.
+    icon: str = ""  # device type: audio-headset, phone, computer, etc.
 
     @property
     def display_name(self) -> str:
@@ -50,7 +49,9 @@ def _run_btctl(*args: str, timeout: int = 10) -> tuple[bool, str, str]:
     try:
         result = subprocess.run(
             ["bluetoothctl"] + list(args),
-            capture_output=True, text=True, timeout=timeout,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
         )
         return result.returncode == 0, result.stdout.strip(), result.stderr.strip()
     except FileNotFoundError:
@@ -273,6 +274,7 @@ def trust(address_or_name: str) -> tuple[list[str], bool, str]:
 #  INTERNAL HELPERS
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def _parse_device_list(output: str) -> list[BluetoothDevice]:
     """Parse bluetoothctl device list output.
 
@@ -285,10 +287,12 @@ def _parse_device_list(output: str) -> list[BluetoothDevice]:
             line.strip(),
         )
         if match:
-            devices.append(BluetoothDevice(
-                address=match.group(1),
-                name=match.group(2).strip(),
-            ))
+            devices.append(
+                BluetoothDevice(
+                    address=match.group(1),
+                    name=match.group(2).strip(),
+                )
+            )
     return devices
 
 
@@ -314,7 +318,7 @@ def _enrich_device(device: BluetoothDevice) -> None:
                 device.name = name
 
 
-def _resolve_device(query: str) -> Optional[BluetoothDevice]:
+def _resolve_device(query: str) -> BluetoothDevice | None:
     """Find a device by address or name (fuzzy match)."""
     query_lower = query.lower().strip()
 

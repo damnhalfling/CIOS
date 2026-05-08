@@ -12,38 +12,39 @@ import re
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from cios.core.planner import _sanitize_error
-from cios.core.humanizer import humanize_error
 from cios.core.error_recovery import enrich_error
-
+from cios.core.humanizer import humanize_error
+from cios.core.planner import _sanitize_error
 
 # ── Forbidden patterns that must NEVER appear in user-facing output ──────
 
 FORBIDDEN_PATTERNS = [
-    (re.compile(r'/[\w/.\-]{3,}'), "File paths"),
-    (re.compile(r'PID \d+'), "Process IDs"),
+    (re.compile(r"/[\w/.\-]{3,}"), "File paths"),
+    (re.compile(r"PID \d+"), "Process IDs"),
     (re.compile(r'File ".*", line \d+'), "Tracebacks"),
-    (re.compile(r'\b(errno|E[A-Z]{2,})\b'), "Error codes"),
-    (re.compile(r'\w+Error:'), "Python exception class names"),
-    (re.compile(r'subprocess\.'), "Subprocess references"),
-    (re.compile(r'Popen|CalledProcessError'), "Implementation details"),
-    (re.compile(r'stderr:'), "Raw stderr"),
+    (re.compile(r"\b(errno|E[A-Z]{2,})\b"), "Error codes"),
+    (re.compile(r"\w+Error:"), "Python exception class names"),
+    (re.compile(r"subprocess\."), "Subprocess references"),
+    (re.compile(r"Popen|CalledProcessError"), "Implementation details"),
+    (re.compile(r"stderr:"), "Raw stderr"),
 ]
 
 
 # ── Strategies for generating error strings with technical artifacts ─────
 
 # File paths
-_file_paths = st.sampled_from([
-    "/usr/lib/python3/dist-packages/foo.py",
-    "/home/user/.local/lib/python3.11/site-packages/bar/baz.py",
-    "/etc/systemd/system/cios.service",
-    "/var/log/syslog",
-    "/tmp/cios_crash_12345.log",
-    "/opt/cios/bin/daemon",
-    "/usr/bin/python3.11",
-    "/proc/1234/status",
-])
+_file_paths = st.sampled_from(
+    [
+        "/usr/lib/python3/dist-packages/foo.py",
+        "/home/user/.local/lib/python3.11/site-packages/bar/baz.py",
+        "/etc/systemd/system/cios.service",
+        "/var/log/syslog",
+        "/tmp/cios_crash_12345.log",
+        "/opt/cios/bin/daemon",
+        "/usr/bin/python3.11",
+        "/proc/1234/status",
+    ]
+)
 
 # PID references
 _pid_refs = st.builds(
@@ -54,45 +55,66 @@ _pid_refs = st.builds(
 # Tracebacks
 _tracebacks = st.builds(
     lambda fname, lineno: f'File "{fname}", line {lineno}, in <module>',
-    st.sampled_from([
-        "/usr/lib/python3/dist-packages/subprocess.py",
-        "/home/user/project/main.py",
-        "/opt/cios/cios/core/executor.py",
-    ]),
+    st.sampled_from(
+        [
+            "/usr/lib/python3/dist-packages/subprocess.py",
+            "/home/user/project/main.py",
+            "/opt/cios/cios/core/executor.py",
+        ]
+    ),
     st.integers(min_value=1, max_value=999),
 )
 
 # Error codes
-_error_codes = st.sampled_from([
-    "errno", "ENOENT", "EACCES", "EADDRINUSE", "ECONNREFUSED",
-    "EPERM", "ENOSPC", "ETIMEDOUT",
-])
+_error_codes = st.sampled_from(
+    [
+        "errno",
+        "ENOENT",
+        "EACCES",
+        "EADDRINUSE",
+        "ECONNREFUSED",
+        "EPERM",
+        "ENOSPC",
+        "ETIMEDOUT",
+    ]
+)
 
 # Python exception class names
-_exception_names = st.sampled_from([
-    "FileNotFoundError:", "PermissionError:", "OSError:",
-    "ConnectionRefusedError:", "TimeoutError:", "RuntimeError:",
-    "subprocess.CalledProcessError:", "ValueError:",
-])
+_exception_names = st.sampled_from(
+    [
+        "FileNotFoundError:",
+        "PermissionError:",
+        "OSError:",
+        "ConnectionRefusedError:",
+        "TimeoutError:",
+        "RuntimeError:",
+        "subprocess.CalledProcessError:",
+        "ValueError:",
+    ]
+)
 
 # Subprocess references
-_subprocess_refs = st.sampled_from([
-    "subprocess.run failed",
-    "subprocess.Popen raised",
-    "CalledProcessError: Command returned non-zero",
-    "Popen(cmd, stdout=PIPE)",
-])
+_subprocess_refs = st.sampled_from(
+    [
+        "subprocess.run failed",
+        "subprocess.Popen raised",
+        "CalledProcessError: Command returned non-zero",
+        "Popen(cmd, stdout=PIPE)",
+    ]
+)
 
 # Random filler text (non-technical)
-_filler_text = st.sampled_from([
-    "something went wrong",
-    "operation failed",
-    "could not complete the action",
-    "an error occurred while processing",
-    "the system encountered a problem",
-    "unable to proceed",
-    "unexpected failure during execution",
-])
+_filler_text = st.sampled_from(
+    [
+        "something went wrong",
+        "operation failed",
+        "could not complete the action",
+        "an error occurred while processing",
+        "the system encountered a problem",
+        "unable to proceed",
+        "unexpected failure during execution",
+    ]
+)
 
 
 # Composite strategy: build error strings with injected technical artifacts
@@ -140,6 +162,7 @@ def _error_with_artifacts(draw):
 
 # ── Property Test ────────────────────────────────────────────────────────
 
+
 class TestOutputSanitizationPipeline:
     """Property 2: Output sanitization pipeline strips all technical artifacts.
 
@@ -181,32 +204,34 @@ class TestOutputSanitizationPipeline:
 # ── Strategies for generating human-readable error strings (non-technical) ───
 
 # Human-readable error phrases that would have already been through sanitization
-_human_error_phrases = st.sampled_from([
-    "something went wrong",
-    "operation failed",
-    "could not complete the action",
-    "an error occurred while processing",
-    "the system encountered a problem",
-    "unable to proceed",
-    "unexpected failure during execution",
-    "connection was refused",
-    "network timed out",
-    "permission was denied",
-    "disk is full",
-    "port is busy",
-    "application not found",
-    "package not found",
-    "audio system unavailable",
-    "bluetooth not available",
-    "window not found",
-    "pairing failed",
-    "wrong password entered",
-    "command did not succeed",
-    "could not connect to the server",
-    "the operation took too long",
-    "dependencies are broken",
-    "brightness control not available",
-])
+_human_error_phrases = st.sampled_from(
+    [
+        "something went wrong",
+        "operation failed",
+        "could not complete the action",
+        "an error occurred while processing",
+        "the system encountered a problem",
+        "unable to proceed",
+        "unexpected failure during execution",
+        "connection was refused",
+        "network timed out",
+        "permission was denied",
+        "disk is full",
+        "port is busy",
+        "application not found",
+        "package not found",
+        "audio system unavailable",
+        "bluetooth not available",
+        "window not found",
+        "pairing failed",
+        "wrong password entered",
+        "command did not succeed",
+        "could not connect to the server",
+        "the operation took too long",
+        "dependencies are broken",
+        "brightness control not available",
+    ]
+)
 
 
 @st.composite
@@ -227,18 +252,19 @@ def _human_readable_error(draw):
 # patterns above. These target actual technical artifacts, not product names
 # like "PulseAudio/PipeWire" which legitimately contain a slash.
 SUGGESTION_FORBIDDEN_PATTERNS = [
-    (re.compile(r'/[\w/.\-]{3,}/[\w/.\-]+'), "File paths (multi-segment)"),
-    (re.compile(r'PID \d+'), "Process IDs"),
+    (re.compile(r"/[\w/.\-]{3,}/[\w/.\-]+"), "File paths (multi-segment)"),
+    (re.compile(r"PID \d+"), "Process IDs"),
     (re.compile(r'File ".*", line \d+'), "Tracebacks"),
-    (re.compile(r'\b(errno|E[A-Z]{2,})\b'), "Error codes"),
-    (re.compile(r'\w+Error:'), "Python exception class names"),
-    (re.compile(r'subprocess\.'), "Subprocess references"),
-    (re.compile(r'Popen|CalledProcessError'), "Implementation details"),
-    (re.compile(r'stderr:'), "Raw stderr"),
+    (re.compile(r"\b(errno|E[A-Z]{2,})\b"), "Error codes"),
+    (re.compile(r"\w+Error:"), "Python exception class names"),
+    (re.compile(r"subprocess\."), "Subprocess references"),
+    (re.compile(r"Popen|CalledProcessError"), "Implementation details"),
+    (re.compile(r"stderr:"), "Raw stderr"),
 ]
 
 
 # ── Property 9 Test ──────────────────────────────────────────────────────
+
 
 class TestErrorEnrichment:
     """Property 9: Error enrichment always provides a recovery suggestion.
@@ -271,7 +297,7 @@ class TestErrorEnrichment:
             f"Input: {error_input!r}\n"
             f"Output: {enriched!r}"
         )
-        appended = enriched[len(error_input):]
+        appended = enriched[len(error_input) :]
         # Strip the separator (newline) to get the suggestion content
         suggestion = appended.lstrip("\n").strip()
         assert len(suggestion) > 0, (

@@ -15,10 +15,9 @@ Can also run standalone for the session script:
 """
 
 import os
-import sys
 import signal
+import sys
 import time
-
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  PROGRESS FILE PROTOCOL
@@ -49,7 +48,14 @@ def show_splash() -> None:
 
     # Import theme tokens (lightweight, no heavy deps)
     from cios.ui.theme import (
-        BG, ACCENT, ACCENT_LT, ACCENT_DK, FG, FG_DIM, BG_CARD, lerp,
+        ACCENT,
+        ACCENT_DK,
+        ACCENT_LT,
+        BG,
+        BG_CARD,
+        FG,
+        FG_DIM,
+        lerp,
     )
 
     root = tk.Tk()
@@ -60,10 +66,10 @@ def show_splash() -> None:
     # Fullscreen on primary monitor
     try:
         from cios.infra.monitors import get_primary_monitor
+
         primary = get_primary_monitor()
         if primary:
-            root.geometry(
-                f"{primary.width}x{primary.height}+{primary.x}+{primary.y}")
+            root.geometry(f"{primary.width}x{primary.height}+{primary.x}+{primary.y}")
         else:
             root.attributes("-fullscreen", True)
     except Exception:
@@ -76,15 +82,16 @@ def show_splash() -> None:
     # State ring (same visual as main GUI — creates continuity)
     ring_size = 72
     ring_canvas = tk.Canvas(
-        frame, width=ring_size, height=ring_size,
-        bg=BG, highlightthickness=0, bd=0)
+        frame, width=ring_size, height=ring_size, bg=BG, highlightthickness=0, bd=0
+    )
     ring_canvas.pack(pady=(0, 16))
     ring_id = ring_canvas.create_oval(
-        6, 6, ring_size - 6, ring_size - 6,
-        outline=ACCENT_LT, width=3)
+        6, 6, ring_size - 6, ring_size - 6, outline=ACCENT_LT, width=3
+    )
 
     # Logo (PNG if available, fallback to symbol inside ring)
     from cios.core.config import get_logo_path
+
     _logo_img = None  # prevent GC
     logo_path = get_logo_path()
     if logo_path:
@@ -92,28 +99,33 @@ def show_splash() -> None:
             raw = tk.PhotoImage(file=str(logo_path))
             scale = max(1, raw.width() // 48)
             _logo_img = raw.subsample(scale, scale)
-            logo_item = ring_canvas.create_image(
-                ring_size // 2, ring_size // 2, image=_logo_img)
+            logo_item = ring_canvas.create_image(ring_size // 2, ring_size // 2, image=_logo_img)
             ring_canvas.image = _logo_img  # prevent GC
         except Exception:
             _logo_img = None
 
     if not _logo_img:
         ring_canvas.create_text(
-            ring_size // 2, ring_size // 2,
-            text="✦", font=("Helvetica", 24), fill=ACCENT_LT)
+            ring_size // 2, ring_size // 2, text="✦", font=("Helvetica", 24), fill=ACCENT_LT
+        )
 
     # Brand name
     brand = tk.Label(
-        frame, text="CIOS", font=("Helvetica", 28, "bold"),
-        fg=FG, bg=BG,
+        frame,
+        text="CIOS",
+        font=("Helvetica", 28, "bold"),
+        fg=FG,
+        bg=BG,
     )
     brand.pack(pady=(0, 8))
 
     # Loading text (updates with real progress)
     loading = tk.Label(
-        frame, text="Iniciando…", font=("Helvetica", 12),
-        fg=FG_DIM, bg=BG,
+        frame,
+        text="Iniciando…",
+        font=("Helvetica", 12),
+        fg=FG_DIM,
+        bg=BG,
     )
     loading.pack(pady=(0, 12))
 
@@ -129,6 +141,7 @@ def show_splash() -> None:
 
     # Breathing animation on ring (same as main GUI state ring)
     import math
+
     _phase = {"val": 0.0}
 
     def pulse():
@@ -190,7 +203,7 @@ def show_splash() -> None:
         # Check progress updates
         try:
             if os.path.exists(_PROGRESS_FILE):
-                with open(_PROGRESS_FILE, "r") as f:
+                with open(_PROGRESS_FILE) as f:
                     data = f.read().strip()
                 if "|" in data:
                     parts = data.split("|")

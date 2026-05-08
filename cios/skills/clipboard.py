@@ -11,13 +11,11 @@ Uses xclip/xsel for X11 clipboard access.
 """
 
 import logging
-import os
 import re
 import subprocess
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 from cios.core.config import CIOS_HOME
 
@@ -45,6 +43,7 @@ class ClipboardItem:
 @dataclass
 class ClipboardAction:
     """A suggested action based on clipboard content."""
+
     label: str
     command: str  # internal command to execute
     icon: str
@@ -64,10 +63,9 @@ class CognitiveClipboard:
         if _HISTORY_PATH.exists():
             try:
                 import json
+
                 data = json.loads(_HISTORY_PATH.read_text())
-                self._history = [
-                    ClipboardItem(**item) for item in data.get("items", [])
-                ]
+                self._history = [ClipboardItem(**item) for item in data.get("items", [])]
             except Exception as e:
                 logger.debug("Could not load clipboard history: %s", e)
 
@@ -75,6 +73,7 @@ class CognitiveClipboard:
         """Save clipboard history to disk."""
         try:
             import json
+
             CIOS_HOME.mkdir(parents=True, exist_ok=True)
             data = {
                 "items": [
@@ -91,12 +90,14 @@ class CognitiveClipboard:
         except Exception as e:
             logger.debug("Could not save clipboard history: %s", e)
 
-    def get_current(self) -> Optional[str]:
+    def get_current(self) -> str | None:
         """Get current clipboard content."""
         try:
             result = subprocess.run(
                 ["xclip", "-selection", "clipboard", "-o"],
-                capture_output=True, text=True, timeout=3,
+                capture_output=True,
+                text=True,
+                timeout=3,
             )
             if result.returncode == 0:
                 return result.stdout
@@ -105,7 +106,9 @@ class CognitiveClipboard:
             try:
                 result = subprocess.run(
                     ["xsel", "--clipboard", "--output"],
-                    capture_output=True, text=True, timeout=3,
+                    capture_output=True,
+                    text=True,
+                    timeout=3,
                 )
                 if result.returncode == 0:
                     return result.stdout
@@ -120,7 +123,8 @@ class CognitiveClipboard:
         try:
             proc = subprocess.Popen(
                 ["xclip", "-selection", "clipboard"],
-                stdin=subprocess.PIPE, timeout=3,
+                stdin=subprocess.PIPE,
+                timeout=3,
             )
             proc.communicate(input=content.encode("utf-8"), timeout=3)
             return proc.returncode == 0
@@ -128,7 +132,8 @@ class CognitiveClipboard:
             try:
                 proc = subprocess.Popen(
                     ["xsel", "--clipboard", "--input"],
-                    stdin=subprocess.PIPE, timeout=3,
+                    stdin=subprocess.PIPE,
+                    timeout=3,
                 )
                 proc.communicate(input=content.encode("utf-8"), timeout=3)
                 return proc.returncode == 0
@@ -138,7 +143,7 @@ class CognitiveClipboard:
             pass
         return False
 
-    def poll(self) -> Optional[ClipboardItem]:
+    def poll(self) -> ClipboardItem | None:
         """Check for new clipboard content. Returns new item or None."""
         content = self.get_current()
         if not content or content == self._last_content:
@@ -166,10 +171,9 @@ class CognitiveClipboard:
     def search_history(self, query: str) -> list[ClipboardItem]:
         """Search clipboard history."""
         query_lower = query.lower()
-        return [
-            item for item in reversed(self._history)
-            if query_lower in item.content.lower()
-        ][:10]
+        return [item for item in reversed(self._history) if query_lower in item.content.lower()][
+            :10
+        ]
 
     def paste_from_history(self, index: int) -> bool:
         """Paste an item from history (0 = most recent)."""
@@ -178,7 +182,7 @@ class CognitiveClipboard:
             return self.set_clipboard(items[index].content)
         return False
 
-    def suggest_actions(self, content: Optional[str] = None) -> list[ClipboardAction]:
+    def suggest_actions(self, content: str | None = None) -> list[ClipboardAction]:
         """Suggest actions based on clipboard content."""
         if content is None:
             content = self.get_current()
@@ -228,37 +232,35 @@ def detect_content_type(content: str) -> str:
     text = content.strip()
 
     # URL
-    if re.match(r'https?://\S+', text):
+    if re.match(r"https?://\S+", text):
         return "url"
 
     # Email
-    if re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', text):
+    if re.match(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", text):
         return "email"
 
     # File path
     if text.startswith("/") or text.startswith("~/") or text.startswith("./"):
-        if not " " in text.split("\n")[0]:  # single path, no spaces in first line
+        if " " not in text.split("\n")[0]:  # single path, no spaces in first line
             return "path"
 
     # Code (heuristic: contains common code patterns)
     code_indicators = [
-        r'^\s*(def |class |function |const |let |var |import |from |#include)',
-        r'[{}\[\]();]',
-        r'^\s*(if|for|while|return|try|catch)\s*[\(:]',
-        r'^\$\s',  # shell prompt
-        r'^(sudo|apt|pip|npm|git|docker|kubectl)\s',
+        r"^\s*(def |class |function |const |let |var |import |from |#include)",
+        r"[{}\[\]();]",
+        r"^\s*(if|for|while|return|try|catch)\s*[\(:]",
+        r"^\$\s",  # shell prompt
+        r"^(sudo|apt|pip|npm|git|docker|kubectl)\s",
     ]
     lines = text.splitlines()
     code_score = sum(
-        1 for line in lines[:10]
-        for pattern in code_indicators
-        if re.search(pattern, line)
+        1 for line in lines[:10] for pattern in code_indicators if re.search(pattern, line)
     )
-    if code_score >= 2 or (len(lines) == 1 and re.match(r'^(sudo|apt|pip|npm|git)\s', text)):
+    if code_score >= 2 or (len(lines) == 1 and re.match(r"^(sudo|apt|pip|npm|git)\s", text)):
         return "code"
 
     # Number
-    if re.match(r'^[\d.,]+$', text):
+    if re.match(r"^[\d.,]+$", text):
         return "number"
 
     return "text"

@@ -4,7 +4,6 @@ import json
 import sqlite3
 import time
 from dataclasses import dataclass, field
-from typing import Optional
 
 from cios.core import config as _config
 
@@ -17,7 +16,7 @@ class MemoryRecord:
     plan: list[str]
     commands: list[str]
     outcome: str  # "success" | "failure" | "recovered"
-    error: Optional[str] = None
+    error: str | None = None
     context: dict = field(default_factory=dict)
 
 
@@ -27,7 +26,7 @@ class SessionContext:
     project_path: str
     project_type: str  # "node", "python", etc.
     editor_command: str = ""
-    server_pid: Optional[int] = None
+    server_pid: int | None = None
     server_port: int = 0
     browser_url: str = ""
     start_command: str = ""
@@ -95,7 +94,7 @@ class Memory:
             )
             self._conn.commit()
 
-    def last_failure(self, intent: Optional[str] = None) -> Optional[MemoryRecord]:
+    def last_failure(self, intent: str | None = None) -> MemoryRecord | None:
         """Get the most recent failure, optionally filtered by intent."""
         with self._lock:
             if intent:
@@ -161,7 +160,7 @@ class Memory:
             )
             self._conn.commit()
 
-    def get_session(self, project_name: str) -> Optional[SessionContext]:
+    def get_session(self, project_name: str) -> SessionContext | None:
         """Retrieve the most recent session for a given project name."""
         with self._lock:
             row = self._conn.execute(
@@ -172,7 +171,7 @@ class Memory:
             ).fetchone()
         return self._row_to_session(row) if row else None
 
-    def get_latest_session(self) -> Optional[SessionContext]:
+    def get_latest_session(self) -> SessionContext | None:
         """Retrieve the session with the maximum timestamp across all projects."""
         with self._lock:
             row = self._conn.execute(

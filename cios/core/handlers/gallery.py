@@ -3,9 +3,9 @@
 import os
 
 from cios.core.executor import Executor
+from cios.core.handlers._common import PlanResult
 from cios.core.intent_parser import Intent
 from cios.core.memory import Memory
-from cios.core.handlers._common import PlanResult
 
 
 def handle_gallery_manage(intent: Intent, executor: Executor, memory: Memory) -> PlanResult:
@@ -34,14 +34,16 @@ def handle_gallery_manage(intent: Intent, executor: Executor, memory: Memory) ->
     elif action == "identify_face":
         return PlanResult(
             plan_steps=["Identificando rosto"],
-            results=[], outcome="success",
+            results=[],
+            outcome="success",
             summary="",
             data={"gallery_action": "identify_face"},
         )
     elif action == "select_mode":
         return PlanResult(
             plan_steps=["Entrando em modo seleção"],
-            results=[], outcome="success",
+            results=[],
+            outcome="success",
             summary="Modo seleção ativado. Toque nas fotos para selecionar.",
             voice_mode="brief",
             data={"gallery_action": "select_mode"},
@@ -73,7 +75,8 @@ def handle_gallery_manage(intent: Intent, executor: Executor, memory: Memory) ->
     else:
         return PlanResult(
             plan_steps=["Ação de galeria desconhecida"],
-            results=[], outcome="failure",
+            results=[],
+            outcome="failure",
             summary="Não entendi o que fazer com a galeria.",
         )
 
@@ -86,7 +89,8 @@ def _handle_toggle_favorite(intent: Intent, store) -> PlanResult:
         # Will be resolved by the UI (current image in viewer)
         return PlanResult(
             plan_steps=["Alternando favorito"],
-            results=[], outcome="success",
+            results=[],
+            outcome="success",
             summary="",
             data={"gallery_action": "toggle_favorite"},
         )
@@ -100,7 +104,8 @@ def _handle_toggle_favorite(intent: Intent, store) -> PlanResult:
 
     return PlanResult(
         plan_steps=["Alternando favorito"],
-        results=[], outcome="success",
+        results=[],
+        outcome="success",
         summary=summary,
         voice_mode="brief",
     )
@@ -118,7 +123,8 @@ def _handle_list_favorites(store) -> PlanResult:
     if not existing:
         return PlanResult(
             plan_steps=["Buscando favoritos"],
-            results=[], outcome="success",
+            results=[],
+            outcome="success",
             summary="Nenhum favorito ainda. Diga 'favoritar' ao ver uma foto.",
         )
 
@@ -126,13 +132,16 @@ def _handle_list_favorites(store) -> PlanResult:
     for path in existing:
         ext = os.path.splitext(path)[1].lower()
         from cios.skills.media_player import _ext_to_type
+
         media_type = _ext_to_type(ext)
-        files.append(MediaFile(
-            path=path,
-            name=os.path.basename(path),
-            media_type=media_type,
-            source="Favoritos",
-        ))
+        files.append(
+            MediaFile(
+                path=path,
+                name=os.path.basename(path),
+                media_type=media_type,
+                source="Favoritos",
+            )
+        )
 
     signal = GallerySignal(
         source_path="★ Favoritos",
@@ -144,7 +153,8 @@ def _handle_list_favorites(store) -> PlanResult:
 
     return PlanResult(
         plan_steps=["Carregando favoritos"],
-        results=[], outcome="success",
+        results=[],
+        outcome="success",
         summary=f"{len(files)} favoritos",
         voice_mode="brief",
         data=signal_data,
@@ -159,7 +169,8 @@ def _handle_delete(intent: Intent, store) -> PlanResult:
         # Will be resolved by the UI (current image in viewer/gallery)
         return PlanResult(
             plan_steps=["Preparando exclusão"],
-            results=[], outcome="success",
+            results=[],
+            outcome="success",
             summary="",
             data={"gallery_action": "delete_current"},
         )
@@ -169,14 +180,16 @@ def _handle_delete(intent: Intent, store) -> PlanResult:
         name = os.path.basename(file_path)
         return PlanResult(
             plan_steps=["Movendo para lixeira"],
-            results=[], outcome="success",
+            results=[],
+            outcome="success",
             summary=f"🗑 {name} movido para a lixeira. Diga 'desfazer' para restaurar.",
             voice_mode="brief",
         )
     else:
         return PlanResult(
             plan_steps=["Tentando deletar"],
-            results=[], outcome="failure",
+            results=[],
+            outcome="failure",
             summary="Não consegui mover o arquivo para a lixeira.",
         )
 
@@ -189,7 +202,8 @@ def _handle_delete_selected(intent: Intent, store) -> PlanResult:
         # Will be resolved by the UI (selected files in gallery)
         return PlanResult(
             plan_steps=["Preparando exclusão em grupo"],
-            results=[], outcome="success",
+            results=[],
+            outcome="success",
             summary="",
             data={"gallery_action": "delete_selected"},
         )
@@ -199,14 +213,16 @@ def _handle_delete_selected(intent: Intent, store) -> PlanResult:
     if count > 0:
         return PlanResult(
             plan_steps=[f"Movendo {count} arquivos para lixeira"],
-            results=[], outcome="success",
+            results=[],
+            outcome="success",
             summary=f"🗑 {count} arquivos movidos para a lixeira. Diga 'desfazer' para restaurar.",
             voice_mode="brief",
         )
     else:
         return PlanResult(
             plan_steps=["Tentando deletar"],
-            results=[], outcome="failure",
+            results=[],
+            outcome="failure",
             summary="Não consegui mover os arquivos para a lixeira.",
         )
 
@@ -218,14 +234,16 @@ def _handle_undo_delete(store) -> PlanResult:
         name = os.path.basename(restored)
         return PlanResult(
             plan_steps=["Restaurando arquivo"],
-            results=[], outcome="success",
+            results=[],
+            outcome="success",
             summary=f"↩ {name} restaurado.",
             voice_mode="brief",
         )
     else:
         return PlanResult(
             plan_steps=["Tentando restaurar"],
-            results=[], outcome="failure",
+            results=[],
+            outcome="failure",
             summary="Nada para desfazer.",
         )
 
@@ -236,7 +254,8 @@ def _handle_create_album(intent: Intent, store) -> PlanResult:
     if not name:
         return PlanResult(
             plan_steps=["Criando álbum"],
-            results=[], outcome="failure",
+            results=[],
+            outcome="failure",
             summary="Qual nome para o álbum?",
         )
 
@@ -244,14 +263,16 @@ def _handle_create_album(intent: Intent, store) -> PlanResult:
     if album:
         return PlanResult(
             plan_steps=["Criando álbum"],
-            results=[], outcome="success",
+            results=[],
+            outcome="success",
             summary=f"📁 Álbum '{name}' criado.",
             voice_mode="brief",
         )
     else:
         return PlanResult(
             plan_steps=["Criando álbum"],
-            results=[], outcome="failure",
+            results=[],
+            outcome="failure",
             summary=f"Já existe um álbum chamado '{name}'.",
         )
 
@@ -264,7 +285,8 @@ def _handle_show_album(intent: Intent, store) -> PlanResult:
     if not name:
         return PlanResult(
             plan_steps=["Abrindo álbum"],
-            results=[], outcome="failure",
+            results=[],
+            outcome="failure",
             summary="Qual álbum?",
         )
 
@@ -272,7 +294,8 @@ def _handle_show_album(intent: Intent, store) -> PlanResult:
     if not album:
         return PlanResult(
             plan_steps=["Buscando álbum"],
-            results=[], outcome="failure",
+            results=[],
+            outcome="failure",
             summary=f"Álbum '{name}' não encontrado.",
         )
 
@@ -282,7 +305,8 @@ def _handle_show_album(intent: Intent, store) -> PlanResult:
     if not existing:
         return PlanResult(
             plan_steps=["Abrindo álbum"],
-            results=[], outcome="success",
+            results=[],
+            outcome="success",
             summary=f"Álbum '{album.name}' está vazio.",
         )
 
@@ -290,12 +314,14 @@ def _handle_show_album(intent: Intent, store) -> PlanResult:
     for path in existing:
         ext = os.path.splitext(path)[1].lower()
         media_type = _ext_to_type(ext)
-        files.append(MediaFile(
-            path=path,
-            name=os.path.basename(path),
-            media_type=media_type,
-            source=album.name,
-        ))
+        files.append(
+            MediaFile(
+                path=path,
+                name=os.path.basename(path),
+                media_type=media_type,
+                source=album.name,
+            )
+        )
 
     signal = GallerySignal(
         source_path=f"📁 {album.name}",
@@ -307,7 +333,8 @@ def _handle_show_album(intent: Intent, store) -> PlanResult:
 
     return PlanResult(
         plan_steps=[f"Abrindo álbum '{album.name}'"],
-        results=[], outcome="success",
+        results=[],
+        outcome="success",
         summary=f"{len(files)} arquivos no álbum '{album.name}'",
         voice_mode="brief",
         data=signal_data,
@@ -321,7 +348,8 @@ def _handle_list_albums(store) -> PlanResult:
     if not albums:
         return PlanResult(
             plan_steps=["Listando álbuns"],
-            results=[], outcome="success",
+            results=[],
+            outcome="success",
             summary="Nenhum álbum criado. Diga 'criar álbum [nome]' para começar.",
         )
 
@@ -332,7 +360,8 @@ def _handle_list_albums(store) -> PlanResult:
     summary = "\n".join(lines)
     return PlanResult(
         plan_steps=["Listando álbuns"],
-        results=[], outcome="success",
+        results=[],
+        outcome="success",
         summary=summary,
     )
 
@@ -345,7 +374,8 @@ def _handle_add_to_album(intent: Intent, store) -> PlanResult:
     if not album_name:
         return PlanResult(
             plan_steps=["Adicionando ao álbum"],
-            results=[], outcome="failure",
+            results=[],
+            outcome="failure",
             summary="Qual álbum?",
         )
 
@@ -353,7 +383,8 @@ def _handle_add_to_album(intent: Intent, store) -> PlanResult:
         # Will be resolved by the UI
         return PlanResult(
             plan_steps=["Adicionando ao álbum"],
-            results=[], outcome="success",
+            results=[],
+            outcome="success",
             summary="",
             data={"gallery_action": "add_to_album", "album_name": album_name},
         )
@@ -365,7 +396,8 @@ def _handle_add_to_album(intent: Intent, store) -> PlanResult:
         if not album:
             return PlanResult(
                 plan_steps=["Adicionando ao álbum"],
-                results=[], outcome="failure",
+                results=[],
+                outcome="failure",
                 summary="Não consegui criar o álbum.",
             )
 
@@ -373,7 +405,8 @@ def _handle_add_to_album(intent: Intent, store) -> PlanResult:
     name = os.path.basename(file_path)
     return PlanResult(
         plan_steps=["Adicionando ao álbum"],
-        results=[], outcome="success",
+        results=[],
+        outcome="success",
         summary=f"{name} adicionado ao álbum '{album.name}'.",
         voice_mode="brief",
     )
@@ -381,15 +414,19 @@ def _handle_add_to_album(intent: Intent, store) -> PlanResult:
 
 def _handle_find_duplicates(store) -> PlanResult:
     """Scan for duplicate images and return results."""
-    from cios.skills.duplicates import scan_duplicates, format_size
+    from cios.skills.duplicates import format_size, scan_duplicates
     from cios.skills.media_player import GallerySignal, MediaFile
 
     result = scan_duplicates()
 
     if not result.groups:
         return PlanResult(
-            plan_steps=["Escaneando duplicatas", f"{result.total_files_scanned} arquivos verificados"],
-            results=[], outcome="success",
+            plan_steps=[
+                "Escaneando duplicatas",
+                f"{result.total_files_scanned} arquivos verificados",
+            ],
+            results=[],
+            outcome="success",
             summary="Nenhuma foto duplicada encontrada.",
         )
 
@@ -398,13 +435,15 @@ def _handle_find_duplicates(store) -> PlanResult:
     all_files = []
     for group in result.groups:
         for f in group.files:
-            all_files.append(MediaFile(
-                path=f.path,
-                name=f.name,
-                media_type="image",
-                size_bytes=f.size_bytes,
-                source=f"{'Idêntica' if group.match_type == 'exact' else 'Similar'} ({len(group.files)} cópias)",
-            ))
+            all_files.append(
+                MediaFile(
+                    path=f.path,
+                    name=f.name,
+                    media_type="image",
+                    size_bytes=f.size_bytes,
+                    source=f"{'Idêntica' if group.match_type == 'exact' else 'Similar'} ({len(group.files)} cópias)",
+                )
+            )
 
     wasted_str = format_size(result.wasted_bytes)
     summary = (
@@ -443,7 +482,8 @@ def _handle_find_duplicates(store) -> PlanResult:
             f"Escaneando {result.total_files_scanned} arquivos…",
             f"{result.total_duplicates} duplicatas encontradas",
         ],
-        results=[], outcome="success",
+        results=[],
+        outcome="success",
         summary=summary,
         voice_mode="brief",
         data=signal_data,
@@ -452,14 +492,15 @@ def _handle_find_duplicates(store) -> PlanResult:
 
 def _handle_search_date(intent: Intent) -> PlanResult:
     """Search media files by date."""
-    from cios.skills.gallery_search import search_by_date, format_date_range
+    from cios.skills.gallery_search import format_date_range, search_by_date
     from cios.skills.media_player import GallerySignal, MediaFile
 
     date_query = intent.params.get("date_query", "")
     if not date_query:
         return PlanResult(
             plan_steps=["Buscando por data"],
-            results=[], outcome="failure",
+            results=[],
+            outcome="failure",
             summary="De quando? (ontem, esta semana, janeiro, 2024…)",
         )
 
@@ -469,20 +510,23 @@ def _handle_search_date(intent: Intent) -> PlanResult:
         label = format_date_range(date_query)
         return PlanResult(
             plan_steps=[f"Buscando fotos: {label}"],
-            results=[], outcome="success",
+            results=[],
+            outcome="success",
             summary=f"Nenhuma foto encontrada para '{label}'.",
         )
 
     # Convert to MediaFile for gallery signal
     media_files = []
     for f in result.files:
-        media_files.append(MediaFile(
-            path=f["path"],
-            name=f["name"],
-            media_type=f.get("media_type", "image"),
-            size_bytes=f.get("size_bytes", 0),
-            source=format_date_range(date_query),
-        ))
+        media_files.append(
+            MediaFile(
+                path=f["path"],
+                name=f["name"],
+                media_type=f.get("media_type", "image"),
+                size_bytes=f.get("size_bytes", 0),
+                source=format_date_range(date_query),
+            )
+        )
 
     label = format_date_range(date_query)
     signal = GallerySignal(
@@ -495,7 +539,8 @@ def _handle_search_date(intent: Intent) -> PlanResult:
 
     return PlanResult(
         plan_steps=[f"Buscando fotos: {label}"],
-        results=[], outcome="success",
+        results=[],
+        outcome="success",
         summary=f"{len(media_files)} arquivos de '{label}'",
         voice_mode="brief",
         data=signal_data,
@@ -511,7 +556,8 @@ def _handle_search_text(intent: Intent) -> PlanResult:
     if not text_query:
         return PlanResult(
             plan_steps=["Buscando por conteúdo"],
-            results=[], outcome="failure",
+            results=[],
+            outcome="failure",
             summary="O que procura? (praia, cachorro, família…)",
         )
 
@@ -520,20 +566,23 @@ def _handle_search_text(intent: Intent) -> PlanResult:
     if not result.files:
         return PlanResult(
             plan_steps=[f"Buscando: {text_query}"],
-            results=[], outcome="success",
+            results=[],
+            outcome="success",
             summary=f"Nenhuma foto encontrada para '{text_query}'.",
         )
 
     # Convert to MediaFile
     media_files = []
     for f in result.files:
-        media_files.append(MediaFile(
-            path=f["path"],
-            name=f["name"],
-            media_type=f.get("media_type", "image"),
-            size_bytes=f.get("size_bytes", 0),
-            source=f"🔍 {text_query}",
-        ))
+        media_files.append(
+            MediaFile(
+                path=f["path"],
+                name=f["name"],
+                media_type=f.get("media_type", "image"),
+                size_bytes=f.get("size_bytes", 0),
+                source=f"🔍 {text_query}",
+            )
+        )
 
     search_type_label = {
         "clip": "IA",
@@ -550,7 +599,8 @@ def _handle_search_text(intent: Intent) -> PlanResult:
 
     return PlanResult(
         plan_steps=[f"Buscando: {text_query}"],
-        results=[], outcome="success",
+        results=[],
+        outcome="success",
         summary=f"{len(media_files)} resultados para '{text_query}'",
         voice_mode="brief",
         data=signal_data,
@@ -569,12 +619,13 @@ def _handle_edit_action(intent: Intent, edit_type: str) -> PlanResult:
         }
         return PlanResult(
             plan_steps=["Editando imagem"],
-            results=[], outcome="success",
+            results=[],
+            outcome="success",
             summary="",
             data={"gallery_action": action_map.get(edit_type, edit_type)},
         )
 
-    from cios.skills.image_edit import rotate_image, flip_image
+    from cios.skills.image_edit import flip_image, rotate_image
 
     if edit_type == "rotate":
         degrees = intent.params.get("degrees", 90)
@@ -582,7 +633,8 @@ def _handle_edit_action(intent: Intent, edit_type: str) -> PlanResult:
         if result:
             return PlanResult(
                 plan_steps=["Rotacionando imagem"],
-                results=[], outcome="success",
+                results=[],
+                outcome="success",
                 summary=f"Imagem rotacionada {degrees}°.",
                 voice_mode="brief",
             )
@@ -592,14 +644,16 @@ def _handle_edit_action(intent: Intent, edit_type: str) -> PlanResult:
         if result:
             return PlanResult(
                 plan_steps=["Espelhando imagem"],
-                results=[], outcome="success",
+                results=[],
+                outcome="success",
                 summary=f"Imagem espelhada ({direction}).",
                 voice_mode="brief",
             )
 
     return PlanResult(
         plan_steps=["Editando imagem"],
-        results=[], outcome="failure",
+        results=[],
+        outcome="failure",
         summary="Não consegui editar a imagem.",
     )
 
@@ -611,16 +665,19 @@ def _handle_share(intent: Intent) -> PlanResult:
     if not file_path:
         return PlanResult(
             plan_steps=["Compartilhando"],
-            results=[], outcome="success",
+            results=[],
+            outcome="success",
             summary="",
             data={"gallery_action": "share"},
         )
 
     from cios.skills.image_edit import share_file
+
     ok, msg = share_file(file_path)
     return PlanResult(
         plan_steps=["Compartilhando"],
-        results=[], outcome="success" if ok else "failure",
+        results=[],
+        outcome="success" if ok else "failure",
         summary=msg,
         voice_mode="brief",
     )
@@ -633,34 +690,43 @@ def _handle_show_info(intent: Intent) -> PlanResult:
     if not file_path:
         return PlanResult(
             plan_steps=["Mostrando informações"],
-            results=[], outcome="success",
+            results=[],
+            outcome="success",
             summary="",
             data={"gallery_action": "show_info"},
         )
 
-    from cios.skills.image_edit import get_metadata, format_metadata
+    from cios.skills.image_edit import format_metadata, get_metadata
+
     meta = get_metadata(file_path)
     if meta:
         return PlanResult(
             plan_steps=["Lendo metadados"],
-            results=[], outcome="success",
+            results=[],
+            outcome="success",
             summary=format_metadata(meta),
         )
     return PlanResult(
         plan_steps=["Lendo metadados"],
-        results=[], outcome="failure",
+        results=[],
+        outcome="failure",
         summary="Não consegui ler os metadados da imagem.",
     )
 
 
 def _handle_scan_faces() -> PlanResult:
     """Scan photos for faces and cluster them."""
-    from cios.skills.face_cluster import scan_and_cluster, is_face_recognition_available, get_install_instructions
+    from cios.skills.face_cluster import (
+        get_install_instructions,
+        is_face_recognition_available,
+        scan_and_cluster,
+    )
 
     if not is_face_recognition_available():
         return PlanResult(
             plan_steps=["Verificando dependências"],
-            results=[], outcome="failure",
+            results=[],
+            outcome="failure",
             summary=get_install_instructions(),
         )
 
@@ -669,7 +735,8 @@ def _handle_scan_faces() -> PlanResult:
     if result.error:
         return PlanResult(
             plan_steps=["Escaneando rostos"],
-            results=[], outcome="failure",
+            results=[],
+            outcome="failure",
             summary=result.error,
         )
 
@@ -679,13 +746,12 @@ def _handle_scan_faces() -> PlanResult:
                 f"Escaneando {result.total_images_scanned} imagens",
                 f"{result.total_faces_found} rostos detectados",
             ],
-            results=[], outcome="success",
+            results=[],
+            outcome="success",
             summary="Nenhum grupo de pessoas identificado ainda. Preciso de mais fotos com rostos.",
         )
 
-    people_list = "\n".join(
-        f"  {c.name} ({c.face_count} fotos)" for c in result.clusters
-    )
+    people_list = "\n".join(f"  {c.name} ({c.face_count} fotos)" for c in result.clusters)
     summary = (
         f"{result.total_faces_found} rostos em {len(result.clusters)} pessoas:\n"
         f"{people_list}\n\n"
@@ -697,19 +763,25 @@ def _handle_scan_faces() -> PlanResult:
             f"Escaneando {result.total_images_scanned} imagens",
             f"{result.total_faces_found} rostos → {len(result.clusters)} pessoas",
         ],
-        results=[], outcome="success",
+        results=[],
+        outcome="success",
         summary=summary,
     )
 
 
 def _handle_list_people() -> PlanResult:
     """List all known people (face clusters)."""
-    from cios.skills.face_cluster import list_people, is_face_recognition_available, get_install_instructions
+    from cios.skills.face_cluster import (
+        get_install_instructions,
+        is_face_recognition_available,
+        list_people,
+    )
 
     if not is_face_recognition_available():
         return PlanResult(
             plan_steps=["Verificando dependências"],
-            results=[], outcome="failure",
+            results=[],
+            outcome="failure",
             summary=get_install_instructions(),
         )
 
@@ -718,27 +790,34 @@ def _handle_list_people() -> PlanResult:
     if not people:
         return PlanResult(
             plan_steps=["Listando pessoas"],
-            results=[], outcome="success",
+            results=[],
+            outcome="success",
             summary="Nenhuma pessoa identificada. Diga 'escanear rostos' primeiro.",
         )
 
     lines = [f"  {p.name} ({p.face_count} fotos)" for p in people]
     return PlanResult(
         plan_steps=["Listando pessoas"],
-        results=[], outcome="success",
+        results=[],
+        outcome="success",
         summary=f"{len(people)} pessoas:\n" + "\n".join(lines),
     )
 
 
 def _handle_search_person(intent: Intent) -> PlanResult:
     """Show photos of a specific person."""
-    from cios.skills.face_cluster import get_person_photos, is_face_recognition_available, get_install_instructions
+    from cios.skills.face_cluster import (
+        get_install_instructions,
+        get_person_photos,
+        is_face_recognition_available,
+    )
     from cios.skills.media_player import GallerySignal, MediaFile
 
     if not is_face_recognition_available():
         return PlanResult(
             plan_steps=["Verificando dependências"],
-            results=[], outcome="failure",
+            results=[],
+            outcome="failure",
             summary=get_install_instructions(),
         )
 
@@ -746,7 +825,8 @@ def _handle_search_person(intent: Intent) -> PlanResult:
     if not name:
         return PlanResult(
             plan_steps=["Buscando pessoa"],
-            results=[], outcome="failure",
+            results=[],
+            outcome="failure",
             summary="De quem? Diga 'fotos do [nome]'.",
         )
 
@@ -755,10 +835,11 @@ def _handle_search_person(intent: Intent) -> PlanResult:
     if not paths:
         return PlanResult(
             plan_steps=[f"Buscando fotos de {name}"],
-            results=[], outcome="success",
+            results=[],
+            outcome="success",
             summary=f"Nenhuma foto encontrada para '{name}'. "
-                    f"Diga 'escanear rostos' para detectar pessoas, "
-                    f"depois 'nomear pessoa de {name}' para atribuir um nome.",
+            f"Diga 'escanear rostos' para detectar pessoas, "
+            f"depois 'nomear pessoa de {name}' para atribuir um nome.",
         )
 
     # Filter to existing files
@@ -766,7 +847,8 @@ def _handle_search_person(intent: Intent) -> PlanResult:
     if not existing:
         return PlanResult(
             plan_steps=[f"Buscando fotos de {name}"],
-            results=[], outcome="success",
+            results=[],
+            outcome="success",
             summary=f"Fotos de '{name}' não encontradas no disco.",
         )
 
@@ -790,7 +872,8 @@ def _handle_search_person(intent: Intent) -> PlanResult:
 
     return PlanResult(
         plan_steps=[f"Buscando fotos de {name}"],
-        results=[], outcome="success",
+        results=[],
+        outcome="success",
         summary=f"{len(files)} fotos de {name}",
         voice_mode="brief",
         data=signal_data,
@@ -799,13 +882,15 @@ def _handle_search_person(intent: Intent) -> PlanResult:
 
 def _handle_name_person(intent: Intent) -> PlanResult:
     """Name a face cluster."""
-    from cios.skills.face_cluster import name_person, list_people, is_face_recognition_available
+    from cios.skills.face_cluster import is_face_recognition_available, list_people, name_person
 
     if not is_face_recognition_available():
         from cios.skills.face_cluster import get_install_instructions
+
         return PlanResult(
             plan_steps=["Verificando dependências"],
-            results=[], outcome="failure",
+            results=[],
+            outcome="failure",
             summary=get_install_instructions(),
         )
 
@@ -813,7 +898,8 @@ def _handle_name_person(intent: Intent) -> PlanResult:
     if not person_name:
         return PlanResult(
             plan_steps=["Nomeando pessoa"],
-            results=[], outcome="failure",
+            results=[],
+            outcome="failure",
             summary="Qual nome?",
         )
 
@@ -824,7 +910,8 @@ def _handle_name_person(intent: Intent) -> PlanResult:
     if not unnamed:
         return PlanResult(
             plan_steps=["Nomeando pessoa"],
-            results=[], outcome="failure",
+            results=[],
+            outcome="failure",
             summary="Nenhuma pessoa sem nome. Escaneie rostos primeiro.",
         )
 
@@ -834,7 +921,8 @@ def _handle_name_person(intent: Intent) -> PlanResult:
 
     return PlanResult(
         plan_steps=["Nomeando pessoa"],
-        results=[], outcome="success",
+        results=[],
+        outcome="success",
         summary=f"'{target.name}' agora se chama '{person_name}'.",
         voice_mode="brief",
     )

@@ -14,18 +14,17 @@ Dependencies:
 import logging
 import os
 import shutil
-import subprocess
 import signal
+import subprocess
 import time
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  PATHS
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def _screenshots_dir() -> Path:
     """Get screenshots directory, creating if needed."""
@@ -49,6 +48,7 @@ def _timestamp() -> str:
 # ═══════════════════════════════════════════════════════════════════════════
 #  SCREENSHOT
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def take_screenshot(mode: str = "full", delay: int = 0) -> tuple[bool, str]:
     """Take a screenshot.
@@ -150,7 +150,7 @@ def _screenshot_import(output: str, mode: str) -> tuple[bool, str]:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         if result.returncode == 0 and os.path.isfile(output):
             return True, output
-        return False, f"Falha na captura"
+        return False, "Falha na captura"
     except Exception as e:
         return False, f"Erro: {e}"
 
@@ -160,8 +160,8 @@ def _screenshot_import(output: str, mode: str) -> tuple[bool, str]:
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Global state for active recording
-_recording_process: Optional[subprocess.Popen] = None
-_recording_path: Optional[str] = None
+_recording_process: subprocess.Popen | None = None
+_recording_path: str | None = None
 
 
 def start_recording(with_audio: bool = True) -> tuple[bool, str]:
@@ -191,21 +191,30 @@ def start_recording(with_audio: bool = True) -> tuple[bool, str]:
 
     cmd = [
         "ffmpeg",
-        "-video_size", resolution,
-        "-framerate", "30",
-        "-f", "x11grab",
-        "-i", os.environ.get("DISPLAY", ":0"),
+        "-video_size",
+        resolution,
+        "-framerate",
+        "30",
+        "-f",
+        "x11grab",
+        "-i",
+        os.environ.get("DISPLAY", ":0"),
     ]
 
     if with_audio:
         # Try PulseAudio/PipeWire
         cmd.extend(["-f", "pulse", "-i", "default"])
 
-    cmd.extend([
-        "-c:v", "libx264",
-        "-preset", "ultrafast",
-        "-crf", "23",
-    ])
+    cmd.extend(
+        [
+            "-c:v",
+            "libx264",
+            "-preset",
+            "ultrafast",
+            "-crf",
+            "23",
+        ]
+    )
 
     if with_audio:
         cmd.extend(["-c:a", "aac", "-b:a", "128k"])
@@ -220,7 +229,7 @@ def start_recording(with_audio: bool = True) -> tuple[bool, str]:
             stdin=subprocess.PIPE,
             start_new_session=True,
         )
-        return True, f"Gravando… Diga 'parar gravação' para finalizar."
+        return True, "Gravando… Diga 'parar gravação' para finalizar."
     except Exception as e:
         _recording_process = None
         _recording_path = None
@@ -272,14 +281,17 @@ def is_recording() -> bool:
 #  HELPERS
 # ═══════════════════════════════════════════════════════════════════════════
 
-def _get_active_window_id() -> Optional[str]:
+
+def _get_active_window_id() -> str | None:
     """Get the active window ID using xdotool."""
     if not shutil.which("xdotool"):
         return None
     try:
         result = subprocess.run(
             ["xdotool", "getactivewindow"],
-            capture_output=True, text=True, timeout=3,
+            capture_output=True,
+            text=True,
+            timeout=3,
         )
         if result.returncode == 0:
             return result.stdout.strip()
@@ -288,16 +300,19 @@ def _get_active_window_id() -> Optional[str]:
     return None
 
 
-def _get_screen_resolution() -> Optional[str]:
+def _get_screen_resolution() -> str | None:
     """Get screen resolution (e.g., '1920x1080')."""
     if shutil.which("xrandr"):
         try:
             result = subprocess.run(
                 ["xrandr", "--current"],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             if result.returncode == 0:
                 import re
+
                 match = re.search(r"(\d+x\d+)\+0\+0", result.stdout)
                 if match:
                     return match.group(1)

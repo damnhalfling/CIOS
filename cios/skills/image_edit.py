@@ -13,12 +13,10 @@ All edits save to a new file (non-destructive) unless overwrite is requested.
 
 import logging
 import os
-import subprocess
 import shutil
-import time
-from dataclasses import dataclass, field
+import subprocess
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +25,11 @@ logger = logging.getLogger(__name__)
 #  EXIF METADATA (#257)
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class ImageMetadata:
     """Extracted image metadata."""
+
     width: int = 0
     height: int = 0
     format: str = ""
@@ -40,19 +40,18 @@ class ImageMetadata:
     focal_length: str = ""
     exposure: str = ""
     iso: str = ""
-    gps_lat: Optional[float] = None
-    gps_lon: Optional[float] = None
+    gps_lat: float | None = None
+    gps_lon: float | None = None
     orientation: int = 1
 
 
-def get_metadata(file_path: str) -> Optional[ImageMetadata]:
+def get_metadata(file_path: str) -> ImageMetadata | None:
     """Extract EXIF and basic metadata from an image file.
 
     Returns ImageMetadata or None if file cannot be read.
     """
     try:
         from PIL import Image
-        from PIL.ExifTags import TAGS, GPSTAGS
 
         img = Image.open(file_path)
         stat = os.stat(file_path)
@@ -83,14 +82,14 @@ def get_metadata(file_path: str) -> Optional[ImageMetadata]:
             # Exposure settings
             focal = exif_data.get(37386)  # FocalLength
             if focal:
-                if hasattr(focal, 'numerator'):
+                if hasattr(focal, "numerator"):
                     meta.focal_length = f"{focal.numerator / focal.denominator:.0f}mm"
                 else:
                     meta.focal_length = f"{focal}mm"
 
             exposure = exif_data.get(33434)  # ExposureTime
             if exposure:
-                if hasattr(exposure, 'numerator') and exposure.numerator > 0:
+                if hasattr(exposure, "numerator") and exposure.numerator > 0:
                     if exposure.numerator == 1:
                         meta.exposure = f"1/{exposure.denominator}s"
                     else:
@@ -127,7 +126,7 @@ def get_metadata(file_path: str) -> Optional[ImageMetadata]:
         return None
 
 
-def _convert_gps(coords, ref) -> Optional[float]:
+def _convert_gps(coords, ref) -> float | None:
     """Convert GPS coordinates from EXIF format to decimal degrees."""
     if not coords or not ref:
         return None
@@ -190,7 +189,8 @@ def _format_size(bytes_val: int) -> str:
 #  IMAGE EDITING (#258)
 # ═══════════════════════════════════════════════════════════════════════════
 
-def rotate_image(file_path: str, degrees: int = 90, overwrite: bool = True) -> Optional[str]:
+
+def rotate_image(file_path: str, degrees: int = 90, overwrite: bool = True) -> str | None:
     """Rotate an image by 90, 180, or 270 degrees.
 
     Args:
@@ -226,7 +226,7 @@ def rotate_image(file_path: str, degrees: int = 90, overwrite: bool = True) -> O
         return None
 
 
-def flip_image(file_path: str, direction: str = "horizontal", overwrite: bool = True) -> Optional[str]:
+def flip_image(file_path: str, direction: str = "horizontal", overwrite: bool = True) -> str | None:
     """Flip an image horizontally or vertically.
 
     Args:
@@ -261,9 +261,12 @@ def flip_image(file_path: str, direction: str = "horizontal", overwrite: bool = 
 
 def crop_image(
     file_path: str,
-    left: int, top: int, right: int, bottom: int,
+    left: int,
+    top: int,
+    right: int,
+    bottom: int,
     overwrite: bool = True,
-) -> Optional[str]:
+) -> str | None:
     """Crop an image to the specified rectangle.
 
     Args:
@@ -303,7 +306,7 @@ def adjust_image(
     brightness: float = 1.0,
     contrast: float = 1.0,
     overwrite: bool = True,
-) -> Optional[str]:
+) -> str | None:
     """Adjust brightness and contrast of an image.
 
     Args:
@@ -341,6 +344,7 @@ def adjust_image(
 # ═══════════════════════════════════════════════════════════════════════════
 #  SHARE (#259)
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def share_file(file_path: str) -> tuple[bool, str]:
     """Share a file using xdg-open (opens system share dialog).
@@ -382,6 +386,7 @@ def share_file(file_path: str) -> tuple[bool, str]:
 # ═══════════════════════════════════════════════════════════════════════════
 #  HELPERS
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def _edited_path(file_path: str) -> str:
     """Generate an _edited variant of a file path."""

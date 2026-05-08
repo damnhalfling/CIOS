@@ -11,24 +11,21 @@ If xrandr is not installed, auto-installs it via apt (non-blocking suggestion).
 """
 
 import logging
-import os
 import re
 import shutil
 import subprocess
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class Monitor:
-    name: str           # e.g. "HDMI-1", "eDP-1"
+    name: str  # e.g. "HDMI-1", "eDP-1"
     width: int
     height: int
-    x: int              # x offset
-    y: int              # y offset
+    x: int  # x offset
+    y: int  # y offset
     primary: bool
 
 
@@ -72,7 +69,9 @@ def _detect_via_xrandr() -> list[Monitor]:
     try:
         result = subprocess.run(
             ["xrandr", "--query"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode != 0:
             logger.debug("xrandr returned non-zero: %s", result.stderr.strip()[:100])
@@ -86,14 +85,16 @@ def _detect_via_xrandr() -> list[Monitor]:
                 line,
             )
             if match:
-                monitors.append(Monitor(
-                    name=match.group(1),
-                    width=int(match.group(3)),
-                    height=int(match.group(4)),
-                    x=int(match.group(5)),
-                    y=int(match.group(6)),
-                    primary=bool(match.group(2)),
-                ))
+                monitors.append(
+                    Monitor(
+                        name=match.group(1),
+                        width=int(match.group(3)),
+                        height=int(match.group(4)),
+                        x=int(match.group(5)),
+                        y=int(match.group(6)),
+                        primary=bool(match.group(2)),
+                    )
+                )
 
     except FileNotFoundError:
         logger.debug("xrandr binary not found")
@@ -117,6 +118,7 @@ def _detect_via_tkinter() -> list[Monitor]:
 
     try:
         import tkinter as tk
+
         # Use a temporary hidden window to query screen info
         probe = tk.Tk()
         probe.withdraw()
@@ -137,34 +139,51 @@ def _detect_via_tkinter() -> list[Monitor]:
             n_monitors = round(aspect / 1.6)  # ~16:10 per monitor
             mon_w = screen_w // n_monitors
             for i in range(n_monitors):
-                monitors.append(Monitor(
-                    name=f"screen-{i}",
-                    width=mon_w,
-                    height=screen_h,
-                    x=mon_w * i,
-                    y=0,
-                    primary=(i == 0),
-                ))
+                monitors.append(
+                    Monitor(
+                        name=f"screen-{i}",
+                        width=mon_w,
+                        height=screen_h,
+                        x=mon_w * i,
+                        y=0,
+                        primary=(i == 0),
+                    )
+                )
         elif aspect > 1.9:
             # Likely 2 monitors side by side
             half_w = screen_w // 2
-            monitors.append(Monitor(
-                name="screen-0",
-                width=half_w, height=screen_h,
-                x=0, y=0, primary=True,
-            ))
-            monitors.append(Monitor(
-                name="screen-1",
-                width=screen_w - half_w, height=screen_h,
-                x=half_w, y=0, primary=False,
-            ))
+            monitors.append(
+                Monitor(
+                    name="screen-0",
+                    width=half_w,
+                    height=screen_h,
+                    x=0,
+                    y=0,
+                    primary=True,
+                )
+            )
+            monitors.append(
+                Monitor(
+                    name="screen-1",
+                    width=screen_w - half_w,
+                    height=screen_h,
+                    x=half_w,
+                    y=0,
+                    primary=False,
+                )
+            )
         else:
             # Single monitor
-            monitors.append(Monitor(
-                name="screen-0",
-                width=screen_w, height=screen_h,
-                x=0, y=0, primary=True,
-            ))
+            monitors.append(
+                Monitor(
+                    name="screen-0",
+                    width=screen_w,
+                    height=screen_h,
+                    x=0,
+                    y=0,
+                    primary=True,
+                )
+            )
 
     except ImportError:
         logger.debug("Tkinter not available for screen detection")
@@ -189,7 +208,7 @@ def get_secondary_monitors() -> list[Monitor]:
     return [m for m in detect_monitors() if not m.primary]
 
 
-def get_primary_monitor() -> Optional[Monitor]:
+def get_primary_monitor() -> Monitor | None:
     """Get the primary monitor."""
     monitors = detect_monitors()
     for m in monitors:

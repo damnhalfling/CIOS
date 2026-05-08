@@ -9,13 +9,11 @@ Supports EN and PT-BR. Language is auto-detected from system locale.
 import locale
 import os
 import re
-from typing import Optional
 
 from cios.core.planner import PlanResult
-from cios.core.executor import ExecResult
-
 
 # ── Language detection ──────────────────────────────────────────────────
+
 
 def _detect_language() -> str:
     """Detect system language. Returns 'pt' or 'en'."""
@@ -228,7 +226,7 @@ _PT_MAP: dict[str, str] = {
     "Which device?": "Qual dispositivo?",
     "No paired devices. Try: scan bluetooth": "Nenhum dispositivo pareado. Tente: escanear bluetooth",
     "Which device should I remove?": "Qual dispositivo devo remover?",
-    "Connected to": "Conectado a",
+    "Connected to device": "Conectado a",
     "Disconnected from": "Desconectado de",
     "Removed": "Removido",
     "Trusted": "Confiável",
@@ -481,9 +479,18 @@ def humanize_step(step: str) -> str:
 # ── Summary translations ────────────────────────────────────────────────
 _SUMMARY_TRANSLATIONS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"Server running on port (\d+) \(PID \d+\)"), "Server running."),
-    (re.compile(r"Fixed port conflict and (?:re)?started server \(PID \d+\)"), "Resolved the conflict — your project is running"),
-    (re.compile(r"Fixed port conflict and (?:re)?started server"), "Resolved the conflict — your project is running"),
-    (re.compile(r"Fixed port conflict and restarted server"), "Resolved the conflict — your project is running"),
+    (
+        re.compile(r"Fixed port conflict and (?:re)?started server \(PID \d+\)"),
+        "Resolved the conflict — your project is running",
+    ),
+    (
+        re.compile(r"Fixed port conflict and (?:re)?started server"),
+        "Resolved the conflict — your project is running",
+    ),
+    (
+        re.compile(r"Fixed port conflict and restarted server"),
+        "Resolved the conflict — your project is running",
+    ),
     (re.compile(r"Killed process on port (\d+)"), "Stopped the service on port {0}"),
     (re.compile(r"Failed to kill process on port (\d+)"), "Couldn't stop the service on port {0}"),
     (re.compile(r"Port (\d+): (.+?) \(PID \d+\)"), "{1} is using port {0}"),
@@ -491,9 +498,18 @@ _SUMMARY_TRANSLATIONS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"No recent failures found"), "Everything looks good — no recent issues"),
     (re.compile(r"Applied fix: (.+)"), "Fixed: {0}"),
     (re.compile(r"Attempted fix but failed\. (.+)"), "Couldn't fix automatically. {0}"),
-    (re.compile(r"Reinstalled deps and restarted server \(PID \d+\)"), "Reinstalled components and restarted — running now"),
-    (re.compile(r"Reinstalled components and restarted — running now"), "Reinstalled components and restarted — running now"),
-    (re.compile(r"I don't understand that request"), 'I\'m not sure what you mean. Try something like "start my backend" or "what\'s running?"'),
+    (
+        re.compile(r"Reinstalled deps and restarted server \(PID \d+\)"),
+        "Reinstalled components and restarted — running now",
+    ),
+    (
+        re.compile(r"Reinstalled components and restarted — running now"),
+        "Reinstalled components and restarted — running now",
+    ),
+    (
+        re.compile(r"I don't understand that request"),
+        'I\'m not sure what you mean. Try something like "start my backend" or "what\'s running?"',
+    ),
     (re.compile(r"What command should I run\?"), "What would you like me to do?"),
     (re.compile(r"Which port\?.*"), "Which port should I look at?"),
     # Continue project / workspace restoration
@@ -502,7 +518,7 @@ _SUMMARY_TRANSLATIONS: list[tuple[re.Pattern, str]] = [
     # App launcher
     (re.compile(r"(.+) opened"), "{0} is open"),
     (re.compile(r"Failed to open (.+)"), "Couldn't open {0}"),
-    (re.compile(r"App not found: (.+)"), "I couldn't find an app called \"{0}\""),
+    (re.compile(r"App not found: (.+)"), 'I couldn\'t find an app called "{0}"'),
     (re.compile(r"Which app should I open\?"), "Which app do you want me to open?"),
     # Session control
     (re.compile(r"Desligar o computador"), "Shutting down…"),
@@ -555,7 +571,10 @@ _ERROR_TRANSLATIONS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"EADDRINUSE.*:(\d+)", re.IGNORECASE), "Port {0} is busy"),
     (re.compile(r"Port (\d+) already in use"), "Port {0} is busy"),
     (re.compile(r"EACCES|permission denied", re.IGNORECASE), "Permission needed"),
-    (re.compile(r"MODULE_NOT_FOUND|Cannot find module", re.IGNORECASE), "Missing component detected"),
+    (
+        re.compile(r"MODULE_NOT_FOUND|Cannot find module", re.IGNORECASE),
+        "Missing component detected",
+    ),
     (re.compile(r"ENOSPC", re.IGNORECASE), "Storage is full"),
     (re.compile(r"ECONNREFUSED", re.IGNORECASE), "Service not reachable"),
     (re.compile(r"SyntaxError|Unexpected token", re.IGNORECASE), "Code error detected"),

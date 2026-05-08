@@ -6,10 +6,10 @@ API keys are stored locally and never leave the machine.
 """
 
 import json
-import os
 import logging
+import os
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -21,17 +21,18 @@ SETTINGS_PATH = CIOS_HOME / "settings.json"
 
 # --- Logo ---
 _LOGO_SEARCH_PATHS = [
-    Path("/usr/share/pixmaps/cios-logo.png"),          # installed via .deb
+    Path("/usr/share/pixmaps/cios-logo.png"),  # installed via .deb
     Path(__file__).parent.parent.parent / "assets" / "cios_logo.png",  # dev
 ]
 
 
-def get_logo_path() -> Optional[Path]:
+def get_logo_path() -> Path | None:
     """Find the CIOS logo PNG. Returns None if not found."""
     for p in _LOGO_SEARCH_PATHS:
         if p.is_file():
             return p
     return None
+
 
 # --- Execution ---
 MAX_PLAN_STEPS = 5
@@ -43,26 +44,20 @@ HOTKEY = os.environ.get("CIOS_HOTKEY", "ctrl+space")
 
 # --- Default settings ---
 _DEFAULTS: dict[str, Any] = {
-    # Provider: "ollama", "openai", "anthropic", "bedrock"
+    # Provider: "ollama" (local, always first), external only when needed
     "llm_provider": "ollama",
-
-    # Ollama
+    # Ollama (local LLM — primary)
     "ollama_url": "http://localhost:11434",
     "ollama_model": "mistral",
-
-    # OpenAI
+    # OpenAI (client's own key — external)
     "openai_api_key": "",
     "openai_model": "gpt-4o-mini",
-
-    # Anthropic (direct API)
+    # Anthropic (client's own key — external)
     "anthropic_api_key": "",
     "anthropic_model": "claude-3-haiku-20240307",
-
-    # AWS Bedrock
-    "bedrock_region": "us-east-1",
-    "bedrock_model_id": "anthropic.claude-3-haiku-20240307-v1:0",
-    "aws_access_key_id": "",
-    "aws_secret_access_key": "",
+    # CIOS API (paid service — external)
+    "cios_api_key": "",
+    "cios_api_url": "https://api.ciosia.com",
 }
 
 # In-memory settings cache
@@ -101,7 +96,7 @@ def _load_settings() -> dict[str, Any]:
     settings = dict(_DEFAULTS)
     if SETTINGS_PATH.exists():
         try:
-            with open(SETTINGS_PATH, "r") as f:
+            with open(SETTINGS_PATH) as f:
                 saved = json.load(f)
             settings.update(saved)
         except Exception as e:
@@ -115,10 +110,8 @@ def _load_settings() -> dict[str, Any]:
         "OPENAI_MODEL": "openai_model",
         "ANTHROPIC_API_KEY": "anthropic_api_key",
         "ANTHROPIC_MODEL": "anthropic_model",
-        "BEDROCK_REGION": "bedrock_region",
-        "BEDROCK_MODEL_ID": "bedrock_model_id",
-        "AWS_ACCESS_KEY_ID": "aws_access_key_id",
-        "AWS_SECRET_ACCESS_KEY": "aws_secret_access_key",
+        "CIOS_API_KEY": "cios_api_key",
+        "CIOS_API_URL": "cios_api_url",
         "CIOS_LLM_PROVIDER": "llm_provider",
     }
     for env_key, setting_key in env_map.items():
@@ -168,7 +161,7 @@ def save() -> None:
     # Only save values that differ from defaults or are API keys
     to_save = {}
     for key, value in _settings.items():
-        if value != _DEFAULTS.get(key, None) or key.endswith("_key"):
+        if value != _DEFAULTS.get(key) or key.endswith("_key"):
             if value:  # Don't save empty strings
                 to_save[key] = value
 
@@ -193,11 +186,11 @@ def mask_key(key: str) -> str:
 # These module-level vars are used by existing code.
 # They now read from the settings system.
 
+
 def _get_legacy(key: str) -> str:
     return str(get(key))
+
 
 # Expose as module attributes for backward compat
 OLLAMA_URL = property(lambda _: _get_legacy("ollama_url"))
 OLLAMA_MODEL = property(lambda _: _get_legacy("ollama_model"))
-BEDROCK_REGION = property(lambda _: _get_legacy("bedrock_region"))
-BEDROCK_MODEL_ID = property(lambda _: _get_legacy("bedrock_model_id"))

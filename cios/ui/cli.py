@@ -1,20 +1,19 @@
 """Minimal fullscreen terminal UI for the CIOS."""
 
 import time
-from rich.console import Console
-from rich.panel import Panel
-from rich.text import Text
-from rich.table import Table
-from rich.live import Live
-from rich import box
 
 from prompt_toolkit import PromptSession
-from prompt_toolkit.history import FileHistory
 from prompt_toolkit.formatted_text import HTML
+from prompt_toolkit.history import FileHistory
+from rich import box
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
 
 from cios.core.config import CIOS_HOME, ensure_dirs
 from cios.core.executor import Executor
-from cios.core.intent_parser import parse_intent, IntentType
+from cios.core.intent_parser import IntentType, parse_intent
 from cios.core.memory import Memory
 from cios.core.model_router import resolve_unknown_intent
 from cios.core.planner import Planner, PlanResult
@@ -38,7 +37,9 @@ def _render_plan(steps: list[str]) -> Panel:
     for i, step in enumerate(steps, 1):
         text.append(f"  {i}. ", style="bold yellow")
         text.append(f"{step}\n", style="white")
-    return Panel(text, title="[bold]Plan[/bold]", border_style="yellow", box=box.ROUNDED, padding=(0, 1))
+    return Panel(
+        text, title="[bold]Plan[/bold]", border_style="yellow", box=box.ROUNDED, padding=(0, 1)
+    )
 
 
 def _render_result(result: PlanResult) -> Panel:
@@ -61,10 +62,11 @@ def _render_result(result: PlanResult) -> Panel:
     # If there's additional context, show it dimmed but sanitized
     if result.outcome == "failure" and result.error:
         import re
+
         # Strip paths, PIDs, and technical noise
-        hint = re.sub(r'/[\w/.\-]+', '', result.error)
-        hint = re.sub(r'\(PID \d+\)', '', hint)
-        hint = re.sub(r'\s+', ' ', hint).strip()
+        hint = re.sub(r"/[\w/.\-]+", "", result.error)
+        hint = re.sub(r"\(PID \d+\)", "", hint)
+        hint = re.sub(r"\s+", " ", hint).strip()
         if hint and hint != result.summary and len(hint) > 5:
             text.append(f"\n  {hint[:120]}", style="dim")
 
@@ -151,7 +153,9 @@ def run_ui() -> None:
                 continue
 
         # --- Show plan preview ---
-        console.print(f"  [dim]Intent: {intent.type.value} (confidence: {intent.confidence:.0%})[/dim]")
+        console.print(
+            f"  [dim]Intent: {intent.type.value} (confidence: {intent.confidence:.0%})[/dim]"
+        )
 
         # --- Execute ---
         start = time.monotonic()

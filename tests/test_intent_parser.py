@@ -2,25 +2,28 @@
 
 import pytest
 
-from cios.core.intent_parser import IntentType, Intent, parse_intent
+from cios.core.intent_parser import IntentType, parse_intent
 
 
 class TestDevStart:
     """DEV_START intent detection."""
 
-    @pytest.mark.parametrize("input_text,expected_target", [
-        ("start my backend", "backend"),
-        ("run the server", "server"),
-        ("launch the app", "app"),
-        ("boot the api", "api"),
-        ("npm run dev", "dev"),
-        ("yarn start", "start"),
-        # PT-BR
-        ("iniciar o backend", "backend"),
-        ("rodar o servidor", "servidor"),
-        ("subir o projeto", "projeto"),
-        ("levantar o serviço", "serviço"),
-    ])
+    @pytest.mark.parametrize(
+        "input_text,expected_target",
+        [
+            ("start my backend", "backend"),
+            ("run the server", "server"),
+            ("launch the app", "app"),
+            ("boot the api", "api"),
+            ("npm run dev", "dev"),
+            ("yarn start", "start"),
+            # PT-BR
+            ("iniciar o backend", "backend"),
+            ("rodar o servidor", "servidor"),
+            ("subir o projeto", "projeto"),
+            ("levantar o serviço", "serviço"),
+        ],
+    )
     def test_dev_start_patterns(self, input_text, expected_target):
         intent = parse_intent(input_text)
         assert intent.type == IntentType.DEV_START
@@ -31,16 +34,19 @@ class TestDevStart:
 class TestProcessControl:
     """PROCESS_CONTROL intent detection."""
 
-    @pytest.mark.parametrize("input_text,expected_action,expected_port", [
-        ("kill the process on port 3000", "kill", 3000),
-        ("stop the server on port 8080", "kill", 8080),
-        ("what's using port 5000", "query", 5000),
-        ("what is running on port 443", "query", 443),
-        # PT-BR
-        ("matar o processo na porta 3000", "kill", 3000),
-        ("parar o servidor na porta 8080", "kill", 8080),
-        ("o que tá usando a porta 5000", "query", 5000),
-    ])
+    @pytest.mark.parametrize(
+        "input_text,expected_action,expected_port",
+        [
+            ("kill the process on port 3000", "kill", 3000),
+            ("stop the server on port 8080", "kill", 8080),
+            ("what's using port 5000", "query", 5000),
+            ("what is running on port 443", "query", 443),
+            # PT-BR
+            ("matar o processo na porta 3000", "kill", 3000),
+            ("parar o servidor na porta 8080", "kill", 8080),
+            ("o que tá usando a porta 5000", "query", 5000),
+        ],
+    )
     def test_process_control_patterns(self, input_text, expected_action, expected_port):
         intent = parse_intent(input_text)
         assert intent.type == IntentType.PROCESS_CONTROL
@@ -51,17 +57,20 @@ class TestProcessControl:
 class TestFixLastError:
     """FIX_LAST_ERROR intent detection."""
 
-    @pytest.mark.parametrize("input_text", [
-        "fix it",
-        "fix the error",
-        "fix last",
-        "it crashed, fix it",
-        # PT-BR
-        "corrigir isso",
-        "consertar o erro",
-        "deu erro",
-        "não funcionou",
-    ])
+    @pytest.mark.parametrize(
+        "input_text",
+        [
+            "fix it",
+            "fix the error",
+            "fix last",
+            "it crashed, fix it",
+            # PT-BR
+            "corrigir isso",
+            "consertar o erro",
+            "deu erro",
+            "não funcionou",
+        ],
+    )
     def test_fix_patterns(self, input_text):
         intent = parse_intent(input_text)
         assert intent.type == IntentType.FIX_LAST_ERROR
@@ -71,16 +80,19 @@ class TestFixLastError:
 class TestLogAnalysis:
     """LOG_ANALYSIS intent detection."""
 
-    @pytest.mark.parametrize("input_text", [
-        "show the logs",
-        "check errors",
-        "analyze the output",
-        # PT-BR
-        "mostrar os logs",
-        "ver os erros",
-        "o que aconteceu",
-        "o que deu errado",
-    ])
+    @pytest.mark.parametrize(
+        "input_text",
+        [
+            "show the logs",
+            "check errors",
+            "analyze the output",
+            # PT-BR
+            "mostrar os logs",
+            "ver os erros",
+            "o que aconteceu",
+            "o que deu errado",
+        ],
+    )
     def test_log_patterns(self, input_text):
         intent = parse_intent(input_text)
         assert intent.type == IntentType.LOG_ANALYSIS
@@ -90,15 +102,18 @@ class TestLogAnalysis:
 class TestFileOrganize:
     """FILE_ORGANIZE intent detection."""
 
-    @pytest.mark.parametrize("input_text,expected_target", [
-        ("organize my downloads", "downloads"),
-        ("clean the desktop", "desktop"),
-        ("sort my documents", "documents"),
-        # PT-BR
-        ("organizar meus downloads", "downloads"),
-        ("arrumar a área de trabalho", "área de trabalho"),
-        ("limpar os documentos", "documentos"),
-    ])
+    @pytest.mark.parametrize(
+        "input_text,expected_target",
+        [
+            ("organize my downloads", "downloads"),
+            ("clean the desktop", "desktop"),
+            ("sort my documents", "documents"),
+            # PT-BR
+            ("organizar meus downloads", "downloads"),
+            ("arrumar a área de trabalho", "área de trabalho"),
+            ("limpar os documentos", "documentos"),
+        ],
+    )
     def test_file_organize_patterns(self, input_text, expected_target):
         intent = parse_intent(input_text)
         assert intent.type == IntentType.FILE_ORGANIZE
@@ -108,17 +123,20 @@ class TestFileOrganize:
 class TestSystemHealth:
     """SYSTEM_HEALTH intent detection."""
 
-    @pytest.mark.parametrize("input_text", [
-        "my computer is slow",
-        "system is lagging",
-        "why is everything so slow",
-        "check my system",
-        # PT-BR
-        "meu computador tá lento",
-        "sistema tá travando",
-        "porque tá lento",
-        "tá pesado",
-    ])
+    @pytest.mark.parametrize(
+        "input_text",
+        [
+            "my computer is slow",
+            "system is lagging",
+            "why is everything so slow",
+            "check my system",
+            # PT-BR
+            "meu computador tá lento",
+            "sistema tá travando",
+            "porque tá lento",
+            "tá pesado",
+        ],
+    )
     def test_system_health_patterns(self, input_text):
         intent = parse_intent(input_text)
         assert intent.type == IntentType.SYSTEM_HEALTH
@@ -128,15 +146,18 @@ class TestSystemHealth:
 class TestAppLaunch:
     """APP_LAUNCH intent detection."""
 
-    @pytest.mark.parametrize("input_text,expected_app", [
-        ("open chrome", "chrome"),
-        ("launch firefox", "firefox"),
-        ("open the terminal", "terminal"),
-        # PT-BR
-        ("abrir chrome", "chrome"),
-        ("abre o firefox", "firefox"),
-        ("abrir o terminal", "terminal"),
-    ])
+    @pytest.mark.parametrize(
+        "input_text,expected_app",
+        [
+            ("open chrome", "chrome"),
+            ("launch firefox", "firefox"),
+            ("open the terminal", "terminal"),
+            # PT-BR
+            ("abrir chrome", "chrome"),
+            ("abre o firefox", "firefox"),
+            ("abrir o terminal", "terminal"),
+        ],
+    )
     def test_app_launch_patterns(self, input_text, expected_app):
         intent = parse_intent(input_text)
         assert intent.type == IntentType.APP_LAUNCH
@@ -146,22 +167,25 @@ class TestAppLaunch:
 class TestSession:
     """SESSION intent detection."""
 
-    @pytest.mark.parametrize("input_text,expected_action", [
-        ("desligar", "shutdown"),
-        ("desligar o computador", "shutdown"),
-        ("power off", "shutdown"),
-        ("restart", "reboot"),
-        ("reiniciar", "reboot"),
-        ("reiniciar o computador", "reboot"),
-        ("suspend", "suspend"),
-        ("suspender", "suspend"),
-        ("hibernate", "hibernate"),
-        ("hibernar", "hibernate"),
-        ("logout", "logout"),
-        ("sair", "logout"),
-        ("lock", "lock"),
-        ("bloquear", "lock"),
-    ])
+    @pytest.mark.parametrize(
+        "input_text,expected_action",
+        [
+            ("desligar", "shutdown"),
+            ("desligar o computador", "shutdown"),
+            ("power off", "shutdown"),
+            ("restart", "reboot"),
+            ("reiniciar", "reboot"),
+            ("reiniciar o computador", "reboot"),
+            ("suspend", "suspend"),
+            ("suspender", "suspend"),
+            ("hibernate", "hibernate"),
+            ("hibernar", "hibernate"),
+            ("logout", "logout"),
+            ("sair", "logout"),
+            ("lock", "lock"),
+            ("bloquear", "lock"),
+        ],
+    )
     def test_session_patterns(self, input_text, expected_action):
         intent = parse_intent(input_text)
         assert intent.type == IntentType.SESSION
@@ -171,16 +195,19 @@ class TestSession:
 class TestNetwork:
     """NETWORK intent detection."""
 
-    @pytest.mark.parametrize("input_text,expected_action", [
-        ("conectar no wifi", "connect"),
-        ("connect to wifi", "connect"),
-        ("desconectar do wifi", "disconnect"),
-        ("disconnect from wifi", "disconnect"),
-        ("listar redes", "list"),
-        ("show networks", "list"),
-        ("qual minha rede", "status"),
-        ("estou conectado", "status"),
-    ])
+    @pytest.mark.parametrize(
+        "input_text,expected_action",
+        [
+            ("conectar no wifi", "connect"),
+            ("connect to wifi", "connect"),
+            ("desconectar do wifi", "disconnect"),
+            ("disconnect from wifi", "disconnect"),
+            ("listar redes", "list"),
+            ("show networks", "list"),
+            ("qual minha rede", "status"),
+            ("estou conectado", "status"),
+        ],
+    )
     def test_network_patterns(self, input_text, expected_action):
         intent = parse_intent(input_text)
         assert intent.type == IntentType.NETWORK
@@ -196,17 +223,20 @@ class TestNetwork:
 class TestAudio:
     """AUDIO intent detection."""
 
-    @pytest.mark.parametrize("input_text,expected_action", [
-        ("aumentar volume", "up"),
-        ("raise volume", "up"),
-        ("diminuir volume", "down"),
-        ("lower volume", "down"),
-        ("silenciar", "mute"),
-        ("mute", "mute"),
-        ("tirar o mute", "unmute"),
-        ("ativar o som", "unmute"),
-        ("qual o volume", "status"),
-    ])
+    @pytest.mark.parametrize(
+        "input_text,expected_action",
+        [
+            ("aumentar volume", "up"),
+            ("raise volume", "up"),
+            ("diminuir volume", "down"),
+            ("lower volume", "down"),
+            ("silenciar", "mute"),
+            ("mute", "mute"),
+            ("tirar o mute", "unmute"),
+            ("ativar o som", "unmute"),
+            ("qual o volume", "status"),
+        ],
+    )
     def test_audio_patterns(self, input_text, expected_action):
         intent = parse_intent(input_text)
         assert intent.type == IntentType.AUDIO
@@ -222,17 +252,20 @@ class TestAudio:
 class TestDiskAnalysis:
     """DISK_ANALYSIS intent detection."""
 
-    @pytest.mark.parametrize("input_text", [
-        "free up space",
-        "liberar espaço",
-        "disco cheio",
-        "disk full",
-        "quanto de espaço",
-        "how much space",
-        "o que tá ocupando meu disco",
-        "limpar cache",
-        "clean trash",
-    ])
+    @pytest.mark.parametrize(
+        "input_text",
+        [
+            "free up space",
+            "liberar espaço",
+            "disco cheio",
+            "disk full",
+            "quanto de espaço",
+            "how much space",
+            "o que tá ocupando meu disco",
+            "limpar cache",
+            "clean trash",
+        ],
+    )
     def test_disk_patterns(self, input_text):
         intent = parse_intent(input_text)
         assert intent.type == IntentType.DISK_ANALYSIS
@@ -241,16 +274,19 @@ class TestDiskAnalysis:
 class TestPower:
     """POWER intent detection."""
 
-    @pytest.mark.parametrize("input_text,expected_action", [
-        ("quanta bateria", "battery_status"),
-        ("how much battery", "battery_status"),
-        ("status da bateria", "battery_status"),
-        ("aumentar brilho", "brightness_up"),
-        ("diminuir brilho", "brightness_down"),
-        ("brilho 50%", "brightness_set"),
-        ("qual o brilho", "brightness_status"),
-        ("modo economia", "power_saving"),
-    ])
+    @pytest.mark.parametrize(
+        "input_text,expected_action",
+        [
+            ("quanta bateria", "battery_status"),
+            ("how much battery", "battery_status"),
+            ("status da bateria", "battery_status"),
+            ("aumentar brilho", "brightness_up"),
+            ("diminuir brilho", "brightness_down"),
+            ("brilho 50%", "brightness_set"),
+            ("qual o brilho", "brightness_status"),
+            ("modo economia", "power_saving"),
+        ],
+    )
     def test_power_patterns(self, input_text, expected_action):
         intent = parse_intent(input_text)
         assert intent.type == IntentType.POWER
@@ -260,12 +296,15 @@ class TestPower:
 class TestUnknown:
     """UNKNOWN intent for unrecognized inputs."""
 
-    @pytest.mark.parametrize("input_text", [
-        "",
-        "asdfghjkl",
-        "tell me a joke",
-        "the quick brown fox jumps over the lazy dog",
-    ])
+    @pytest.mark.parametrize(
+        "input_text",
+        [
+            "",
+            "asdfghjkl",
+            "tell me a joke",
+            "the quick brown fox jumps over the lazy dog",
+        ],
+    )
     def test_unknown_patterns(self, input_text):
         intent = parse_intent(input_text)
         assert intent.type == IntentType.UNKNOWN
@@ -284,23 +323,29 @@ class TestUnknown:
 class TestContinueProject:
     """CONTINUE_PROJECT intent detection."""
 
-    @pytest.mark.parametrize("input_text,expected_project", [
-        ("continuar projeto fidelidade", "fidelidade"),
-        ("continuar no backend", "backend"),
-        ("voltar pro frontend", "frontend"),
-        ("continue project myapp", "myapp"),
-        ("resume dashboard", "dashboard"),
-    ])
+    @pytest.mark.parametrize(
+        "input_text,expected_project",
+        [
+            ("continuar projeto fidelidade", "fidelidade"),
+            ("continuar no backend", "backend"),
+            ("voltar pro frontend", "frontend"),
+            ("continue project myapp", "myapp"),
+            ("resume dashboard", "dashboard"),
+        ],
+    )
     def test_continue_project_with_name(self, input_text, expected_project):
         intent = parse_intent(input_text)
         assert intent.type == IntentType.CONTINUE_PROJECT
         assert intent.params.get("project") == expected_project
         assert intent.confidence >= 0.90
 
-    @pytest.mark.parametrize("input_text", [
-        "continuar",
-        "continue",
-    ])
+    @pytest.mark.parametrize(
+        "input_text",
+        [
+            "continuar",
+            "continue",
+        ],
+    )
     def test_continue_project_bare(self, input_text):
         intent = parse_intent(input_text)
         assert intent.type == IntentType.CONTINUE_PROJECT

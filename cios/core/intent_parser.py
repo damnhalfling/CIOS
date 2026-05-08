@@ -4,10 +4,11 @@ Uses pattern matching first (fast, no LLM needed), falls back to LLM for
 ambiguous inputs.
 """
 
+from __future__ import annotations
+
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 
 class IntentType(Enum):
@@ -55,7 +56,7 @@ class Intent:
 
 
 # Pattern rules: (compiled regex, IntentType, param extractor, confidence)
-_RULES: list[tuple[re.Pattern, IntentType, Optional[callable], float]] = [
+_RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
     # --- dev_start (EN) ---
     (
         re.compile(
@@ -530,7 +531,10 @@ _RULES: list[tuple[re.Pattern, IntentType, Optional[callable], float]] = [
             re.IGNORECASE,
         ),
         IntentType.GALLERY_MANAGE,
-        lambda m: {"action": "search_date", "date_query": (m.group(1) + (" " + m.group(2) if m.group(2) else "")).strip()},
+        lambda m: {
+            "action": "search_date",
+            "date_query": (m.group(1) + (" " + m.group(2) if m.group(2) else "")).strip(),
+        },
         0.95,
     ),
     (
@@ -1254,8 +1258,7 @@ _RULES: list[tuple[re.Pattern, IntentType, Optional[callable], float]] = [
     ),
     (
         re.compile(
-            r"(?:bloquear|lock|travar|bloqueia|trava)"
-            r"(?:\s+(?:a\s+)?(?:tela|screen))?",
+            r"(?:bloquear|lock|travar|bloqueia|trava)" r"(?:\s+(?:a\s+)?(?:tela|screen))?",
             re.IGNORECASE,
         ),
         IntentType.SESSION,

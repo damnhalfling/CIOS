@@ -2,8 +2,6 @@
 
 import re
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Optional
 
 from cios.core.executor import Executor
 from cios.core.model_router import route_to_llm
@@ -78,7 +76,7 @@ def analyze_text(text: str, source: str = "output") -> LogInsight:
     # Fallback: use LLM for unknown errors
     if error_lines:
         llm_result = route_to_llm(
-            f"Analyze these error lines and give a one-line root cause and fix:\n"
+            "Analyze these error lines and give a one-line root cause and fix:\n"
             + "\n".join(error_lines[:10]),
             complex=False,
         )
@@ -108,5 +106,7 @@ def analyze_text(text: str, source: str = "output") -> LogInsight:
 
 def read_system_logs(executor: Executor, lines: int = 50) -> str:
     """Read recent system journal entries."""
-    result = executor.run(f"journalctl --user --no-pager -n {lines} 2>/dev/null || tail -n {lines} /var/log/syslog 2>/dev/null || echo 'No logs available'")
+    result = executor.run(
+        f"journalctl --user --no-pager -n {lines} 2>/dev/null || tail -n {lines} /var/log/syslog 2>/dev/null || echo 'No logs available'"
+    )
     return result.stdout or result.stderr

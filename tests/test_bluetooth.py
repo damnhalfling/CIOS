@@ -1,16 +1,14 @@
 """Tests for Bluetooth skill and intent parsing."""
 
-from unittest.mock import patch, MagicMock
 import subprocess
+from unittest.mock import patch
 
-import pytest
-
-from cios.core.intent_parser import parse_intent, IntentType
-
+from cios.core.intent_parser import IntentType, parse_intent
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  INTENT PARSER — BLUETOOTH PATTERNS
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 class TestBluetoothIntents:
     """Test Bluetooth intent pattern matching (PT + EN)."""
@@ -193,14 +191,17 @@ class TestBluetoothIntents:
 #  BLUETOOTH SKILL
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class TestBluetoothSkill:
     """Test Bluetooth skill functions with mocked bluetoothctl."""
 
     def test_is_available_true(self):
         from cios.skills.bluetooth import is_available
+
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(
-                args=[], returncode=0,
+                args=[],
+                returncode=0,
                 stdout="Controller XX:XX:XX:XX:XX:XX\n\tPowered: yes\n",
                 stderr="",
             )
@@ -208,17 +209,23 @@ class TestBluetoothSkill:
 
     def test_is_available_false_no_controller(self):
         from cios.skills.bluetooth import is_available
+
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(
-                args=[], returncode=1, stdout="", stderr="No default controller",
+                args=[],
+                returncode=1,
+                stdout="",
+                stderr="No default controller",
             )
             assert is_available() is False
 
     def test_is_powered_on(self):
         from cios.skills.bluetooth import is_powered
+
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(
-                args=[], returncode=0,
+                args=[],
+                returncode=0,
                 stdout="Controller XX:XX\n\tPowered: yes\n",
                 stderr="",
             )
@@ -226,9 +233,11 @@ class TestBluetoothSkill:
 
     def test_is_powered_off(self):
         from cios.skills.bluetooth import is_powered
+
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(
-                args=[], returncode=0,
+                args=[],
+                returncode=0,
                 stdout="Controller XX:XX\n\tPowered: no\n",
                 stderr="",
             )
@@ -236,6 +245,7 @@ class TestBluetoothSkill:
 
     def test_power_on(self):
         from cios.skills.bluetooth import power_on
+
         with patch("subprocess.run") as mock_run:
             # First call: is_powered check (returns off)
             # Second call: power on
@@ -248,9 +258,12 @@ class TestBluetoothSkill:
 
     def test_power_off(self):
         from cios.skills.bluetooth import power_off
+
         with patch("subprocess.run") as mock_run:
             mock_run.side_effect = [
-                subprocess.CompletedProcess(args=[], returncode=0, stdout="Powered: yes", stderr=""),
+                subprocess.CompletedProcess(
+                    args=[], returncode=0, stdout="Powered: yes", stderr=""
+                ),
                 subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr=""),
             ]
             steps, ok, msg = power_off()
@@ -258,9 +271,9 @@ class TestBluetoothSkill:
 
     def test_parse_device_list(self):
         from cios.skills.bluetooth import _parse_device_list
+
         output = (
-            "Device AA:BB:CC:DD:EE:FF JBL Flip 5\n"
-            "Device 11:22:33:44:55:66 Galaxy Buds Pro\n"
+            "Device AA:BB:CC:DD:EE:FF JBL Flip 5\n" "Device 11:22:33:44:55:66 Galaxy Buds Pro\n"
         )
         devices = _parse_device_list(output)
         assert len(devices) == 2
@@ -270,39 +283,47 @@ class TestBluetoothSkill:
 
     def test_humanize_error_not_available(self):
         from cios.skills.bluetooth import _humanize_error
+
         assert "not available" in _humanize_error("No default controller available").lower()
 
     def test_humanize_error_pair_failed(self):
         from cios.skills.bluetooth import _humanize_error
+
         result = _humanize_error("Failed to pair")
         assert "pairing" in result.lower()
 
     def test_humanize_error_timeout(self):
         from cios.skills.bluetooth import _humanize_error
+
         result = _humanize_error("Operation timed out")
         assert "timed out" in result.lower()
 
     def test_humanize_error_not_installed(self):
         from cios.skills.bluetooth import _humanize_error
+
         result = _humanize_error("bluetoothctl not found — BlueZ not installed")
         assert "not installed" in result.lower() or "not found" in result.lower()
 
     def test_device_type_icon(self):
         from cios.skills.bluetooth import BluetoothDevice
+
         dev = BluetoothDevice(address="AA:BB:CC:DD:EE:FF", name="Test", icon="audio-headset")
         assert dev.type_icon == "🎧"
 
     def test_device_type_icon_unknown(self):
         from cios.skills.bluetooth import BluetoothDevice
+
         dev = BluetoothDevice(address="AA:BB:CC:DD:EE:FF", name="Test", icon="unknown-type")
         assert dev.type_icon == "📶"
 
     def test_device_display_name(self):
         from cios.skills.bluetooth import BluetoothDevice
+
         dev = BluetoothDevice(address="AA:BB:CC:DD:EE:FF", name="JBL Flip")
         assert dev.display_name == "JBL Flip"
 
     def test_device_display_name_fallback(self):
         from cios.skills.bluetooth import BluetoothDevice
+
         dev = BluetoothDevice(address="AA:BB:CC:DD:EE:FF", name="AA:BB:CC:DD:EE:FF")
         assert dev.display_name == "AA:BB:CC:DD:EE:FF"

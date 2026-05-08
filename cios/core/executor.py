@@ -2,10 +2,8 @@
 
 import os
 import subprocess
-import signal
 import time
 from dataclasses import dataclass
-from typing import Optional
 
 from cios.core.config import COMMAND_TIMEOUT_SECONDS
 
@@ -33,9 +31,9 @@ class Executor:
     def run(
         self,
         command: str,
-        cwd: Optional[str] = None,
-        timeout: Optional[int] = None,
-        env: Optional[dict] = None,
+        cwd: str | None = None,
+        timeout: int | None = None,
+        env: dict | None = None,
     ) -> ExecResult:
         """Run a shell command and return structured result."""
         timeout = timeout or COMMAND_TIMEOUT_SECONDS
@@ -95,8 +93,8 @@ class Executor:
     def run_background(
         self,
         command: str,
-        cwd: Optional[str] = None,
-        env: Optional[dict] = None,
+        cwd: str | None = None,
+        env: dict | None = None,
     ) -> subprocess.Popen:
         """Start a long-running process in the background."""
         merged_env = {**os.environ, **(env or {})}
@@ -115,7 +113,7 @@ class Executor:
         """Kill whatever process is listening on the given port."""
         return self.run(f"fuser -k {port}/tcp 2>/dev/null || lsof -ti:{port} | xargs -r kill -9")
 
-    def find_port_user(self, port: int) -> Optional[str]:
+    def find_port_user(self, port: int) -> str | None:
         """Return the PID/name using a port, or None."""
         result = self.run(f"lsof -i:{port} -t 2>/dev/null || fuser {port}/tcp 2>/dev/null")
         output = result.stdout.strip() or result.stderr.strip()

@@ -9,16 +9,14 @@ Provides:
 Database: ~/.cios/gallery.db
 """
 
-import json
 import logging
 import os
 import shutil
 import sqlite3
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 from cios.core.config import CIOS_HOME
 
@@ -67,9 +65,11 @@ CREATE INDEX IF NOT EXISTS idx_trash_time ON trash_log(deleted_at DESC);
 #  DATA STRUCTURES
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class Album:
     """An album/collection of media files."""
+
     id: int
     name: str
     created_at: float
@@ -80,6 +80,7 @@ class Album:
 @dataclass
 class TrashEntry:
     """A file that was moved to trash."""
+
     original_path: str
     trash_path: str
     deleted_at: float
@@ -88,6 +89,7 @@ class TrashEntry:
 # ═══════════════════════════════════════════════════════════════════════════
 #  TRASH HELPERS
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def _get_trash_dir() -> Path:
     """Get XDG trash directory (~/.local/share/Trash/)."""
@@ -98,7 +100,7 @@ def _get_trash_dir() -> Path:
     return trash_dir
 
 
-def _move_to_trash(file_path: str) -> Optional[str]:
+def _move_to_trash(file_path: str) -> str | None:
     """Move a file to XDG trash. Returns trash path or None on failure.
 
     Creates a .trashinfo file per the freedesktop.org Trash spec.
@@ -123,11 +125,7 @@ def _move_to_trash(file_path: str) -> Optional[str]:
     # Write .trashinfo file (freedesktop spec)
     info_path = trash_dir / "info" / f"{dest_name}.trashinfo"
     deletion_date = time.strftime("%Y-%m-%dT%H:%M:%S")
-    info_content = (
-        "[Trash Info]\n"
-        f"Path={file_path}\n"
-        f"DeletionDate={deletion_date}\n"
-    )
+    info_content = "[Trash Info]\n" f"Path={file_path}\n" f"DeletionDate={deletion_date}\n"
 
     try:
         info_path.write_text(info_content)
@@ -167,6 +165,7 @@ def _restore_from_trash(trash_path: str, original_path: str) -> bool:
 #  GALLERY STORE
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class GalleryStore:
     """SQLite-backed store for gallery metadata (favorites, albums, trash)."""
 
@@ -195,9 +194,7 @@ class GalleryStore:
                 "SELECT 1 FROM favorites WHERE file_path = ?", (file_path,)
             ).fetchone()
             if row:
-                self._conn.execute(
-                    "DELETE FROM favorites WHERE file_path = ?", (file_path,)
-                )
+                self._conn.execute("DELETE FROM favorites WHERE file_path = ?", (file_path,))
                 self._conn.commit()
                 return False
             else:
@@ -220,9 +217,7 @@ class GalleryStore:
     def remove_favorite(self, file_path: str) -> None:
         """Remove a file from favorites."""
         with self._lock:
-            self._conn.execute(
-                "DELETE FROM favorites WHERE file_path = ?", (file_path,)
-            )
+            self._conn.execute("DELETE FROM favorites WHERE file_path = ?", (file_path,))
             self._conn.commit()
 
     def list_favorites(self) -> list[str]:
@@ -241,7 +236,7 @@ class GalleryStore:
 
     # ─── Albums ───────────────────────────────────────────────────────
 
-    def create_album(self, name: str) -> Optional[Album]:
+    def create_album(self, name: str) -> Album | None:
         """Create a new album. Returns None if name already exists."""
         now = time.time()
         with self._lock:
@@ -251,8 +246,9 @@ class GalleryStore:
                     (name, now, now),
                 )
                 self._conn.commit()
-                return Album(id=cursor.lastrowid, name=name,
-                             created_at=now, updated_at=now, file_count=0)
+                return Album(
+                    id=cursor.lastrowid, name=name, created_at=now, updated_at=now, file_count=0
+                )
             except sqlite3.IntegrityError:
                 return None
 
@@ -287,12 +283,17 @@ class GalleryStore:
                    ORDER BY a.updated_at DESC"""
             ).fetchall()
         return [
-            Album(id=r["id"], name=r["name"], created_at=r["created_at"],
-                  updated_at=r["updated_at"], file_count=r["file_count"])
+            Album(
+                id=r["id"],
+                name=r["name"],
+                created_at=r["created_at"],
+                updated_at=r["updated_at"],
+                file_count=r["file_count"],
+            )
             for r in rows
         ]
 
-    def get_album_by_name(self, name: str) -> Optional[Album]:
+    def get_album_by_name(self, name: str) -> Album | None:
         """Find an album by name (case-insensitive)."""
         with self._lock:
             row = self._conn.execute(
@@ -305,8 +306,13 @@ class GalleryStore:
                 (name,),
             ).fetchone()
         if row:
-            return Album(id=row["id"], name=row["name"], created_at=row["created_at"],
-                         updated_at=row["updated_at"], file_count=row["file_count"])
+            return Album(
+                id=row["id"],
+                name=row["name"],
+                created_at=row["created_at"],
+                updated_at=row["updated_at"],
+                file_count=row["file_count"],
+            )
         return None
 
     def add_to_album(self, album_id: int, file_path: str) -> None:
@@ -317,9 +323,7 @@ class GalleryStore:
                 "INSERT OR IGNORE INTO album_files (album_id, file_path, added_at) VALUES (?, ?, ?)",
                 (album_id, file_path, now),
             )
-            self._conn.execute(
-                "UPDATE albums SET updated_at = ? WHERE id = ?", (now, album_id)
-            )
+            self._conn.execute("UPDATE albums SET updated_at = ? WHERE id = ?", (now, album_id))
             self._conn.commit()
 
     def remove_from_album(self, album_id: int, file_path: str) -> None:
@@ -342,7 +346,7 @@ class GalleryStore:
 
     # ─── Trash ────────────────────────────────────────────────────────
 
-    def trash_file(self, file_path: str) -> Optional[TrashEntry]:
+    def trash_file(self, file_path: str) -> TrashEntry | None:
         """Move a file to XDG trash and log it. Returns entry or None on failure."""
         trash_path = _move_to_trash(file_path)
         if not trash_path:
@@ -357,13 +361,9 @@ class GalleryStore:
                 (file_path, trash_path, now),
             )
             # Also remove from favorites if it was favorited
-            self._conn.execute(
-                "DELETE FROM favorites WHERE file_path = ?", (file_path,)
-            )
+            self._conn.execute("DELETE FROM favorites WHERE file_path = ?", (file_path,))
             # Remove from any albums
-            self._conn.execute(
-                "DELETE FROM album_files WHERE file_path = ?", (file_path,)
-            )
+            self._conn.execute("DELETE FROM album_files WHERE file_path = ?", (file_path,))
             self._conn.commit()
 
         return entry
@@ -377,7 +377,7 @@ class GalleryStore:
                 entries.append(entry)
         return entries
 
-    def undo_last_trash(self) -> Optional[str]:
+    def undo_last_trash(self) -> str | None:
         """Restore the most recently trashed file. Returns original path or None."""
         with self._lock:
             row = self._conn.execute(
@@ -405,8 +405,11 @@ class GalleryStore:
                 (limit,),
             ).fetchall()
         return [
-            TrashEntry(original_path=r["original_path"], trash_path=r["trash_path"],
-                       deleted_at=r["deleted_at"])
+            TrashEntry(
+                original_path=r["original_path"],
+                trash_path=r["trash_path"],
+                deleted_at=r["deleted_at"],
+            )
             for r in rows
         ]
 
@@ -424,7 +427,7 @@ class GalleryStore:
 #  SINGLETON
 # ═══════════════════════════════════════════════════════════════════════════
 
-_store: Optional[GalleryStore] = None
+_store: GalleryStore | None = None
 
 
 def get_store() -> GalleryStore:

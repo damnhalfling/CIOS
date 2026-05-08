@@ -13,8 +13,10 @@ def memory(tmp_path):
     from unittest.mock import patch
 
     db_path = tmp_path / "test_memory.db"
-    with patch("cios.core.config.DB_PATH", db_path), \
-         patch("cios.core.config.ensure_dirs", lambda: None):
+    with (
+        patch("cios.core.config.DB_PATH", db_path),
+        patch("cios.core.config.ensure_dirs", lambda: None),
+    ):
         mem = Memory()
         yield mem
         mem.close()
@@ -78,33 +80,39 @@ class TestMemoryLastFailure:
 
     def test_last_failure_returns_most_recent(self, memory):
         # Store a success
-        memory.store(MemoryRecord(
-            timestamp=time.time() - 100,
-            user_input="open chrome",
-            intent="app_launch",
-            plan=["Open Chrome"],
-            commands=[],
-            outcome="success",
-        ))
+        memory.store(
+            MemoryRecord(
+                timestamp=time.time() - 100,
+                user_input="open chrome",
+                intent="app_launch",
+                plan=["Open Chrome"],
+                commands=[],
+                outcome="success",
+            )
+        )
         # Store a failure
-        memory.store(MemoryRecord(
-            timestamp=time.time() - 50,
-            user_input="start server",
-            intent="dev_start",
-            plan=["Start"],
-            commands=["npm start"],
-            outcome="failure",
-            error="EADDRINUSE: port 3000 in use",
-        ))
+        memory.store(
+            MemoryRecord(
+                timestamp=time.time() - 50,
+                user_input="start server",
+                intent="dev_start",
+                plan=["Start"],
+                commands=["npm start"],
+                outcome="failure",
+                error="EADDRINUSE: port 3000 in use",
+            )
+        )
         # Store another success
-        memory.store(MemoryRecord(
-            timestamp=time.time(),
-            user_input="check status",
-            intent="status",
-            plan=["Check"],
-            commands=[],
-            outcome="success",
-        ))
+        memory.store(
+            MemoryRecord(
+                timestamp=time.time(),
+                user_input="check status",
+                intent="status",
+                plan=["Check"],
+                commands=[],
+                outcome="success",
+            )
+        )
 
         last = memory.last_failure()
         assert last is not None
@@ -112,51 +120,59 @@ class TestMemoryLastFailure:
         assert "port 3000" in last.error
 
     def test_last_failure_by_intent(self, memory):
-        memory.store(MemoryRecord(
-            timestamp=time.time(),
-            user_input="start server",
-            intent="dev_start",
-            plan=["Start"],
-            commands=[],
-            outcome="failure",
-            error="Port in use",
-        ))
-        memory.store(MemoryRecord(
-            timestamp=time.time(),
-            user_input="connect wifi",
-            intent="network",
-            plan=["Connect"],
-            commands=[],
-            outcome="failure",
-            error="Network not found",
-        ))
+        memory.store(
+            MemoryRecord(
+                timestamp=time.time(),
+                user_input="start server",
+                intent="dev_start",
+                plan=["Start"],
+                commands=[],
+                outcome="failure",
+                error="Port in use",
+            )
+        )
+        memory.store(
+            MemoryRecord(
+                timestamp=time.time(),
+                user_input="connect wifi",
+                intent="network",
+                plan=["Connect"],
+                commands=[],
+                outcome="failure",
+                error="Network not found",
+            )
+        )
 
         last = memory.last_failure(intent="dev_start")
         assert last is not None
         assert last.intent == "dev_start"
 
     def test_last_failure_none_when_no_failures(self, memory):
-        memory.store(MemoryRecord(
-            timestamp=time.time(),
-            user_input="open chrome",
-            intent="app_launch",
-            plan=["Open"],
-            commands=[],
-            outcome="success",
-        ))
+        memory.store(
+            MemoryRecord(
+                timestamp=time.time(),
+                user_input="open chrome",
+                intent="app_launch",
+                plan=["Open"],
+                commands=[],
+                outcome="success",
+            )
+        )
         last = memory.last_failure()
         assert last is None
 
     def test_recovered_counts_as_failure(self, memory):
-        memory.store(MemoryRecord(
-            timestamp=time.time(),
-            user_input="start server",
-            intent="dev_start",
-            plan=["Start"],
-            commands=[],
-            outcome="recovered",
-            error="Port conflict resolved",
-        ))
+        memory.store(
+            MemoryRecord(
+                timestamp=time.time(),
+                user_input="start server",
+                intent="dev_start",
+                plan=["Start"],
+                commands=[],
+                outcome="recovered",
+                error="Port conflict resolved",
+            )
+        )
 
         last = memory.last_failure()
         assert last is not None
@@ -168,28 +184,32 @@ class TestMemoryRecent:
 
     def test_recent_respects_limit(self, memory):
         for i in range(20):
-            memory.store(MemoryRecord(
-                timestamp=time.time() + i,
-                user_input=f"command {i}",
-                intent="command_exec",
-                plan=[f"Step {i}"],
-                commands=[f"cmd {i}"],
-                outcome="success",
-            ))
+            memory.store(
+                MemoryRecord(
+                    timestamp=time.time() + i,
+                    user_input=f"command {i}",
+                    intent="command_exec",
+                    plan=[f"Step {i}"],
+                    commands=[f"cmd {i}"],
+                    outcome="success",
+                )
+            )
 
         recent = memory.recent(5)
         assert len(recent) == 5
 
     def test_recent_ordered_by_timestamp_desc(self, memory):
         for i in range(5):
-            memory.store(MemoryRecord(
-                timestamp=1000.0 + i,
-                user_input=f"command {i}",
-                intent="command_exec",
-                plan=[],
-                commands=[],
-                outcome="success",
-            ))
+            memory.store(
+                MemoryRecord(
+                    timestamp=1000.0 + i,
+                    user_input=f"command {i}",
+                    intent="command_exec",
+                    plan=[],
+                    commands=[],
+                    outcome="success",
+                )
+            )
 
         recent = memory.recent(5)
         assert recent[0].user_input == "command 4"

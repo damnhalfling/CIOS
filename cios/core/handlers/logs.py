@@ -1,13 +1,13 @@
 """Handlers for log analysis and fix-last-error intents."""
 
+import logging
 import re
 import time
-import logging
 
 from cios.core.executor import Executor
+from cios.core.handlers._common import PlanResult
 from cios.core.intent_parser import Intent
 from cios.core.memory import Memory
-from cios.core.handlers._common import PlanResult, sanitize_error
 from cios.skills.dev_start import detect_project, execute_dev_start
 from cios.skills.log_analysis import analyze_text
 
@@ -22,6 +22,7 @@ def handle_log_analysis(intent: Intent, executor: Executor, memory: Memory) -> P
         insight = analyze_text(combined, source="memory")
     else:
         from cios.skills.log_analysis import read_system_logs
+
         logs = read_system_logs(executor)
         insight = analyze_text(logs, source="system_logs")
 
@@ -30,7 +31,8 @@ def handle_log_analysis(intent: Intent, executor: Executor, memory: Memory) -> P
 
     return PlanResult(
         plan_steps=["Read logs", "Analyze errors"],
-        results=[], outcome="success",
+        results=[],
+        outcome="success",
         summary=f"{lines_display}\n\n{summary}",
         voice_mode="brief",
     )
@@ -42,7 +44,8 @@ def handle_fix_last_error(intent: Intent, executor: Executor, memory: Memory) ->
     if last is None:
         return PlanResult(
             plan_steps=["Check memory for last failure"],
-            results=[], outcome="success",
+            results=[],
+            outcome="success",
             summary="No recent failures found in memory.",
         )
 
@@ -73,14 +76,17 @@ def handle_fix_last_error(intent: Intent, executor: Executor, memory: Memory) ->
             plan_steps.append("Retrying server start")
             project = detect_project(last.context.get("directory", "."))
             start_plan, start_results, pid = execute_dev_start(
-                executor, project=project, memory=memory,
+                executor,
+                project=project,
+                memory=memory,
             )
             plan_steps.extend(start_plan)
             results.extend(start_results)
 
             if pid:
                 return PlanResult(
-                    plan_steps=plan_steps, results=results,
+                    plan_steps=plan_steps,
+                    results=results,
                     outcome="recovered",
                     summary="Fixed port conflict and restarted server",
                 )
@@ -89,20 +95,21 @@ def handle_fix_last_error(intent: Intent, executor: Executor, memory: Memory) ->
         plan_steps.append("Reinstalling dependencies")
         project = detect_project(".")
         if project.install_command:
-            install_result = executor.run(
-                project.install_command, cwd=project.root, timeout=180
-            )
+            install_result = executor.run(project.install_command, cwd=project.root, timeout=180)
             results.append(install_result)
             if install_result.success and last.intent == "dev_start":
                 plan_steps.append("Retrying server start")
                 start_plan, start_results, pid = execute_dev_start(
-                    executor, project=project, memory=memory,
+                    executor,
+                    project=project,
+                    memory=memory,
                 )
                 plan_steps.extend(start_plan)
                 results.extend(start_results)
                 if pid:
                     return PlanResult(
-                        plan_steps=plan_steps, results=results,
+                        plan_steps=plan_steps,
+                        results=results,
                         outcome="recovered",
                         summary="Reinstalled components and restarted — running now",
                     )
@@ -110,14 +117,16 @@ def handle_fix_last_error(intent: Intent, executor: Executor, memory: Memory) ->
     failed = [r for r in results if not r.success]
     if failed:
         return PlanResult(
-            plan_steps=plan_steps, results=results,
+            plan_steps=plan_steps,
+            results=results,
             outcome="failure",
             summary=f"Attempted fix but failed. {insight.suggestion}",
             error=insight.root_cause,
         )
 
     return PlanResult(
-        plan_steps=plan_steps, results=results,
+        plan_steps=plan_steps,
+        results=results,
         outcome="recovered" if results else "success",
         summary=f"Applied fix: {insight.suggestion}",
     )

@@ -6,6 +6,7 @@ from pathlib import Path
 def get_services() -> list[dict]:
     """Get list of listening ports/services."""
     from cios.skills.process_control import list_listening_ports
+
     return list_listening_ports()
 
 
@@ -15,8 +16,15 @@ def get_projects() -> list[dict]:
 
     projects = []
     home = Path.home()
-    scan_dirs = [home, home / "projects", home / "dev", home / "code",
-                 home / "workspace", home / "repos", Path.cwd()]
+    scan_dirs = [
+        home,
+        home / "projects",
+        home / "dev",
+        home / "code",
+        home / "workspace",
+        home / "repos",
+        Path.cwd(),
+    ]
     seen = set()
     for d in scan_dirs:
         if not d.is_dir():

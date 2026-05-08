@@ -18,7 +18,6 @@ import subprocess
 import sys
 import threading
 import time
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +29,6 @@ def _grab_hotkey_xdotool(callback) -> None:
     # We use a subprocess-based approach with xbindkeys
     # This is more reliable than python-xlib for global hotkeys
     import subprocess
-    import tempfile
 
     # Create xbindkeys config
     config = f'"{sys.executable} -c \\"import cios.hotkey; cios.ui.hotkey._show_overlay()\\""\\n  Control + space\\n'
@@ -59,14 +57,24 @@ def _show_overlay() -> None:
         logger.error("Tkinter not available for overlay")
         return
 
-    from cios.infra.daemon import send_command, is_daemon_running
+    from cios.infra.daemon import is_daemon_running, send_command
     from cios.ui.theme import (
-        BG_PANEL, BG_INPUT, BG_CARD, BG_HOVER,
-        FG, FG_SEC, FG_DIM,
-        ACCENT, ACCENT_LT, ACCENT_DK,
-        SUCCESS, ERROR, WARNING,
-        RING_IDLE, RING_PROCESSING, RING_SUCCESS, RING_ERROR,
-        T_RING, lerp,
+        ACCENT,
+        ACCENT_DK,
+        ACCENT_LT,
+        BG_CARD,
+        BG_INPUT,
+        BG_PANEL,
+        ERROR,
+        FG,
+        FG_DIM,
+        FG_SEC,
+        RING_ERROR,
+        RING_IDLE,
+        RING_SUCCESS,
+        SUCCESS,
+        T_RING,
+        lerp,
     )
 
     if not is_daemon_running():
@@ -99,13 +107,10 @@ def _show_overlay() -> None:
     frame.pack(fill=tk.BOTH, expand=True)
 
     # State ring (mini version)
-    ring_canvas = tk.Canvas(
-        frame, width=32, height=32,
-        bg=BG_PANEL, highlightthickness=0, bd=0)
+    ring_canvas = tk.Canvas(frame, width=32, height=32, bg=BG_PANEL, highlightthickness=0, bd=0)
     ring_canvas.pack(side=tk.LEFT, padx=(0, 12))
     ring_id = ring_canvas.create_oval(4, 4, 28, 28, outline=RING_IDLE, width=2)
-    symbol_id = ring_canvas.create_text(16, 16, text="✦", fill=ACCENT_LT,
-                                         font=("Helvetica", 11))
+    symbol_id = ring_canvas.create_text(16, 16, text="✦", fill=ACCENT_LT, font=("Helvetica", 11))
 
     # Breathing animation for ring
     ring_phase = [0.0]
@@ -114,6 +119,7 @@ def _show_overlay() -> None:
 
     def animate_ring():
         import math
+
         if not root.winfo_exists():
             return
         ring_phase[0] += 0.05 if ring_state[0] == "idle" else 0.12
@@ -150,9 +156,13 @@ def _show_overlay() -> None:
     # Result label (hidden initially)
     result_var = tk.StringVar()
     result_label = tk.Label(
-        root, textvariable=result_var,
-        font=("Helvetica", 11), fg=FG_SEC, bg=BG_PANEL,
-        wraplength=520, justify=tk.LEFT,
+        root,
+        textvariable=result_var,
+        font=("Helvetica", 11),
+        fg=FG_SEC,
+        bg=BG_PANEL,
+        wraplength=520,
+        justify=tk.LEFT,
     )
 
     def submit(event=None):

@@ -1,17 +1,16 @@
 """Tests for the Guided Flow Engine (GuidedFlowStep, GuidedFlow, multi-step flows)."""
 
-from unittest.mock import patch, MagicMock, PropertyMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from cios.core.bridge import (
-    GuidedFlowStep,
-    GuidedFlow,
     CIOSBridge,
+    GuidedFlow,
+    GuidedFlowStep,
     PendingQuestion,
 )
 from cios.core.intent_parser import Intent, IntentType
-
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  DATACLASS TESTS
@@ -111,6 +110,7 @@ def bridge():
         mock_ctx.stop = MagicMock()
         mock_ctx.boot_times = {}
         from cios.core.mcp import ContextSnapshot, SystemState
+
         mock_snapshot = ContextSnapshot(
             system=SystemState(
                 cpu_percent=15.0,
@@ -140,8 +140,10 @@ class TestGuidedFlowNetworkConnect:
             WifiNetwork(ssid="CafeWifi", signal=60, security="WPA2"),
         ]
 
-        with patch("cios.skills.network.list_networks", return_value=networks), \
-             patch("cios.core.mcp.context") as mock_mcp:
+        with (
+            patch("cios.skills.network.list_networks", return_value=networks),
+            patch("cios.core.mcp.context") as mock_mcp,
+        ):
             # Not connected, no known networks
             mock_mcp.wifi.connected = False
             mock_mcp.known_networks = []
@@ -165,8 +167,10 @@ class TestGuidedFlowNetworkConnect:
             WifiNetwork(ssid="CafeWifi", signal=60, security="WPA2"),
         ]
 
-        with patch("cios.skills.network.list_networks", return_value=networks), \
-             patch("cios.core.mcp.context") as mock_mcp:
+        with (
+            patch("cios.skills.network.list_networks", return_value=networks),
+            patch("cios.core.mcp.context") as mock_mcp,
+        ):
             mock_mcp.wifi.connected = False
             mock_mcp.known_networks = []
 
@@ -186,8 +190,10 @@ class TestGuidedFlowNetworkConnect:
         assert bridge._pending_question is not None
 
         # Step 3: answer with password → should execute
-        with patch("cios.core.mcp.context") as mock_mcp, \
-             patch("cios.core.bridge.CIOSBridge._execute_intent") as mock_exec:
+        with (
+            patch("cios.core.mcp.context") as mock_mcp,
+            patch("cios.core.bridge.CIOSBridge._execute_intent") as mock_exec,
+        ):
             mock_mcp.notify_activity = MagicMock()
             mock_exec.return_value = {
                 "steps": ["Connecting to HomeNet"],
@@ -214,8 +220,10 @@ class TestGuidedFlowNetworkConnect:
             WifiNetwork(ssid="SavedNet", signal=90, security="WPA2"),
         ]
 
-        with patch("cios.skills.network.list_networks", return_value=networks), \
-             patch("cios.core.mcp.context") as mock_mcp:
+        with (
+            patch("cios.skills.network.list_networks", return_value=networks),
+            patch("cios.core.mcp.context") as mock_mcp,
+        ):
             mock_mcp.wifi.connected = False
             mock_mcp.known_networks = []
 
@@ -224,8 +232,10 @@ class TestGuidedFlowNetworkConnect:
             assert "SavedNet" in result1["result"]
 
         # Step 2: answer with SSID of a known network → should skip password
-        with patch("cios.core.mcp.context") as mock_mcp, \
-             patch("cios.core.bridge.CIOSBridge._execute_intent") as mock_exec:
+        with (
+            patch("cios.core.mcp.context") as mock_mcp,
+            patch("cios.core.bridge.CIOSBridge._execute_intent") as mock_exec,
+        ):
             mock_mcp.known_networks = ["SavedNet"]  # Known network!
             mock_mcp.notify_activity = MagicMock()
             mock_exec.return_value = {
@@ -253,8 +263,10 @@ class TestGuidedFlowNetworkConnect:
             WifiNetwork(ssid="Gamma", signal=50, security="Open"),
         ]
 
-        with patch("cios.skills.network.list_networks", return_value=networks), \
-             patch("cios.core.mcp.context") as mock_mcp:
+        with (
+            patch("cios.skills.network.list_networks", return_value=networks),
+            patch("cios.core.mcp.context") as mock_mcp,
+        ):
             mock_mcp.wifi.connected = False
             mock_mcp.known_networks = []
 

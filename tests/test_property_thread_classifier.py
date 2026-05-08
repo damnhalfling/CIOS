@@ -6,18 +6,17 @@ Feature: conversation-threads
 
 import time
 
-from hypothesis import given, settings, assume
+from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from cios.core.thread_manager import (
+    _ALL_PRONOUNS,
+    _CONTINUATION_PHRASES,
     Classification,
     ConversationTurn,
     Thread,
     ThreadClassifier,
-    _ALL_PRONOUNS,
-    _CONTINUATION_PHRASES,
 )
-
 
 # --- Strategies ---
 
@@ -29,12 +28,35 @@ _continuation_phrases_list = list(_CONTINUATION_PHRASES)
 
 # Base text that does NOT contain any continuation signals
 # Use simple alphabetic words that won't accidentally match pronouns or phrases
-_safe_words = st.sampled_from([
-    "please", "now", "run", "open", "close", "start", "stop",
-    "check", "show", "list", "find", "help", "update", "install",
-    "configure", "connect", "disconnect", "restart", "status",
-    "hello", "world", "test", "file", "folder", "network",
-])
+_safe_words = st.sampled_from(
+    [
+        "please",
+        "now",
+        "run",
+        "open",
+        "close",
+        "start",
+        "stop",
+        "check",
+        "show",
+        "list",
+        "find",
+        "help",
+        "update",
+        "install",
+        "configure",
+        "connect",
+        "disconnect",
+        "restart",
+        "status",
+        "hello",
+        "world",
+        "test",
+        "file",
+        "folder",
+        "network",
+    ]
+)
 
 _base_text = st.lists(_safe_words, min_size=1, max_size=5).map(lambda words: " ".join(words))
 
@@ -70,9 +92,9 @@ _input_with_signal = st.one_of(
 )
 
 # Generate a recent timestamp (within 90 seconds of now)
-_recent_timestamp = st.floats(
-    min_value=0.0, max_value=60.0
-).map(lambda offset: time.time() - offset)
+_recent_timestamp = st.floats(min_value=0.0, max_value=60.0).map(
+    lambda offset: time.time() - offset
+)
 
 # Generate an active thread with at least one turn (recent timestamp)
 _active_thread_with_turn = _recent_timestamp.map(
@@ -91,6 +113,7 @@ _active_thread_with_turn = _recent_timestamp.map(
 
 # --- Property Test ---
 
+
 class TestContinuationSignalsProduceContinue:
     """Property 2: Continuation signals produce CONTINUE classification.
 
@@ -106,9 +129,7 @@ class TestContinuationSignalsProduceContinue:
         active_thread=_active_thread_with_turn,
     )
     @settings(max_examples=30, deadline=None)
-    def test_pronoun_reference_produces_continue(
-        self, user_input: str, active_thread: Thread
-    ):
+    def test_pronoun_reference_produces_continue(self, user_input: str, active_thread: Thread):
         """Input containing a pronoun reference (whole word) produces CONTINUE.
 
         **Validates: Requirements 2.2, 2.4**
@@ -116,8 +137,7 @@ class TestContinuationSignalsProduceContinue:
         classifier = ThreadClassifier()
         result = classifier.classify(user_input, active_thread)
         assert result == Classification.CONTINUE, (
-            f"Expected CONTINUE for input with pronoun: {user_input!r}, "
-            f"got {result}"
+            f"Expected CONTINUE for input with pronoun: {user_input!r}, " f"got {result}"
         )
 
     @given(
@@ -125,9 +145,7 @@ class TestContinuationSignalsProduceContinue:
         active_thread=_active_thread_with_turn,
     )
     @settings(max_examples=30, deadline=None)
-    def test_continuation_phrase_produces_continue(
-        self, user_input: str, active_thread: Thread
-    ):
+    def test_continuation_phrase_produces_continue(self, user_input: str, active_thread: Thread):
         """Input containing a continuation phrase produces CONTINUE.
 
         **Validates: Requirements 2.2, 2.4**
@@ -144,9 +162,7 @@ class TestContinuationSignalsProduceContinue:
         active_thread=_active_thread_with_turn,
     )
     @settings(max_examples=30, deadline=None)
-    def test_any_high_weight_signal_produces_continue(
-        self, user_input: str, active_thread: Thread
-    ):
+    def test_any_high_weight_signal_produces_continue(self, user_input: str, active_thread: Thread):
         """Input containing any high-weight signal (pronoun or phrase) produces CONTINUE.
 
         **Validates: Requirements 2.2, 2.4**
@@ -154,6 +170,5 @@ class TestContinuationSignalsProduceContinue:
         classifier = ThreadClassifier()
         result = classifier.classify(user_input, active_thread)
         assert result == Classification.CONTINUE, (
-            f"Expected CONTINUE for input with signal: {user_input!r}, "
-            f"got {result}"
+            f"Expected CONTINUE for input with signal: {user_input!r}, " f"got {result}"
         )

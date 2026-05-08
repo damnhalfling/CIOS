@@ -10,20 +10,15 @@ Tests cover:
 
 import os
 import time
-import tempfile
-from pathlib import Path
-from unittest.mock import patch, MagicMock
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 from cios.skills.dev_start import (
     ProjectInfo,
-    needs_install,
-    _wait_for_port_free,
     _detect_editor,
+    _wait_for_port_free,
     execute_dev_start,
+    needs_install,
 )
-
 
 # ── Stale dependency detection ──────────────────────────────────────────
 
@@ -35,9 +30,12 @@ class TestNeedsInstallStaleDeps:
         """Missing node_modules → needs install."""
         (tmp_path / "package.json").write_text("{}")
         project = ProjectInfo(
-            type="node", root=str(tmp_path),
-            start_command="npm start", install_command="npm install",
-            port=3000, package_manager="npm",
+            type="node",
+            root=str(tmp_path),
+            start_command="npm start",
+            install_command="npm install",
+            port=3000,
+            package_manager="npm",
         )
         assert needs_install(project) is True
 
@@ -46,9 +44,12 @@ class TestNeedsInstallStaleDeps:
         (tmp_path / "package.json").write_text("{}")
         (tmp_path / "node_modules").mkdir()
         project = ProjectInfo(
-            type="node", root=str(tmp_path),
-            start_command="npm start", install_command="npm install",
-            port=3000, package_manager="npm",
+            type="node",
+            root=str(tmp_path),
+            start_command="npm start",
+            install_command="npm install",
+            port=3000,
+            package_manager="npm",
         )
         assert needs_install(project) is False
 
@@ -63,9 +64,12 @@ class TestNeedsInstallStaleDeps:
         # Create lock file (will have current mtime, which is newer)
         (tmp_path / "package-lock.json").write_text("{}")
         project = ProjectInfo(
-            type="node", root=str(tmp_path),
-            start_command="npm start", install_command="npm install",
-            port=3000, package_manager="npm",
+            type="node",
+            root=str(tmp_path),
+            start_command="npm start",
+            install_command="npm install",
+            port=3000,
+            package_manager="npm",
         )
         assert needs_install(project) is True
 
@@ -80,17 +84,22 @@ class TestNeedsInstallStaleDeps:
         # Create node_modules (will have current mtime, which is newer)
         (tmp_path / "node_modules").mkdir()
         project = ProjectInfo(
-            type="node", root=str(tmp_path),
-            start_command="npm start", install_command="npm install",
-            port=3000, package_manager="npm",
+            type="node",
+            root=str(tmp_path),
+            start_command="npm start",
+            install_command="npm install",
+            port=3000,
+            package_manager="npm",
         )
         assert needs_install(project) is False
 
     def test_python_no_venv_needs_install(self, tmp_path):
         """Python project without venv → needs install."""
         project = ProjectInfo(
-            type="python", root=str(tmp_path),
-            start_command="python app.py", install_command="pip install -r requirements.txt",
+            type="python",
+            root=str(tmp_path),
+            start_command="python app.py",
+            install_command="pip install -r requirements.txt",
             port=8000,
         )
         assert needs_install(project) is True
@@ -99,8 +108,10 @@ class TestNeedsInstallStaleDeps:
         """Python project with .venv → skip install."""
         (tmp_path / ".venv").mkdir()
         project = ProjectInfo(
-            type="python", root=str(tmp_path),
-            start_command="python app.py", install_command="pip install -r requirements.txt",
+            type="python",
+            root=str(tmp_path),
+            start_command="python app.py",
+            install_command="pip install -r requirements.txt",
             port=8000,
         )
         assert needs_install(project) is False
@@ -160,6 +171,7 @@ class TestDetectEditor:
             if cmd == "vim":
                 return "/usr/bin/vim"
             return None
+
         mock_which.side_effect = which_side_effect
         assert _detect_editor() == "vim"
 
@@ -179,7 +191,10 @@ class TestExecuteDevStartHardened:
         """Create a mock executor with a fake background process."""
         executor = MagicMock()
         executor.run.return_value = MagicMock(
-            success=True, stdout="ok", stderr="", returncode=0,
+            success=True,
+            stdout="ok",
+            stderr="",
+            returncode=0,
         )
         mock_proc = MagicMock()
         mock_proc.pid = server_pid
@@ -193,14 +208,22 @@ class TestExecuteDevStartHardened:
     @patch("cios.skills.dev_start._is_port_in_use", return_value=False)
     @patch("cios.skills.dev_start.time.sleep")
     def test_editor_and_browser_steps_in_plan(
-        self, mock_sleep, mock_port, mock_detect_ed, mock_open_ed, mock_open_br,
+        self,
+        mock_sleep,
+        mock_port,
+        mock_detect_ed,
+        mock_open_ed,
+        mock_open_br,
     ):
         """Successful dev start includes editor_open and browser_open steps."""
         executor = self._make_mock_executor()
         project = ProjectInfo(
-            type="node", root="/tmp/myproject",
-            start_command="npm run dev", install_command="npm install",
-            port=3000, package_manager="npm",
+            type="node",
+            root="/tmp/myproject",
+            start_command="npm run dev",
+            install_command="npm install",
+            port=3000,
+            package_manager="npm",
         )
         # node_modules exists so no install needed
         with patch("cios.skills.dev_start.needs_install", return_value=False):
@@ -218,14 +241,22 @@ class TestExecuteDevStartHardened:
     @patch("cios.skills.dev_start._is_port_in_use", return_value=False)
     @patch("cios.skills.dev_start.time.sleep")
     def test_no_editor_skips_editor_step(
-        self, mock_sleep, mock_port, mock_detect_ed, mock_open_ed, mock_open_br,
+        self,
+        mock_sleep,
+        mock_port,
+        mock_detect_ed,
+        mock_open_ed,
+        mock_open_br,
     ):
         """When no editor is detected, the editor step is skipped."""
         executor = self._make_mock_executor()
         project = ProjectInfo(
-            type="node", root="/tmp/myproject",
-            start_command="npm run dev", install_command="npm install",
-            port=3000, package_manager="npm",
+            type="node",
+            root="/tmp/myproject",
+            start_command="npm run dev",
+            install_command="npm install",
+            port=3000,
+            package_manager="npm",
         )
         with patch("cios.skills.dev_start.needs_install", return_value=False):
             plan, results, pid = execute_dev_start(executor, project=project)
@@ -242,22 +273,32 @@ class TestExecuteDevStartHardened:
     @patch("cios.skills.dev_start._is_port_in_use", return_value=False)
     @patch("cios.skills.dev_start.time.sleep")
     def test_session_persisted_to_memory(
-        self, mock_sleep, mock_port, mock_detect_ed, mock_open_ed, mock_open_br,
+        self,
+        mock_sleep,
+        mock_port,
+        mock_detect_ed,
+        mock_open_ed,
+        mock_open_br,
     ):
         """Successful dev start persists SessionContext to Memory."""
         from cios.core.memory import Memory, SessionContext
 
         executor = self._make_mock_executor(server_pid=9999)
         project = ProjectInfo(
-            type="node", root="/tmp/myproject",
-            start_command="npm run dev", install_command="npm install",
-            port=3000, package_manager="npm",
+            type="node",
+            root="/tmp/myproject",
+            start_command="npm run dev",
+            install_command="npm install",
+            port=3000,
+            package_manager="npm",
         )
         memory = MagicMock(spec=Memory)
 
         with patch("cios.skills.dev_start.needs_install", return_value=False):
             plan, results, pid = execute_dev_start(
-                executor, project=project, memory=memory,
+                executor,
+                project=project,
+                memory=memory,
             )
 
         assert pid == 9999
@@ -280,18 +321,28 @@ class TestExecuteDevStartHardened:
     @patch("cios.skills.dev_start._is_port_in_use", return_value=False)
     @patch("cios.skills.dev_start.time.sleep")
     def test_no_memory_skips_session_persist(
-        self, mock_sleep, mock_port, mock_detect_ed, mock_open_ed, mock_open_br,
+        self,
+        mock_sleep,
+        mock_port,
+        mock_detect_ed,
+        mock_open_ed,
+        mock_open_br,
     ):
         """When memory is None, session persistence is skipped gracefully."""
         executor = self._make_mock_executor()
         project = ProjectInfo(
-            type="node", root="/tmp/myproject",
-            start_command="npm run dev", install_command="npm install",
-            port=3000, package_manager="npm",
+            type="node",
+            root="/tmp/myproject",
+            start_command="npm run dev",
+            install_command="npm install",
+            port=3000,
+            package_manager="npm",
         )
         with patch("cios.skills.dev_start.needs_install", return_value=False):
             plan, results, pid = execute_dev_start(
-                executor, project=project, memory=None,
+                executor,
+                project=project,
+                memory=None,
             )
 
         assert pid == 12345
@@ -304,17 +355,25 @@ class TestExecuteDevStartHardened:
     @patch("cios.skills.dev_start._is_port_in_use", return_value=True)
     @patch("cios.skills.dev_start.time.sleep")
     def test_port_conflict_uses_polling(
-        self, mock_sleep, mock_port_in_use, mock_detect_ed,
-        mock_open_ed, mock_open_br, mock_wait,
+        self,
+        mock_sleep,
+        mock_port_in_use,
+        mock_detect_ed,
+        mock_open_ed,
+        mock_open_br,
+        mock_wait,
     ):
         """Port conflict resolution uses polling instead of fixed sleep."""
         executor = self._make_mock_executor()
         # After kill, _is_port_in_use is still True (mocked), but
         # _wait_for_port_free returns True (port freed via polling)
         project = ProjectInfo(
-            type="node", root="/tmp/myproject",
-            start_command="npm run dev", install_command="npm install",
-            port=3000, package_manager="npm",
+            type="node",
+            root="/tmp/myproject",
+            start_command="npm run dev",
+            install_command="npm install",
+            port=3000,
+            package_manager="npm",
         )
         with patch("cios.skills.dev_start.needs_install", return_value=False):
             plan, results, pid = execute_dev_start(executor, project=project)

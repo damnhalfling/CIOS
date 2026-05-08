@@ -6,12 +6,10 @@ and a slideshow button. Thumbnails are loaded asynchronously in a background thr
 """
 
 import logging
-import os
 import queue
 import threading
 import tkinter as tk
 from dataclasses import dataclass
-from typing import Optional
 
 from PIL import Image, ImageDraw
 
@@ -21,12 +19,19 @@ except ImportError:
     ImageTk = None  # type: ignore[assignment,misc]
 
 from cios.ui.theme import (
-    BG, BG_CARD, BG_HOVER, BG_PANEL,
-    BORDER, BORDER_LT,
-    FG, FG_SEC, FG_DIM,
-    ACCENT, ACCENT_LT,
-    WARNING, ERROR,
-    SP_MICRO, SP_TIGHT, SP_COMPACT, SP_DEFAULT, SP_SECTION,
+    ACCENT,
+    ACCENT_LT,
+    BG,
+    BG_CARD,
+    BG_HOVER,
+    ERROR,
+    FG,
+    FG_DIM,
+    FG_SEC,
+    SP_COMPACT,
+    SP_MICRO,
+    SP_TIGHT,
+    WARNING,
 )
 
 logger = logging.getLogger(__name__)
@@ -35,6 +40,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ThumbnailTask:
     """A pending thumbnail generation task."""
+
     index: int
     file_path: str
     media_type: str  # determines if play overlay is needed
@@ -92,10 +98,10 @@ class GalleryComponent:
         self._total_count: int = gallery_data.get("total_count", len(self._files))
 
         # Widget references
-        self._outer_frame: Optional[tk.Frame] = None
-        self._header_frame: Optional[tk.Frame] = None
+        self._outer_frame: tk.Frame | None = None
+        self._header_frame: tk.Frame | None = None
         self._scroll_frame = None  # ScrollFrame instance
-        self._grid_frame: Optional[tk.Frame] = None
+        self._grid_frame: tk.Frame | None = None
         self._cells: list[dict] = []  # list of cell state dicts
         self._photos: list = []  # keep PhotoImage references alive
 
@@ -103,7 +109,7 @@ class GalleryComponent:
         self._current_cols: int = 0
 
         # Reference to active ImageViewer (prevent GC)
-        self._viewer: Optional[object] = None
+        self._viewer: object | None = None
 
         # Async thumbnail loading state
         self._cancelled: bool = False
@@ -113,7 +119,7 @@ class GalleryComponent:
         # Selection mode state
         self._selection_mode: bool = False
         self._selected_indices: set = set()
-        self._selection_toolbar: Optional[tk.Frame] = None
+        self._selection_toolbar: tk.Frame | None = None
 
         self._build()
 
@@ -577,7 +583,11 @@ class GalleryComponent:
             return
 
         count = len(self._selected_indices)
-        paths = [self._files[i].get("path", "") for i in sorted(self._selected_indices) if i < len(self._files)]
+        paths = [
+            self._files[i].get("path", "")
+            for i in sorted(self._selected_indices)
+            if i < len(self._files)
+        ]
         paths = [p for p in paths if p]
 
         if not paths:
@@ -684,14 +694,26 @@ class GalleryComponent:
         btn_frame.pack(pady=(0, 20))
 
         yes_btn = tk.Label(
-            btn_frame, text="Sim", font=self._fonts.get("small", None),
-            fg=ERROR, bg=BG_HOVER, padx=8, pady=2, cursor="hand2",
+            btn_frame,
+            text="Sim",
+            font=self._fonts.get("small", None),
+            fg=ERROR,
+            bg=BG_HOVER,
+            padx=8,
+            pady=2,
+            cursor="hand2",
         )
         yes_btn.pack(side="left", padx=4)
 
         no_btn = tk.Label(
-            btn_frame, text="Não", font=self._fonts.get("small", None),
-            fg=FG_SEC, bg=BG_HOVER, padx=8, pady=2, cursor="hand2",
+            btn_frame,
+            text="Não",
+            font=self._fonts.get("small", None),
+            fg=FG_SEC,
+            bg=BG_HOVER,
+            padx=8,
+            pady=2,
+            cursor="hand2",
         )
         no_btn.pack(side="left", padx=4)
 
@@ -782,7 +804,9 @@ class GalleryComponent:
 
         # Calculate visible rows (with 1-row buffer above and below)
         start_row = max(0, int(scroll_pos // row_height) - 1)
-        end_row = int((scroll_pos + viewport_height) // row_height) + 2  # +1 for partial row, +1 for buffer
+        end_row = (
+            int((scroll_pos + viewport_height) // row_height) + 2
+        )  # +1 for partial row, +1 for buffer
 
         # Convert rows to indices
         start_index = max(0, start_row * cols)
@@ -884,9 +908,7 @@ class GalleryComponent:
 
                 if thumb_path is None:
                     # Thumbnail generation failed — post placeholder signal
-                    logger.warning(
-                        "Thumbnail generation failed for: %s", task.file_path
-                    )
+                    logger.warning("Thumbnail generation failed for: %s", task.file_path)
                     self._post_to_main_thread(task.index, None)
                     continue
 
@@ -902,12 +924,10 @@ class GalleryComponent:
                 self._post_to_main_thread(task.index, pil_image)
 
             except Exception as e:
-                logger.warning(
-                    "Error loading thumbnail for %s: %s", task.file_path, e
-                )
+                logger.warning("Error loading thumbnail for %s: %s", task.file_path, e)
                 self._post_to_main_thread(task.index, None)
 
-    def _post_to_main_thread(self, index: int, pil_image: Optional[Image.Image]) -> None:
+    def _post_to_main_thread(self, index: int, pil_image: Image.Image | None) -> None:
         """Schedule _on_thumbnail_ready callback on the main thread."""
         if self._cancelled:
             return
@@ -917,7 +937,7 @@ class GalleryComponent:
             # Root may have been destroyed
             pass
 
-    def _on_thumbnail_ready(self, index: int, pil_image: Optional[Image.Image]) -> None:
+    def _on_thumbnail_ready(self, index: int, pil_image: Image.Image | None) -> None:
         """Callback from background thread — update cell on main thread.
 
         Converts PIL Image to ImageTk.PhotoImage (must be done on main thread)

@@ -18,7 +18,6 @@ import os
 import shutil
 import subprocess
 from dataclasses import dataclass
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -27,14 +26,16 @@ logger = logging.getLogger(__name__)
 #  DEPENDENCY REGISTRY
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class DepInfo:
     """Metadata for a system dependency."""
-    binary: str          # Binary name to check via shutil.which
-    apt_package: str     # Package to install via apt-get
-    feature: str         # Human-readable feature name (PT-BR)
-    degraded_msg: str    # Message shown when feature is unavailable
-    critical: bool       # If True, core features break without it
+
+    binary: str  # Binary name to check via shutil.which
+    apt_package: str  # Package to install via apt-get
+    feature: str  # Human-readable feature name (PT-BR)
+    degraded_msg: str  # Message shown when feature is unavailable
+    critical: bool  # If True, core features break without it
 
 
 # Mapping of tool → package → feature → degradation message
@@ -136,6 +137,7 @@ def is_tool_available(binary: str) -> bool:
 #  MAIN CHECK
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def check_and_install_deps() -> list[str]:
     """Check for missing system tools and attempt to install them.
 
@@ -191,12 +193,16 @@ def check_and_install_deps() -> list[str]:
         if dep.critical:
             logger.error(
                 "Recurso degradado: %s — %s (instale com: sudo apt install %s)",
-                dep.feature, dep.degraded_msg, dep.apt_package,
+                dep.feature,
+                dep.degraded_msg,
+                dep.apt_package,
             )
         else:
             logger.warning(
                 "Recurso degradado: %s — %s (instale com: sudo apt install %s)",
-                dep.feature, dep.degraded_msg, dep.apt_package,
+                dep.feature,
+                dep.degraded_msg,
+                dep.apt_package,
             )
 
     still_missing_names = [dep.binary for dep in still_missing]
@@ -218,6 +224,7 @@ def check_and_install_deps() -> list[str]:
 # ═══════════════════════════════════════════════════════════════════════════
 #  INSTALL STRATEGIES
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def _try_install(packages: list[str]) -> bool:
     """Attempt to install packages via apt.
@@ -247,8 +254,11 @@ def _run_apt(command: str) -> bool:
     """Run an apt command."""
     try:
         result = subprocess.run(
-            command, shell=True,
-            capture_output=True, text=True, timeout=30,
+            command,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         return result.returncode == 0
     except Exception as e:
@@ -263,7 +273,8 @@ def _has_passwordless_sudo() -> bool:
     try:
         result = subprocess.run(
             ["sudo", "-n", "true"],
-            capture_output=True, timeout=5,
+            capture_output=True,
+            timeout=5,
         )
         return result.returncode == 0
     except Exception:

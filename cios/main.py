@@ -9,8 +9,9 @@ Modes:
   6. (default)   → native Tkinter GUI + topbar
 """
 
-import sys
 import logging
+import sys
+
 from cios.core.config import LOG_DIR, ensure_dirs
 
 
@@ -18,6 +19,7 @@ def main() -> None:
     # Quick flags (no logging needed)
     if "--version" in sys.argv or "-V" in sys.argv:
         from cios import __version__
+
         print(f"CIOS v{__version__}")
         return
 
@@ -32,20 +34,24 @@ def main() -> None:
     # Onboarding check (first run)
     if "--setup" in sys.argv:
         from cios.ui.onboarding import run_onboarding
+
         run_onboarding()
         return
 
     # Check if first run (no --cli, --daemon, etc.)
     if not any(arg.startswith("--") for arg in sys.argv[1:]):
         from cios.ui.onboarding import needs_onboarding
+
         if needs_onboarding():
             from cios.ui.onboarding import run_onboarding
+
             if not run_onboarding():
                 return
 
     # Daemon mode
     if "--daemon" in sys.argv or "-d" in sys.argv:
         from cios.infra.daemon import run_daemon
+
         try:
             run_daemon()
         except Exception as e:
@@ -57,12 +63,14 @@ def main() -> None:
     # Hotkey overlay
     if "--overlay" in sys.argv:
         from cios.ui.hotkey import run_overlay
+
         run_overlay()
         return
 
     # Top bar
     if "--topbar" in sys.argv:
         from cios.ui.topbar import run_topbar
+
         try:
             run_topbar()
         except Exception as e:
@@ -74,6 +82,7 @@ def main() -> None:
     # CLI mode
     if "--cli" in sys.argv or "-c" in sys.argv:
         from cios.ui.cli import run_ui
+
         try:
             run_ui()
         except Exception as e:
@@ -85,7 +94,9 @@ def main() -> None:
     # Native Tkinter GUI (default)
     try:
         import tkinter  # noqa: F401 — test availability
+
         from cios.ui.gui import run_gui
+
         run_gui()
     except ImportError:
         print("\n  Tkinter não encontrado.")

@@ -12,13 +12,11 @@ import time
 import pytest
 
 from cios.core.thread_manager import (
-    ConversationTurn,
-    PendingQuestion,
-    Thread,
-    ThreadManager,
-    ThreadStore,
     PENDING_QUESTION_TIMEOUT,
     THREAD_INACTIVITY_TIMEOUT,
+    PendingQuestion,
+    ThreadManager,
+    ThreadStore,
 )
 
 
@@ -40,7 +38,9 @@ def _setup_active_thread_with_pending(manager: ThreadManager) -> None:
     # Create a thread by routing input
     manager.route_input("connect to wifi")
     # Record a turn so the thread has history
-    manager.record_turn("connect to wifi", "network", {"response": "Which network?", "status": "success"})
+    manager.record_turn(
+        "connect to wifi", "network", {"response": "Which network?", "status": "success"}
+    )
     # Set a pending question
     manager.set_pending_question(PendingQuestion(question="Which network?"))
 
@@ -48,7 +48,9 @@ def _setup_active_thread_with_pending(manager: ThreadManager) -> None:
 def _setup_active_thread(manager: ThreadManager) -> None:
     """Set up an active thread with a recorded turn."""
     manager.route_input("check disk space")
-    manager.record_turn("check disk space", "system", {"response": "50GB free", "status": "success"})
+    manager.record_turn(
+        "check disk space", "system", {"response": "50GB free", "status": "success"}
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -261,7 +263,8 @@ class TestConcurrentAccess:
         def record_worker(i):
             try:
                 manager.record_turn(
-                    f"record {i}", "general",
+                    f"record {i}",
+                    "general",
                     {"response": "ok", "status": "success"},
                 )
             except Exception as e:
@@ -269,9 +272,7 @@ class TestConcurrentAccess:
 
         def pending_worker(i):
             try:
-                manager.set_pending_question(
-                    PendingQuestion(question=f"Question {i}?")
-                )
+                manager.set_pending_question(PendingQuestion(question=f"Question {i}?"))
             except Exception as e:
                 errors.append(("pending", i, e))
 
@@ -293,6 +294,7 @@ class TestConcurrentAccess:
 
     def test_state_consistent_after_concurrent_access(self, manager):
         """After concurrent access, the manager state should be consistent."""
+
         def worker(i):
             manager.route_input(f"command {i}")
 

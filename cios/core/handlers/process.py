@@ -1,9 +1,9 @@
 """Handlers for process control and status intents."""
 
 from cios.core.executor import Executor
+from cios.core.handlers._common import PlanResult, sanitize_error
 from cios.core.intent_parser import Intent
 from cios.core.memory import Memory
-from cios.core.handlers._common import PlanResult, sanitize_error
 from cios.skills.process_control import (
     find_process_on_port,
     kill_process_on_port,
@@ -19,7 +19,8 @@ def handle_process_control(intent: Intent, executor: Executor, memory: Memory) -
     if port is None:
         return PlanResult(
             plan_steps=["No port specified"],
-            results=[], outcome="failure",
+            results=[],
+            outcome="failure",
             summary="Which port? e.g., 'kill process on port 3000'",
             error="Missing port",
         )
@@ -32,7 +33,9 @@ def handle_process_control(intent: Intent, executor: Executor, memory: Memory) -
             summary = f"Port {port} is free"
         return PlanResult(
             plan_steps=[f"Check port {port}"],
-            results=[], outcome="success", summary=summary,
+            results=[],
+            outcome="success",
+            summary=summary,
         )
 
     plan, result = kill_process_on_port(executor, port)
@@ -40,7 +43,9 @@ def handle_process_control(intent: Intent, executor: Executor, memory: Memory) -
         plan_steps=plan,
         results=[result],
         outcome="success" if result.success else "failure",
-        summary=f"Killed process on port {port}" if result.success else f"Failed to kill process on port {port}",
+        summary=f"Killed process on port {port}"
+        if result.success
+        else f"Failed to kill process on port {port}",
         error=sanitize_error(result.stderr, "process_control") if not result.success else None,
     )
 
@@ -56,6 +61,8 @@ def handle_status(intent: Intent, executor: Executor, memory: Memory) -> PlanRes
 
     return PlanResult(
         plan_steps=["Check running services"],
-        results=[], outcome="success",
-        summary=summary, voice_mode="brief",
+        results=[],
+        outcome="success",
+        summary=summary,
+        voice_mode="brief",
     )

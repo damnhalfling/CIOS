@@ -8,14 +8,13 @@ Rules:
 
 Usage:
     from cios.core.error_recovery import enrich_error, suggest_recovery
-    
+
     msg = enrich_error("Connection refused", context={"intent": "network"})
     # → "Não consegui conectar. Quer ver as redes disponíveis?"
 """
 
-import re
 import logging
-from typing import Optional
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +22,7 @@ logger = logging.getLogger(__name__)
 # ═══════════════════════════════════════════════════════════════════════════
 #  ERROR CLASSIFICATION
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 class ErrorType:
     NETWORK_CONNECT = "network_connect"
@@ -50,7 +50,10 @@ class ErrorType:
 _CLASSIFIERS: list[tuple[re.Pattern, str]] = [
     # Network
     (re.compile(r"no.*(network|wifi|wi-fi).*found", re.I), ErrorType.NETWORK_NO_NETWORKS),
-    (re.compile(r"(wrong|incorrect|invalid).*(password|key|secret)", re.I), ErrorType.NETWORK_WRONG_PASSWORD),
+    (
+        re.compile(r"(wrong|incorrect|invalid).*(password|key|secret)", re.I),
+        ErrorType.NETWORK_WRONG_PASSWORD,
+    ),
     (re.compile(r"(connection|connect).*(refused|failed|error)", re.I), ErrorType.NETWORK_CONNECT),
     (re.compile(r"(network|wifi).*(timeout|timed out)", re.I), ErrorType.NETWORK_TIMEOUT),
     # Packages
@@ -58,7 +61,10 @@ _CLASSIFIERS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"(dpkg|apt).*(error|failed|broken)", re.I), ErrorType.PACKAGE_INSTALL_FAILED),
     (re.compile(r"(unmet|dependency|depends)", re.I), ErrorType.PACKAGE_DEPS),
     # Apps
-    (re.compile(r"(app|application|program).*(not found|not installed)", re.I), ErrorType.APP_NOT_FOUND),
+    (
+        re.compile(r"(app|application|program).*(not found|not installed)", re.I),
+        ErrorType.APP_NOT_FOUND,
+    ),
     (re.compile(r"could not find.*(app|application)", re.I), ErrorType.APP_NOT_FOUND),
     # System
     (re.compile(r"(permission|access).*(denied|refused)", re.I), ErrorType.PERMISSION_DENIED),
@@ -71,7 +77,10 @@ _CLASSIFIERS: list[tuple[re.Pattern, str]] = [
     # Window
     (re.compile(r"window.*(not found|no.*window)", re.I), ErrorType.WINDOW_NOT_FOUND),
     # Bluetooth
-    (re.compile(r"bluetooth.*(not available|no.*controller|not found)", re.I), ErrorType.BLUETOOTH_UNAVAILABLE),
+    (
+        re.compile(r"bluetooth.*(not available|no.*controller|not found)", re.I),
+        ErrorType.BLUETOOTH_UNAVAILABLE,
+    ),
     (re.compile(r"(pair|pairing).*(fail|reject|timeout)", re.I), ErrorType.BLUETOOTH_PAIR_FAILED),
 ]
 
@@ -94,7 +103,7 @@ def classify_error(error: str) -> str:
 _SUGGESTIONS_PT: dict[str, list[str]] = {
     ErrorType.NETWORK_CONNECT: [
         "Quer ver as redes disponíveis?",
-        "Tente: \"listar redes\"",
+        'Tente: "listar redes"',
     ],
     ErrorType.NETWORK_NO_NETWORKS: [
         "O Wi-Fi pode estar desativado. Verifique o hardware.",
@@ -110,10 +119,10 @@ _SUGGESTIONS_PT: dict[str, list[str]] = {
         "Pacote não encontrado. Quer que eu busque nomes parecidos?",
     ],
     ErrorType.PACKAGE_INSTALL_FAILED: [
-        "Quer que eu atualize as listas primeiro? (\"atualizar pacotes\")",
+        'Quer que eu atualize as listas primeiro? ("atualizar pacotes")',
     ],
     ErrorType.PACKAGE_DEPS: [
-        "Há dependências quebradas. Tente: \"atualizar pacotes\" primeiro.",
+        'Há dependências quebradas. Tente: "atualizar pacotes" primeiro.',
     ],
     ErrorType.APP_NOT_FOUND: [
         "Não encontrei esse app. Quer que eu procure nomes parecidos?",
@@ -125,7 +134,7 @@ _SUGGESTIONS_PT: dict[str, list[str]] = {
         "Demorou demais. Quer tentar de novo?",
     ],
     ErrorType.DISK_FULL: [
-        "Disco cheio. Quer que eu analise o que está ocupando espaço? (\"libera espaço\")",
+        'Disco cheio. Quer que eu analise o que está ocupando espaço? ("libera espaço")',
     ],
     ErrorType.PORT_BUSY: [
         "A porta está ocupada. Quer que eu encerre o processo que está usando?",
@@ -140,7 +149,7 @@ _SUGGESTIONS_PT: dict[str, list[str]] = {
         "Controle de brilho não disponível neste hardware.",
     ],
     ErrorType.WINDOW_NOT_FOUND: [
-        "Não encontrei essa janela. Quer ver as janelas abertas? (\"janelas abertas\")",
+        'Não encontrei essa janela. Quer ver as janelas abertas? ("janelas abertas")',
     ],
     ErrorType.BLUETOOTH_UNAVAILABLE: [
         "Bluetooth não disponível. Verifique se o adaptador está conectado.",
@@ -218,6 +227,7 @@ _SUGGESTIONS_EN: dict[str, list[str]] = {
 def _get_lang() -> str:
     """Get current language."""
     import os
+
     for var in ("LANG", "LC_MESSAGES", "LC_ALL"):
         val = os.environ.get(var, "")
         if val.lower().startswith("pt"):
@@ -228,12 +238,12 @@ def _get_lang() -> str:
 def suggest_recovery(error_type: str) -> str:
     """Get a recovery suggestion for an error type."""
     lang = _get_lang()
-    suggestions = (_SUGGESTIONS_PT if lang == "pt" else _SUGGESTIONS_EN)
+    suggestions = _SUGGESTIONS_PT if lang == "pt" else _SUGGESTIONS_EN
     options = suggestions.get(error_type, suggestions[ErrorType.GENERIC])
     return options[0]
 
 
-def enrich_error(error: str, context: Optional[dict] = None) -> str:
+def enrich_error(error: str, context: dict | None = None) -> str:
     """Enrich an error message with a recovery suggestion.
 
     Takes a raw/humanized error and appends an actionable suggestion.

@@ -6,42 +6,40 @@ the right sidebar. Shares the bridge with the main window.
 """
 
 import threading
-import time
 import tkinter as tk
 from tkinter import font as tkfont
-from typing import Optional
 
 from cios.infra.monitors import Monitor
 
 # Design tokens (same as main GUI)
-BG         = "#0b0f14"
-BG_PANEL   = "#0f1319"
-BG_CARD    = "#111827"
-BG_INPUT   = "#111827"
-BG_HOVER   = "#1f2937"
-BORDER     = "#1f2937"
-FG         = "#e5e7eb"
-FG_SEC     = "#9ca3af"
-FG_DIM     = "#6b7280"
-ACCENT     = "#7c3aed"
-ACCENT_LT  = "#a78bfa"
-SUCCESS    = "#22c55e"
-WARNING    = "#eab308"
-ERROR      = "#ef4444"
+BG = "#0b0f14"
+BG_PANEL = "#0f1319"
+BG_CARD = "#111827"
+BG_INPUT = "#111827"
+BG_HOVER = "#1f2937"
+BORDER = "#1f2937"
+FG = "#e5e7eb"
+FG_SEC = "#9ca3af"
+FG_DIM = "#6b7280"
+ACCENT = "#7c3aed"
+ACCENT_LT = "#a78bfa"
+SUCCESS = "#22c55e"
+WARNING = "#eab308"
+ERROR = "#ef4444"
 
 # Spacing
-SP_PAGE    = 48
+SP_PAGE = 48
 SP_SECTION = 24
 SP_DEFAULT = 16
 SP_COMPACT = 10
-SP_TIGHT   = 6
-SP_MICRO   = 4
+SP_TIGHT = 6
+SP_MICRO = 4
 
 # Timing
-T_STEP     = 180
-T_SLOW     = 300
-T_FAST     = 120
-T_NORMAL   = 200
+T_STEP = 180
+T_SLOW = 300
+T_FAST = 120
+T_NORMAL = 200
 
 
 class SecondaryPanel:
@@ -51,9 +49,9 @@ class SecondaryPanel:
         self._root = root
         self._monitor = monitor
         self._bridge = bridge
-        self._win: Optional[tk.Toplevel] = None
+        self._win: tk.Toplevel | None = None
         self._busy = False
-        self._pending: Optional[str] = None
+        self._pending: str | None = None
         self._step_widgets: list[tk.Label] = []
         self._ph = True
         self._cancelled = False
@@ -69,8 +67,9 @@ class SecondaryPanel:
         self._win.configure(bg=BG)
 
         # Position on secondary monitor (fullscreen, no decoration via openbox rule)
-        geo = (f"{self._monitor.width}x{self._monitor.height}"
-               f"+{self._monitor.x}+{self._monitor.y}")
+        geo = (
+            f"{self._monitor.width}x{self._monitor.height}" f"+{self._monitor.x}+{self._monitor.y}"
+        )
         self._win.geometry(geo)
         # Set WM class so openbox applies decor=no rule
         self._win.wm_attributes("-type", "normal")
@@ -79,14 +78,14 @@ class SecondaryPanel:
 
         # Fonts
         self._f = {
-            "greet":   tkfont.Font(family="Helvetica", size=22, weight="bold"),
-            "sub":     tkfont.Font(family="Helvetica", size=13),
-            "input":   tkfont.Font(family="Helvetica", size=14),
-            "step":    tkfont.Font(family="Helvetica", size=12),
-            "res_t":   tkfont.Font(family="Helvetica", size=14, weight="bold"),
-            "res_b":   tkfont.Font(family="Helvetica", size=12),
-            "btn":     tkfont.Font(family="Helvetica", size=11),
-            "small":   tkfont.Font(family="Helvetica", size=9),
+            "greet": tkfont.Font(family="Helvetica", size=22, weight="bold"),
+            "sub": tkfont.Font(family="Helvetica", size=13),
+            "input": tkfont.Font(family="Helvetica", size=14),
+            "step": tkfont.Font(family="Helvetica", size=12),
+            "res_t": tkfont.Font(family="Helvetica", size=14, weight="bold"),
+            "res_b": tkfont.Font(family="Helvetica", size=12),
+            "btn": tkfont.Font(family="Helvetica", size=11),
+            "small": tkfont.Font(family="Helvetica", size=9),
         }
 
         # Main container — single column, no sidebar
@@ -104,58 +103,90 @@ class SecondaryPanel:
         tk.Frame(self._greeting_frame, bg=BG).pack(fill="both", expand=True)
         center = tk.Frame(self._greeting_frame, bg=BG)
         center.pack()
-        tk.Label(center, text="CIOS", font=self._f["greet"],
-                 fg=FG, bg=BG).pack()
-        tk.Label(center, text="O que vamos fazer?", font=self._f["sub"],
-                 fg=FG_DIM, bg=BG).pack(pady=(SP_MICRO, 0))
+        tk.Label(center, text="CIOS", font=self._f["greet"], fg=FG, bg=BG).pack()
+        tk.Label(center, text="O que vamos fazer?", font=self._f["sub"], fg=FG_DIM, bg=BG).pack(
+            pady=(SP_MICRO, 0)
+        )
         tk.Frame(self._greeting_frame, bg=BG).pack(fill="both", expand=True)
 
         # Spinner (hidden)
         self._spinner_frame = tk.Frame(self._feed_area, bg=BG)
         self._spinner_canvas = tk.Canvas(
-            self._spinner_frame, width=36, height=36,
-            bg=BG, highlightthickness=0, bd=0)
+            self._spinner_frame, width=36, height=36, bg=BG, highlightthickness=0, bd=0
+        )
         self._spinner_canvas.pack(pady=(SP_DEFAULT, SP_COMPACT))
         self._spinner_arc = self._spinner_canvas.create_arc(
-            4, 4, 32, 32, start=0, extent=270,
-            outline=ACCENT, width=3, style="arc")
+            4, 4, 32, 32, start=0, extent=270, outline=ACCENT, width=3, style="arc"
+        )
         self._spinner_dot = self._spinner_canvas.create_oval(
-            14, 14, 22, 22, fill=ACCENT_LT, outline="")
+            14, 14, 22, 22, fill=ACCENT_LT, outline=""
+        )
         self._spinner_phase = 0.0
-        self._spinner_anim_id: Optional[str] = None
+        self._spinner_anim_id: str | None = None
 
         # Feed (execution steps)
         self._feed = tk.Frame(self._feed_area, bg=BG)
 
         # Confirm dialog
-        self._confirm_frame = tk.Frame(self._feed_area, bg=BG_CARD,
-                                       padx=SP_SECTION, pady=SP_DEFAULT)
-        self._confirm_msg = tk.Label(self._confirm_frame, font=self._f["step"],
-                                     fg=FG, bg=BG_CARD, wraplength=600,
-                                     justify="left", anchor="w")
+        self._confirm_frame = tk.Frame(
+            self._feed_area, bg=BG_CARD, padx=SP_SECTION, pady=SP_DEFAULT
+        )
+        self._confirm_msg = tk.Label(
+            self._confirm_frame,
+            font=self._f["step"],
+            fg=FG,
+            bg=BG_CARD,
+            wraplength=600,
+            justify="left",
+            anchor="w",
+        )
         self._confirm_msg.pack(fill="x", pady=(0, SP_COMPACT))
 
         btn_row = tk.Frame(self._confirm_frame, bg=BG_CARD)
         btn_row.pack(anchor="w")
         self._confirm_btn = tk.Button(
-            btn_row, text="Confirmar", font=self._f["btn"],
-            bg=ACCENT, fg="#fff", activebackground=ACCENT_LT,
-            activeforeground="#fff", relief="flat",
-            padx=18, pady=5, command=self._on_confirm)
+            btn_row,
+            text="Confirmar",
+            font=self._f["btn"],
+            bg=ACCENT,
+            fg="#fff",
+            activebackground=ACCENT_LT,
+            activeforeground="#fff",
+            relief="flat",
+            padx=18,
+            pady=5,
+            command=self._on_confirm,
+        )
         self._confirm_btn.pack(side="left", padx=(0, 10))
         self._confirm_btn.bind("<Return>", lambda e: self._on_confirm())
-        tk.Button(btn_row, text="Cancelar", font=self._f["btn"],
-                  bg=BG_INPUT, fg=FG_DIM, activebackground=BG_HOVER,
-                  activeforeground=FG, relief="flat",
-                  padx=18, pady=5, command=self._on_cancel).pack(side="left")
+        tk.Button(
+            btn_row,
+            text="Cancelar",
+            font=self._f["btn"],
+            bg=BG_INPUT,
+            fg=FG_DIM,
+            activebackground=BG_HOVER,
+            activeforeground=FG,
+            relief="flat",
+            padx=18,
+            pady=5,
+            command=self._on_cancel,
+        ).pack(side="left")
 
         # Result
         self._result_frame = tk.Frame(self._feed_area, bg=BG)
-        self._res_title = tk.Label(self._result_frame, font=self._f["res_t"],
-                                   bg=BG, anchor="w", justify="left")
-        self._res_body = tk.Label(self._result_frame, font=self._f["res_b"],
-                                  bg=BG, fg=FG_SEC, wraplength=600,
-                                  justify="left", anchor="w")
+        self._res_title = tk.Label(
+            self._result_frame, font=self._f["res_t"], bg=BG, anchor="w", justify="left"
+        )
+        self._res_body = tk.Label(
+            self._result_frame,
+            font=self._f["res_b"],
+            bg=BG,
+            fg=FG_SEC,
+            wraplength=600,
+            justify="left",
+            anchor="w",
+        )
 
         # ═══ BOTTOM: prompt ═══
         self._prompt_area = tk.Frame(container, bg=BG_PANEL, padx=SP_PAGE, pady=SP_DEFAULT)
@@ -167,16 +198,23 @@ class SecondaryPanel:
         prompt_inner = tk.Frame(self._prompt_glow, bg=BG_INPUT)
         prompt_inner.pack(fill="x")
 
-        tk.Label(prompt_inner, text="✦", font=self._f["input"],
-                 fg=FG_DIM, bg=BG_INPUT).pack(
-            side="left", padx=(SP_DEFAULT, 10), anchor="n", pady=SP_COMPACT)
+        tk.Label(prompt_inner, text="✦", font=self._f["input"], fg=FG_DIM, bg=BG_INPUT).pack(
+            side="left", padx=(SP_DEFAULT, 10), anchor="n", pady=SP_COMPACT
+        )
 
         self._entry = tk.Text(
-            prompt_inner, font=self._f["input"], bg=BG_INPUT, fg=FG,
-            insertbackground=ACCENT, relief="flat", bd=0,
-            highlightthickness=0, height=2, wrap="word")
-        self._entry.pack(side="left", fill="both", expand=True,
-                         pady=SP_COMPACT, padx=(0, SP_TIGHT))
+            prompt_inner,
+            font=self._f["input"],
+            bg=BG_INPUT,
+            fg=FG,
+            insertbackground=ACCENT,
+            relief="flat",
+            bd=0,
+            highlightthickness=0,
+            height=2,
+            wrap="word",
+        )
+        self._entry.pack(side="left", fill="both", expand=True, pady=SP_COMPACT, padx=(0, SP_TIGHT))
         self._entry.bind("<Return>", self._on_enter_key)
 
         # Focus glow
@@ -190,9 +228,16 @@ class SecondaryPanel:
         send_outer = tk.Frame(btn_frame, bg=ACCENT, padx=1, pady=1)
         send_outer.pack(pady=(0, SP_TIGHT))
         self._send_btn_outer = send_outer
-        send_btn = tk.Label(send_outer, text=" Enviar ", font=self._f["btn"],
-                            fg="#fff", bg=ACCENT, pady=3, padx=SP_TIGHT,
-                            cursor="hand2")
+        send_btn = tk.Label(
+            send_outer,
+            text=" Enviar ",
+            font=self._f["btn"],
+            fg="#fff",
+            bg=ACCENT,
+            pady=3,
+            padx=SP_TIGHT,
+            cursor="hand2",
+        )
         send_btn.pack()
 
         for w in [send_outer, send_btn]:
@@ -262,8 +307,10 @@ class SecondaryPanel:
         }
 
         self._root.after(delay, self._stop_spinner)
-        self._root.after(delay + 80, lambda: self._show_result(
-            titles.get(status, "Concluído"), result_text, status))
+        self._root.after(
+            delay + 80,
+            lambda: self._show_result(titles.get(status, "Concluído"), result_text, status),
+        )
         self._root.after(delay + 150, self._finish)
 
     # ── Confirm ──
@@ -291,9 +338,9 @@ class SecondaryPanel:
         self._add_step("Executando…", thinking=True)
         self._start_spinner()
         threading.Thread(
-            target=lambda: self._display(
-                self._bridge.execute_command(cmd, confirmed=True)),
-            daemon=True).start()
+            target=lambda: self._display(self._bridge.execute_command(cmd, confirmed=True)),
+            daemon=True,
+        ).start()
 
     def _on_cancel(self) -> None:
         self._pending = None
@@ -304,9 +351,14 @@ class SecondaryPanel:
     # ── Feed / Result ──
 
     def _add_step(self, text: str, thinking: bool = False) -> None:
-        lbl = tk.Label(self._feed, text=f"  {'⟳' if thinking else '•'}  {text}",
-                       font=self._f["step"], fg=FG_SEC if not thinking else FG_DIM,
-                       bg=BG, anchor="w")
+        lbl = tk.Label(
+            self._feed,
+            text=f"  {'⟳' if thinking else '•'}  {text}",
+            font=self._f["step"],
+            fg=FG_SEC if not thinking else FG_DIM,
+            bg=BG,
+            anchor="w",
+        )
         lbl.pack(fill="x")
         self._step_widgets.append(lbl)
         self._feed.pack(fill="x")
@@ -362,15 +414,14 @@ class SecondaryPanel:
         if not self._win or not self._win.winfo_exists():
             return
         self._spinner_phase += 12
-        self._spinner_canvas.itemconfigure(
-            self._spinner_arc, start=self._spinner_phase)
+        self._spinner_canvas.itemconfigure(self._spinner_arc, start=self._spinner_phase)
         # Pulse dot
         import math
+
         scale = 0.8 + 0.2 * math.sin(self._spinner_phase * 0.05)
         cx, cy = 18, 18
         r = 4 * scale
-        self._spinner_canvas.coords(
-            self._spinner_dot, cx - r, cy - r, cx + r, cy + r)
+        self._spinner_canvas.coords(self._spinner_dot, cx - r, cy - r, cx + r, cy + r)
         self._spinner_anim_id = self._root.after(30, self._animate_spinner)
 
     # ── Placeholder ──

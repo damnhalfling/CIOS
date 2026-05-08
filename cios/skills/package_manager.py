@@ -18,10 +18,8 @@ Security:
 import logging
 import os
 import re
-import shutil
 import subprocess
 from dataclasses import dataclass
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +37,8 @@ def _sudo_cmd() -> list[str]:
     try:
         r = subprocess.run(
             ["sudo", "-n", "true"],
-            capture_output=True, timeout=3,
+            capture_output=True,
+            timeout=3,
         )
         if r.returncode == 0:
             return ["sudo", "-n"]
@@ -55,7 +54,8 @@ def needs_sudo_password() -> bool:
     try:
         r = subprocess.run(
             ["sudo", "-n", "true"],
-            capture_output=True, timeout=3,
+            capture_output=True,
+            timeout=3,
         )
         return r.returncode != 0
     except Exception:
@@ -82,21 +82,37 @@ def _run_privileged(
         return subprocess.run(
             ["sudo", "-S"] + cmd,
             input=password + "\n",
-            capture_output=True, text=True,
-            timeout=timeout, env=env,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=env,
         )
     else:
         return subprocess.run(
             _sudo_cmd() + cmd,
-            capture_output=True, text=True,
-            timeout=timeout, env=env,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=env,
         )
 
+
 # Packages that should never be removed
-_PROTECTED_PACKAGES = frozenset([
-    "systemd", "init", "linux-image", "grub", "apt", "dpkg",
-    "libc6", "bash", "coreutils", "login", "passwd",
-])
+_PROTECTED_PACKAGES = frozenset(
+    [
+        "systemd",
+        "init",
+        "linux-image",
+        "grub",
+        "apt",
+        "dpkg",
+        "libc6",
+        "bash",
+        "coreutils",
+        "login",
+        "passwd",
+    ]
+)
 
 
 @dataclass
@@ -125,7 +141,9 @@ def is_installed(package: str) -> bool:
     try:
         result = subprocess.run(
             ["dpkg", "-s", package],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         return result.returncode == 0 and "Status: install ok installed" in result.stdout
     except Exception:
@@ -138,7 +156,9 @@ def search_packages(query: str, limit: int = 10) -> PackageResult:
     try:
         result = subprocess.run(
             ["apt-cache", "search", query],
-            capture_output=True, text=True, timeout=_SEARCH_TIMEOUT,
+            capture_output=True,
+            text=True,
+            timeout=_SEARCH_TIMEOUT,
         )
         if result.returncode != 0:
             return PackageResult(steps, False, _humanize_apt_error(result.stderr, "search", query))
@@ -148,11 +168,13 @@ def search_packages(query: str, limit: int = 10) -> PackageResult:
             parts = line.split(" - ", 1)
             if len(parts) == 2:
                 name, desc = parts
-                packages.append(PackageInfo(
-                    name=name.strip(),
-                    description=desc.strip(),
-                    installed=is_installed(name.strip()),
-                ))
+                packages.append(
+                    PackageInfo(
+                        name=name.strip(),
+                        description=desc.strip(),
+                        installed=is_installed(name.strip()),
+                    )
+                )
 
         if not packages:
             return PackageResult(steps, True, f"No packages found for '{query}'")
@@ -160,7 +182,9 @@ def search_packages(query: str, limit: int = 10) -> PackageResult:
         steps.append(f"Found {len(packages)} packages")
         return PackageResult(steps, True, f"Found {len(packages)} packages", packages)
     except subprocess.TimeoutExpired:
-        return PackageResult(steps, False, "A busca demorou demais. Tente um termo mais específico.")
+        return PackageResult(
+            steps, False, "A busca demorou demais. Tente um termo mais específico."
+        )
     except Exception as e:
         return PackageResult(steps, False, _humanize_apt_error(str(e), "search", query))
 
@@ -216,10 +240,14 @@ def _install_special(spec: dict, password: str = "") -> PackageResult:
     try:
         result = subprocess.run(
             ["curl", "-fsSL", "-o", deb_path, url],
-            capture_output=True, text=True, timeout=120,
+            capture_output=True,
+            text=True,
+            timeout=120,
         )
         if result.returncode != 0:
-            return PackageResult(steps, False, f"Não consegui baixar {name}. Verifique sua conexão.")
+            return PackageResult(
+                steps, False, f"Não consegui baixar {name}. Verifique sua conexão."
+            )
     except subprocess.TimeoutExpired:
         return PackageResult(steps, False, f"Download de {name} demorou demais.")
     except Exception as e:
@@ -230,13 +258,15 @@ def _install_special(spec: dict, password: str = "") -> PackageResult:
     try:
         result = _run_privileged(
             ["dpkg", "-i", deb_path],
-            password=password, timeout=_INSTALL_TIMEOUT,
+            password=password,
+            timeout=_INSTALL_TIMEOUT,
         )
         # Fix missing dependencies
         if result.returncode != 0:
             _run_privileged(
                 ["apt-get", "install", "-f", "-y"],
-                password=password, timeout=_INSTALL_TIMEOUT,
+                password=password,
+                timeout=_INSTALL_TIMEOUT,
             )
 
         # Verify installation
@@ -266,7 +296,7 @@ def install_package(package: str, password: str = "") -> PackageResult:
         return _install_special(special, password)
 
     # Validate package name
-    if not re.match(r'^[a-z0-9][a-z0-9.+\-]+$', package):
+    if not re.match(r"^[a-z0-9][a-z0-9.+\-]+$", package):
         return PackageResult(steps, False, f"Invalid package name: {package}")
 
     if is_installed(package):
@@ -276,15 +306,20 @@ def install_package(package: str, password: str = "") -> PackageResult:
     try:
         result = _run_privileged(
             ["apt-get", "install", "-y", package],
-            password=password, timeout=_INSTALL_TIMEOUT,
+            password=password,
+            timeout=_INSTALL_TIMEOUT,
         )
         if result.returncode == 0:
             steps.append(f"{package} installed successfully")
             return PackageResult(steps, True, f"{package} installed successfully")
         else:
-            return PackageResult(steps, False, _humanize_apt_error(result.stderr, "install", package))
+            return PackageResult(
+                steps, False, _humanize_apt_error(result.stderr, "install", package)
+            )
     except subprocess.TimeoutExpired:
-        return PackageResult(steps, False, f"A instalação de {package} demorou demais. Tente novamente.")
+        return PackageResult(
+            steps, False, f"A instalação de {package} demorou demais. Tente novamente."
+        )
     except Exception as e:
         return PackageResult(steps, False, _humanize_apt_error(str(e), "install", package))
 
@@ -304,13 +339,16 @@ def remove_package(package: str, password: str = "") -> PackageResult:
     try:
         result = _run_privileged(
             ["apt-get", "remove", "-y", package],
-            password=password, timeout=_INSTALL_TIMEOUT,
+            password=password,
+            timeout=_INSTALL_TIMEOUT,
         )
         if result.returncode == 0:
             steps.append(f"{package} removed")
             return PackageResult(steps, True, f"{package} removed successfully")
         else:
-            return PackageResult(steps, False, _humanize_apt_error(result.stderr, "remove", package))
+            return PackageResult(
+                steps, False, _humanize_apt_error(result.stderr, "remove", package)
+            )
     except subprocess.TimeoutExpired:
         return PackageResult(steps, False, f"A remoção de {package} demorou demais.")
     except Exception as e:
@@ -323,7 +361,8 @@ def update_lists(password: str = "") -> PackageResult:
     try:
         result = _run_privileged(
             ["apt-get", "update"],
-            password=password, timeout=_UPDATE_TIMEOUT,
+            password=password,
+            timeout=_UPDATE_TIMEOUT,
         )
         if result.returncode == 0:
             steps.append("Package lists updated")
@@ -342,7 +381,8 @@ def upgrade_packages(password: str = "") -> PackageResult:
     try:
         result = _run_privileged(
             ["apt-get", "upgrade", "-y"],
-            password=password, timeout=600,
+            password=password,
+            timeout=600,
         )
         if result.returncode == 0:
             # Count upgraded packages
@@ -352,17 +392,21 @@ def upgrade_packages(password: str = "") -> PackageResult:
         else:
             return PackageResult(steps, False, _humanize_apt_error(result.stderr, "upgrade", ""))
     except subprocess.TimeoutExpired:
-        return PackageResult(steps, False, "A atualização demorou demais (>10min). Tente novamente.")
+        return PackageResult(
+            steps, False, "A atualização demorou demais (>10min). Tente novamente."
+        )
     except Exception as e:
         return PackageResult(steps, False, _humanize_apt_error(str(e), "upgrade", ""))
 
 
-def get_package_info(package: str) -> Optional[PackageInfo]:
+def get_package_info(package: str) -> PackageInfo | None:
     """Get detailed info about a package."""
     try:
         result = subprocess.run(
             ["apt-cache", "show", package],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         if result.returncode != 0:
             return None
@@ -401,8 +445,12 @@ def _humanize_apt_error(stderr: str, action: str = "", package: str = "") -> str
 
     # Generic fallback — never show raw stderr
     _ACTION_MSGS = {
-        "install": f"Não consegui instalar {package}." if package else "Não consegui instalar o pacote.",
-        "remove": f"Não consegui remover {package}." if package else "Não consegui remover o pacote.",
+        "install": f"Não consegui instalar {package}."
+        if package
+        else "Não consegui instalar o pacote.",
+        "remove": f"Não consegui remover {package}."
+        if package
+        else "Não consegui remover o pacote.",
         "search": "A busca de pacotes falhou.",
         "update": "Não consegui atualizar as listas de pacotes.",
         "upgrade": "Não consegui atualizar o sistema.",

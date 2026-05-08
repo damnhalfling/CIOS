@@ -30,11 +30,9 @@ import socket
 import sys
 import threading
 import time
-from pathlib import Path
-from typing import Optional
 
 from cios.core.bridge import CIOSBridge
-from cios.core.config import ensure_dirs, CIOS_HOME
+from cios.core.config import CIOS_HOME, ensure_dirs
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +45,8 @@ class CIOSDaemon:
     """Unix socket daemon for CIOS."""
 
     def __init__(self) -> None:
-        self._bridge: Optional[CIOSBridge] = None
-        self._server: Optional[socket.socket] = None
+        self._bridge: CIOSBridge | None = None
+        self._server: socket.socket | None = None
         self._running = False
         self._start_time = 0.0
         self._clients: list[threading.Thread] = []
@@ -101,7 +99,7 @@ class CIOSDaemon:
                 t = threading.Thread(target=self._handle_client, args=(client,), daemon=True)
                 t.start()
                 self._clients.append(t)
-            except socket.timeout:
+            except TimeoutError:
                 continue
             except OSError:
                 if self._running:
@@ -139,7 +137,7 @@ class CIOSDaemon:
 
             response = self._process_request(request)
             client.sendall(json.dumps(response).encode("utf-8"))
-        except socket.timeout:
+        except TimeoutError:
             self._send_error(client, "Timeout")
         except Exception as e:
             logger.error("Client handler error: %s", e)
@@ -213,7 +211,7 @@ class CIOSDaemon:
             return False
 
 
-def send_command(command: str, confirmed: bool = False, timeout: float = 30.0) -> Optional[dict]:
+def send_command(command: str, confirmed: bool = False, timeout: float = 30.0) -> dict | None:
     """Send a command to the running daemon. Returns response or None."""
     if not os.path.exists(SOCKET_PATH):
         return None

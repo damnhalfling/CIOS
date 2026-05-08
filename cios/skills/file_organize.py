@@ -1,44 +1,88 @@
 """Skill: file_organize — organize files in a directory by type."""
 
-import os
 import shutil
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
-
-from cios.core.executor import Executor, ExecResult
 
 # File type → folder name mapping
 _TYPE_MAP: dict[str, str] = {
     # Images
-    ".jpg": "Images", ".jpeg": "Images", ".png": "Images", ".gif": "Images",
-    ".bmp": "Images", ".svg": "Images", ".webp": "Images", ".ico": "Images",
-    ".tiff": "Images", ".heic": "Images",
+    ".jpg": "Images",
+    ".jpeg": "Images",
+    ".png": "Images",
+    ".gif": "Images",
+    ".bmp": "Images",
+    ".svg": "Images",
+    ".webp": "Images",
+    ".ico": "Images",
+    ".tiff": "Images",
+    ".heic": "Images",
     # Documents
-    ".pdf": "Documents", ".doc": "Documents", ".docx": "Documents",
-    ".xls": "Documents", ".xlsx": "Documents", ".ppt": "Documents",
-    ".pptx": "Documents", ".odt": "Documents", ".ods": "Documents",
-    ".txt": "Documents", ".rtf": "Documents", ".csv": "Documents",
+    ".pdf": "Documents",
+    ".doc": "Documents",
+    ".docx": "Documents",
+    ".xls": "Documents",
+    ".xlsx": "Documents",
+    ".ppt": "Documents",
+    ".pptx": "Documents",
+    ".odt": "Documents",
+    ".ods": "Documents",
+    ".txt": "Documents",
+    ".rtf": "Documents",
+    ".csv": "Documents",
     # Videos
-    ".mp4": "Videos", ".avi": "Videos", ".mkv": "Videos", ".mov": "Videos",
-    ".wmv": "Videos", ".flv": "Videos", ".webm": "Videos",
+    ".mp4": "Videos",
+    ".avi": "Videos",
+    ".mkv": "Videos",
+    ".mov": "Videos",
+    ".wmv": "Videos",
+    ".flv": "Videos",
+    ".webm": "Videos",
     # Audio
-    ".mp3": "Audio", ".wav": "Audio", ".flac": "Audio", ".aac": "Audio",
-    ".ogg": "Audio", ".wma": "Audio", ".m4a": "Audio",
+    ".mp3": "Audio",
+    ".wav": "Audio",
+    ".flac": "Audio",
+    ".aac": "Audio",
+    ".ogg": "Audio",
+    ".wma": "Audio",
+    ".m4a": "Audio",
     # Archives
-    ".zip": "Archives", ".tar": "Archives", ".gz": "Archives",
-    ".rar": "Archives", ".7z": "Archives", ".bz2": "Archives",
-    ".xz": "Archives", ".deb": "Archives",
+    ".zip": "Archives",
+    ".tar": "Archives",
+    ".gz": "Archives",
+    ".rar": "Archives",
+    ".7z": "Archives",
+    ".bz2": "Archives",
+    ".xz": "Archives",
+    ".deb": "Archives",
     # Code
-    ".py": "Code", ".js": "Code", ".ts": "Code", ".java": "Code",
-    ".c": "Code", ".cpp": "Code", ".h": "Code", ".go": "Code",
-    ".rs": "Code", ".rb": "Code", ".php": "Code", ".sh": "Code",
-    ".html": "Code", ".css": "Code", ".json": "Code", ".xml": "Code",
-    ".yaml": "Code", ".yml": "Code", ".toml": "Code", ".md": "Code",
+    ".py": "Code",
+    ".js": "Code",
+    ".ts": "Code",
+    ".java": "Code",
+    ".c": "Code",
+    ".cpp": "Code",
+    ".h": "Code",
+    ".go": "Code",
+    ".rs": "Code",
+    ".rb": "Code",
+    ".php": "Code",
+    ".sh": "Code",
+    ".html": "Code",
+    ".css": "Code",
+    ".json": "Code",
+    ".xml": "Code",
+    ".yaml": "Code",
+    ".yml": "Code",
+    ".toml": "Code",
+    ".md": "Code",
     # Installers
-    ".exe": "Installers", ".msi": "Installers", ".dmg": "Installers",
-    ".AppImage": "Installers", ".snap": "Installers",
+    ".exe": "Installers",
+    ".msi": "Installers",
+    ".dmg": "Installers",
+    ".AppImage": "Installers",
+    ".snap": "Installers",
 }
 
 

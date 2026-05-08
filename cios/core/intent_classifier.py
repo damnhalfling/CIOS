@@ -20,12 +20,10 @@ Flow:
 
 import json
 import logging
-import os
 import re
 import sqlite3
 import threading
 import time
-from typing import Optional
 
 from cios.core.config import CIOS_HOME
 from cios.core.intent_parser import Intent, IntentType
@@ -73,7 +71,7 @@ _CLASSIFY_SYSTEM = (
     "- gallery_manage: manage gallery (favorite, delete, albums, search, duplicates) (params: action, album_name, date_query, text_query)\n\n"
     "Rules:\n"
     "- Respond ONLY with the JSON object, nothing else\n"
-    "- If you cannot classify, use: {\"intent\": \"unknown\", \"params\": {}}\n"
+    '- If you cannot classify, use: {"intent": "unknown", "params": {}}\n'
     "- Extract relevant params from the user input\n"
     "- For audio: action can be up/down/mute/unmute/set/status\n"
     "- For network: action can be connect/disconnect/list/status\n"
@@ -105,7 +103,7 @@ class IntentCache:
             CREATE INDEX IF NOT EXISTS idx_cache_intent ON intent_cache(intent);
         """)
 
-    def get(self, user_input: str) -> Optional[Intent]:
+    def get(self, user_input: str) -> Intent | None:
         """Look up a cached classification (exact match on normalized input)."""
         normalized = _normalize(user_input)
         with self._lock:
@@ -130,7 +128,7 @@ class IntentCache:
                 pass
         return None
 
-    def get_fuzzy(self, user_input: str) -> Optional[Intent]:
+    def get_fuzzy(self, user_input: str) -> Intent | None:
         """Look up a cached classification using word-overlap similarity."""
         normalized = _normalize(user_input)
         words = set(normalized.split())
@@ -166,7 +164,9 @@ class IntentCache:
                 self._record_hit(best_match["input_normalized"])
                 logger.debug(
                     "Cache HIT (fuzzy %.2f): '%s' → %s (via '%s')",
-                    best_score, user_input, best_match["intent"],
+                    best_score,
+                    user_input,
+                    best_match["intent"],
                     best_match["input_normalized"],
                 )
                 return Intent(
@@ -195,8 +195,15 @@ class IntentCache:
                    confidence = excluded.confidence,
                    hit_count = hit_count + 1,
                    last_hit = excluded.last_hit""",
-                (normalized, intent.type.value, json.dumps(intent.params),
-                 intent.confidence, now, now, source),
+                (
+                    normalized,
+                    intent.type.value,
+                    json.dumps(intent.params),
+                    intent.confidence,
+                    now,
+                    now,
+                    source,
+                ),
             )
             self._conn.commit()
         logger.debug("Cache STORE: '%s' → %s (source: %s)", user_input, intent.type.value, source)
@@ -230,7 +237,7 @@ class IntentCache:
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Module-level cache singleton
-_cache: Optional[IntentCache] = None
+_cache: IntentCache | None = None
 
 
 def _get_cache() -> IntentCache:
@@ -241,7 +248,7 @@ def _get_cache() -> IntentCache:
     return _cache
 
 
-def classify_intent(user_input: str) -> Optional[Intent]:
+def classify_intent(user_input: str) -> Intent | None:
     """Classify user input using cache + LLM fallback.
 
     Flow:
@@ -274,14 +281,14 @@ def classify_intent(user_input: str) -> Optional[Intent]:
     return None
 
 
-def _classify_via_llm(user_input: str) -> Optional[Intent]:
+def _classify_via_llm(user_input: str) -> Intent | None:
     """Call LLM with the lightweight classification prompt."""
-    from cios.core.model_router import _call_provider
+    from cios.core.model_router import _call_local
 
     prompt = f'Classify this user request: "{user_input}"'
 
     try:
-        raw = _call_provider(prompt, system=_CLASSIFY_SYSTEM)
+        raw = _call_local(prompt, system=_CLASSIFY_SYSTEM)
     except Exception as e:
         logger.warning("LLM classification failed: %s", e)
         return None
@@ -313,7 +320,7 @@ def _classify_via_llm(user_input: str) -> Optional[Intent]:
     )
 
 
-def _parse_classification(raw: str) -> Optional[tuple[str, dict]]:
+def _parse_classification(raw: str) -> tuple[str, dict] | None:
     """Parse LLM classification response into (intent_str, params)."""
     # Try direct JSON parse
     try:
@@ -350,17 +357,30 @@ def learn_from_success(user_input: str, intent: Intent) -> None:
 #  HELPERS
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def _normalize(text: str) -> str:
     """Normalize text for cache matching: lowercase, strip accents, stem verbs, collapse spaces."""
     text = text.lower().strip()
     # Remove accents
     _ACCENTS = {
-        "á": "a", "à": "a", "ã": "a", "â": "a",
-        "é": "e", "ê": "e", "è": "e",
-        "í": "i", "ì": "i",
-        "ó": "o", "ô": "o", "õ": "o", "ò": "o",
-        "ú": "u", "ü": "u", "ù": "u",
-        "ç": "c", "ñ": "n",
+        "á": "a",
+        "à": "a",
+        "ã": "a",
+        "â": "a",
+        "é": "e",
+        "ê": "e",
+        "è": "e",
+        "í": "i",
+        "ì": "i",
+        "ó": "o",
+        "ô": "o",
+        "õ": "o",
+        "ò": "o",
+        "ú": "u",
+        "ü": "u",
+        "ù": "u",
+        "ç": "c",
+        "ñ": "n",
     }
     for old, new in _ACCENTS.items():
         text = text.replace(old, new)
@@ -388,28 +408,61 @@ def _light_stem(word: str) -> str:
         return word
     # Words that should never be stemmed (proper nouns, tech terms, etc.)
     _NO_STEM = {
-        "wifi", "bluetooth", "chrome", "firefox", "spotify", "vlc",
-        "terminal", "volume", "desktop", "linux", "cios",
-        "projeto", "arquivo", "sistema", "computador", "navegador",
+        "wifi",
+        "bluetooth",
+        "chrome",
+        "firefox",
+        "spotify",
+        "vlc",
+        "terminal",
+        "volume",
+        "desktop",
+        "linux",
+        "cios",
+        "projeto",
+        "arquivo",
+        "sistema",
+        "computador",
+        "navegador",
     }
     if word in _NO_STEM:
         return word
     # Portuguese verb endings (most common conjugations)
     # Order matters: longer suffixes first
     _PT_SUFFIXES = (
-        "ando", "endo", "indo",          # gerund
-        "aram", "eram", "iram",           # past plural
-        "amos", "emos", "imos",           # present plural
-        "ava", "evo", "ivo",              # imperfect
-        "ar", "er", "ir",                 # infinitive
-        "ou", "ei", "eu", "iu",           # past singular
-        "am", "em",                       # present plural
-        "as", "es", "is", "os",           # plural / 2nd person
-        "a", "e", "i", "o",              # present singular
+        "ando",
+        "endo",
+        "indo",  # gerund
+        "aram",
+        "eram",
+        "iram",  # past plural
+        "amos",
+        "emos",
+        "imos",  # present plural
+        "ava",
+        "evo",
+        "ivo",  # imperfect
+        "ar",
+        "er",
+        "ir",  # infinitive
+        "ou",
+        "ei",
+        "eu",
+        "iu",  # past singular
+        "am",
+        "em",  # present plural
+        "as",
+        "es",
+        "is",
+        "os",  # plural / 2nd person
+        "a",
+        "e",
+        "i",
+        "o",  # present singular
     )
     for suffix in _PT_SUFFIXES:
         if word.endswith(suffix) and len(word) - len(suffix) >= 3:
-            return word[:-len(suffix)]
+            return word[: -len(suffix)]
     return word
 
 
@@ -424,9 +477,9 @@ def get_cache_stats() -> dict:
         from_learned = cache._conn.execute(
             "SELECT COUNT(*) FROM intent_cache WHERE source = 'learned'"
         ).fetchone()[0]
-        total_hits = cache._conn.execute(
-            "SELECT SUM(hit_count) FROM intent_cache"
-        ).fetchone()[0] or 0
+        total_hits = (
+            cache._conn.execute("SELECT SUM(hit_count) FROM intent_cache").fetchone()[0] or 0
+        )
     return {
         "total_cached": total,
         "from_llm": from_llm,

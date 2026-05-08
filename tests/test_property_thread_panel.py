@@ -18,17 +18,13 @@ the rendering LOGIC directly:
    guarantees this via _create_thread_unlocked)
 """
 
-import time
-import uuid
-
-from hypothesis import given, settings, assume
+from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from cios.core.thread_manager import (
     ConversationTurn,
     Thread,
 )
-
 
 # --- Strategies ---
 
@@ -54,14 +50,14 @@ _summary_text = st.text(
 _outcome = st.sampled_from(["success", "error", "incomplete", ""])
 
 # Generate intent types
-_intent_type = st.sampled_from(
-    ["network", "system", "app", "media", "file", "general", "search"]
-)
+_intent_type = st.sampled_from(["network", "system", "app", "media", "file", "general", "search"])
 
 # Generate a ConversationTurn
 _turn = st.builds(
     ConversationTurn,
-    user_input=st.text(min_size=1, max_size=100, alphabet=st.characters(blacklist_categories=("Cs",))),
+    user_input=st.text(
+        min_size=1, max_size=100, alphabet=st.characters(blacklist_categories=("Cs",))
+    ),
     intent_type=_intent_type,
     params=st.just({}),
     result_summary=st.text(max_size=100, alphabet=st.characters(blacklist_categories=("Cs",))),
@@ -95,7 +91,7 @@ _OUTCOME_ICONS = {
 
 _OUTCOME_COLORS = {
     "success": "#4ade80",  # SUCCESS color from theme
-    "error": "#f87171",    # ERROR color from theme
+    "error": "#f87171",  # ERROR color from theme
     "incomplete": "#6b7280",  # FG_DIM
     "": "#6b7280",
 }
@@ -127,6 +123,7 @@ def _format_timestamp(ts: float) -> str:
 
 # --- Property Tests ---
 
+
 # Feature: conversation-threads, Property 9: Thread entry rendering completeness
 class TestThreadEntryRenderingCompleteness:
     """Property 9: Thread entry rendering completeness.
@@ -146,12 +143,10 @@ class TestThreadEntryRenderingCompleteness:
         **Validates: Requirements 6.2**
         """
         result = _format_timestamp(thread.created_at)
-        assert isinstance(result, str), (
-            f"Expected str, got {type(result).__name__}"
-        )
-        assert len(result) > 0, (
-            f"Timestamp formatting produced empty string for ts={thread.created_at}"
-        )
+        assert isinstance(result, str), f"Expected str, got {type(result).__name__}"
+        assert (
+            len(result) > 0
+        ), f"Timestamp formatting produced empty string for ts={thread.created_at}"
 
     @given(outcome=_outcome)
     @settings(max_examples=30, deadline=None)
@@ -161,16 +156,10 @@ class TestThreadEntryRenderingCompleteness:
         **Validates: Requirements 6.2**
         """
         icon = _OUTCOME_ICONS.get(outcome, "○")
-        assert isinstance(icon, str), (
-            f"Expected str icon, got {type(icon).__name__}"
-        )
-        assert len(icon) > 0, (
-            f"Outcome icon is empty for outcome={outcome!r}"
-        )
+        assert isinstance(icon, str), f"Expected str icon, got {type(icon).__name__}"
+        assert len(icon) > 0, f"Outcome icon is empty for outcome={outcome!r}"
         # Verify it's one of the expected icons
-        assert icon in {"✓", "⚠", "○"}, (
-            f"Unexpected icon {icon!r} for outcome={outcome!r}"
-        )
+        assert icon in {"✓", "⚠", "○"}, f"Unexpected icon {icon!r} for outcome={outcome!r}"
 
     @given(thread=_completed_thread)
     @settings(max_examples=30, deadline=None)
@@ -185,12 +174,8 @@ class TestThreadEntryRenderingCompleteness:
         # Our strategy generates non-empty summaries (min_size=1)
         # This validates the invariant that completed threads always have summaries
         summary = thread.summary
-        assert isinstance(summary, str), (
-            f"Expected str summary, got {type(summary).__name__}"
-        )
-        assert len(summary) > 0, (
-            f"Thread {thread.id} has empty summary"
-        )
+        assert isinstance(summary, str), f"Expected str summary, got {type(summary).__name__}"
+        assert len(summary) > 0, f"Thread {thread.id} has empty summary"
 
     @given(thread=_completed_thread)
     @settings(max_examples=30, deadline=None)
@@ -204,25 +189,21 @@ class TestThreadEntryRenderingCompleteness:
         """
         # 1. Summary text is present
         summary = thread.summary
-        assert summary and len(summary) > 0, (
-            f"Missing summary for thread {thread.id}"
-        )
+        assert summary and len(summary) > 0, f"Missing summary for thread {thread.id}"
 
         # 2. Formatted timestamp is non-empty
         timestamp_str = _format_timestamp(thread.created_at)
-        assert timestamp_str and len(timestamp_str) > 0, (
-            f"Empty timestamp for thread {thread.id} (ts={thread.created_at})"
-        )
+        assert (
+            timestamp_str and len(timestamp_str) > 0
+        ), f"Empty timestamp for thread {thread.id} (ts={thread.created_at})"
 
         # 3. Outcome status indicator is valid
         outcome = thread.outcome or ""
         icon = _OUTCOME_ICONS.get(outcome, "○")
-        assert icon in {"✓", "⚠", "○"}, (
-            f"Invalid outcome icon for thread {thread.id}: {icon!r}"
-        )
+        assert icon in {"✓", "⚠", "○"}, f"Invalid outcome icon for thread {thread.id}: {icon!r}"
 
         # 4. Outcome color is valid (non-empty hex color)
         color = _OUTCOME_COLORS.get(outcome, "#6b7280")
-        assert color.startswith("#") and len(color) == 7, (
-            f"Invalid outcome color for thread {thread.id}: {color!r}"
-        )
+        assert (
+            color.startswith("#") and len(color) == 7
+        ), f"Invalid outcome color for thread {thread.id}: {color!r}"

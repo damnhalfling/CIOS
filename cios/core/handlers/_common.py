@@ -6,11 +6,12 @@ Contains:
 - _sanitize_error() for human-friendly error messages
 """
 
+import logging
 import re
 import time
-import logging
-from dataclasses import dataclass, field
-from typing import Optional, Callable, Any
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
 
 from cios.core.executor import ExecResult
 
@@ -23,9 +24,9 @@ class PlanResult:
     results: list[ExecResult]
     outcome: str  # "success" | "failure" | "recovered"
     summary: str = ""
-    error: Optional[str] = None
+    error: str | None = None
     voice_mode: str = "full"  # "full" = speak summary, "brief" = "pronto, tá na tela"
-    data: Optional[dict] = None  # extra structured data (e.g., gallery signal)
+    data: dict | None = None  # extra structured data (e.g., gallery signal)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -60,22 +61,22 @@ def sanitize_error(error: str, skill: str = "") -> str:
         return ""
 
     # Strip raw stderr prefix
-    cleaned = re.sub(r'\bstderr:\s*', '', error)
+    cleaned = re.sub(r"\bstderr:\s*", "", error)
     # Strip file paths
-    cleaned = re.sub(r'/[\w/.\-]+', '', cleaned)
+    cleaned = re.sub(r"/[\w/.\-]+", "", cleaned)
     # Strip tracebacks
-    cleaned = re.sub(r'File ".*?", line \d+.*', '', cleaned)
+    cleaned = re.sub(r'File ".*?", line \d+.*', "", cleaned)
     # Strip error codes
-    cleaned = re.sub(r'\b(errno|E[A-Z]{2,}|error\s*\d+)\b', '', cleaned, flags=re.I)
+    cleaned = re.sub(r"\b(errno|E[A-Z]{2,}|error\s*\d+)\b", "", cleaned, flags=re.I)
     # Strip PID references
-    cleaned = re.sub(r'\(PID \d+\)', '', cleaned)
-    cleaned = re.sub(r'PID \d+', '', cleaned)
+    cleaned = re.sub(r"\(PID \d+\)", "", cleaned)
+    cleaned = re.sub(r"PID \d+", "", cleaned)
     # Strip subprocess noise
-    cleaned = re.sub(r'(subprocess|Popen|CalledProcessError).*', '', cleaned, flags=re.I)
+    cleaned = re.sub(r"(subprocess|Popen|CalledProcessError).*", "", cleaned, flags=re.I)
     # Strip Python exception class names
-    cleaned = re.sub(r'\b\w*(Error|Exception|Warning)\b:\s*', '', cleaned)
+    cleaned = re.sub(r"\b\w*(Error|Exception|Warning)\b:\s*", "", cleaned)
     # Collapse whitespace
-    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
 
     # If nothing useful remains, return a generic message
     if not cleaned or len(cleaned) < 5:
@@ -90,11 +91,20 @@ def _is_transient(error: str) -> bool:
     if not error:
         return False
     lower = error.lower()
-    return any(kw in lower for kw in (
-        "timeout", "timed out", "busy", "temporarily",
-        "try again", "connection reset", "resource",
-        "lock", "unavailable",
-    ))
+    return any(
+        kw in lower
+        for kw in (
+            "timeout",
+            "timed out",
+            "busy",
+            "temporarily",
+            "try again",
+            "connection reset",
+            "resource",
+            "lock",
+            "unavailable",
+        )
+    )
 
 
 def resilient_call(
@@ -141,7 +151,12 @@ def resilient_call(
                     pass  # keep original result
 
         # Sanitize error message in the result
-        if isinstance(result, tuple) and len(result) >= 3 and isinstance(result[1], bool) and not result[1]:
+        if (
+            isinstance(result, tuple)
+            and len(result) >= 3
+            and isinstance(result[1], bool)
+            and not result[1]
+        ):
             sanitized = sanitize_error(str(result[2]), skill)
             result = (result[0], result[1], sanitized)
 

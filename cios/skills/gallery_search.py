@@ -13,13 +13,8 @@ Dependencies:
 import logging
 import os
 import re
-import sqlite3
-import threading
-import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Optional
 
 from cios.core.config import CIOS_HOME
 
@@ -29,11 +24,14 @@ _IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff", ".heic
 _ALL_MEDIA_EXTS = _IMAGE_EXTS | {".mp4", ".avi", ".mkv", ".mov", ".webm", ".mp3", ".wav", ".flac"}
 
 _SEARCH_DIRS = [
-    "~/Pictures", "~/Imagens",
-    "~/Videos", "~/Vídeos",
+    "~/Pictures",
+    "~/Imagens",
+    "~/Videos",
+    "~/Vídeos",
     "~/Downloads",
     "~/Desktop",
-    "~/Documents", "~/Documentos",
+    "~/Documents",
+    "~/Documentos",
 ]
 
 _CLIP_DB_PATH = CIOS_HOME / "clip_cache.db"
@@ -53,9 +51,11 @@ CREATE INDEX IF NOT EXISTS idx_clip_mtime ON clip_embeddings(mtime);
 #  DATA STRUCTURES
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class SearchResult:
     """Result of a gallery search."""
+
     files: list[dict] = field(default_factory=list)  # [{path, name, media_type, score}]
     query: str = ""
     search_type: str = ""  # "date", "text", "clip"
@@ -66,9 +66,10 @@ class SearchResult:
 #  DATE SEARCH (#254)
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def search_by_date(
     query: str,
-    directories: Optional[list[str]] = None,
+    directories: list[str] | None = None,
 ) -> SearchResult:
     """Search media files by date expression.
 
@@ -108,7 +109,7 @@ def search_by_date(
     )
 
 
-def _parse_date_query(query: str) -> Optional[tuple[float, float]]:
+def _parse_date_query(query: str) -> tuple[float, float] | None:
     """Parse a date query into (start_timestamp, end_timestamp)."""
     q = query.lower().strip()
     now = datetime.now()
@@ -142,16 +143,34 @@ def _parse_date_query(query: str) -> Optional[tuple[float, float]]:
 
     # Month names (PT)
     _MONTHS_PT = {
-        "janeiro": 1, "fevereiro": 2, "março": 3, "marco": 3,
-        "abril": 4, "maio": 5, "junho": 6,
-        "julho": 7, "agosto": 8, "setembro": 9,
-        "outubro": 10, "novembro": 11, "dezembro": 12,
+        "janeiro": 1,
+        "fevereiro": 2,
+        "março": 3,
+        "marco": 3,
+        "abril": 4,
+        "maio": 5,
+        "junho": 6,
+        "julho": 7,
+        "agosto": 8,
+        "setembro": 9,
+        "outubro": 10,
+        "novembro": 11,
+        "dezembro": 12,
     }
     # Month names (EN)
     _MONTHS_EN = {
-        "january": 1, "february": 2, "march": 3, "april": 4,
-        "may": 5, "june": 6, "july": 7, "august": 8,
-        "september": 9, "october": 10, "november": 11, "december": 12,
+        "january": 1,
+        "february": 2,
+        "march": 3,
+        "april": 4,
+        "may": 5,
+        "june": 6,
+        "july": 7,
+        "august": 8,
+        "september": 9,
+        "october": 10,
+        "november": 11,
+        "december": 12,
     }
     all_months = {**_MONTHS_PT, **_MONTHS_EN}
 
@@ -182,8 +201,12 @@ def _parse_date_query(query: str) -> Optional[tuple[float, float]]:
 
 
 def _collect_by_date(
-    path: str, start_ts: float, end_ts: float,
-    results: list, max_depth: int, depth: int,
+    path: str,
+    start_ts: float,
+    end_ts: float,
+    results: list,
+    max_depth: int,
+    depth: int,
 ) -> None:
     """Recursively collect media files within a date range."""
     if depth > max_depth:
@@ -202,13 +225,15 @@ def _collect_by_date(
                     file_time = stat.st_mtime
                     if start_ts <= file_time <= end_ts:
                         media_type = "image" if ext in _IMAGE_EXTS else "video"
-                        results.append({
-                            "path": entry.path,
-                            "name": entry.name,
-                            "media_type": media_type,
-                            "mtime": file_time,
-                            "size_bytes": stat.st_size,
-                        })
+                        results.append(
+                            {
+                                "path": entry.path,
+                                "name": entry.name,
+                                "media_type": media_type,
+                                "mtime": file_time,
+                                "size_bytes": stat.st_size,
+                            }
+                        )
                 except OSError:
                     continue
             elif entry.is_dir() and depth < max_depth:
@@ -222,7 +247,7 @@ def _collect_by_date(
 # ═══════════════════════════════════════════════════════════════════════════
 
 # CLIP availability flag (lazy-loaded)
-_clip_available: Optional[bool] = None
+_clip_available: bool | None = None
 _clip_model = None
 _clip_processor = None
 
@@ -236,11 +261,14 @@ def _check_clip_available() -> bool:
     try:
         import torch
         from transformers import CLIPModel, CLIPProcessor
+
         _clip_available = True
     except ImportError:
         _clip_available = False
-        logger.info("CLIP not available (torch/transformers not installed). "
-                    "Text search will use filename matching only.")
+        logger.info(
+            "CLIP not available (torch/transformers not installed). "
+            "Text search will use filename matching only."
+        )
 
     return _clip_available
 
@@ -253,7 +281,6 @@ def _load_clip_model():
         return _clip_model, _clip_processor
 
     try:
-        import torch
         from transformers import CLIPModel, CLIPProcessor
 
         model_name = "openai/clip-vit-base-patch32"
@@ -269,7 +296,7 @@ def _load_clip_model():
 
 def search_by_text(
     query: str,
-    directories: Optional[list[str]] = None,
+    directories: list[str] | None = None,
     max_results: int = 50,
 ) -> SearchResult:
     """Search media files by text description.
@@ -306,7 +333,7 @@ def search_by_text(
     return result
 
 
-def _search_clip(query: str, files: list[dict], max_results: int) -> Optional[SearchResult]:
+def _search_clip(query: str, files: list[dict], max_results: int) -> SearchResult | None:
     """Search using CLIP embeddings (semantic similarity)."""
     try:
         import torch
@@ -408,6 +435,7 @@ def _search_filename(query: str, files: list[dict], max_results: int) -> SearchR
 #  HELPERS
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def _expand_dirs(dirs: list[str]) -> list[str]:
     """Expand ~ and filter to existing directories."""
     result = []
@@ -439,13 +467,15 @@ def _collect_images_recursive(path: str, results: list, max_depth: int, depth: i
                 if ext in _IMAGE_EXTS:
                     try:
                         stat = entry.stat()
-                        results.append({
-                            "path": entry.path,
-                            "name": entry.name,
-                            "media_type": "image",
-                            "mtime": stat.st_mtime,
-                            "size_bytes": stat.st_size,
-                        })
+                        results.append(
+                            {
+                                "path": entry.path,
+                                "name": entry.name,
+                                "media_type": "image",
+                                "mtime": stat.st_mtime,
+                                "size_bytes": stat.st_size,
+                            }
+                        )
                     except OSError:
                         continue
             elif entry.is_dir() and depth < max_depth:

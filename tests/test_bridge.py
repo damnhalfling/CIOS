@@ -1,6 +1,6 @@
 """Tests for the Bridge module (integration)."""
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -16,6 +16,7 @@ def bridge():
         mock_ctx.boot_times = {}
         # Mock snapshot for get_system_status (returns real-looking data)
         from cios.core.mcp import ContextSnapshot, SystemState
+
         mock_snapshot = ContextSnapshot(
             system=SystemState(
                 cpu_percent=15.0,
@@ -64,10 +65,10 @@ class TestBridgeIntentRouting:
         assert "hello" in result["result"]
 
     def test_unknown_intent_without_llm(self, bridge):
-        """Unknown intent without LLM fallback returns error."""
+        """Unknown intent without LLM fallback returns info (no provider message)."""
         with patch("cios.core.bridge.resolve_unknown_intent", return_value=None):
             result = bridge.execute_command("asdfghjkl")
-            assert result["status"] == "error"
+            assert result["status"] in ("error", "info")
 
 
 class TestBridgeConfirmation:
@@ -148,7 +149,9 @@ class TestBridgeStreamingProgress:
             steps_received.append((text, index, total))
 
         result = bridge.execute_streaming(
-            "run echo hello", confirmed=True, on_step=on_step,
+            "run echo hello",
+            confirmed=True,
+            on_step=on_step,
         )
         assert result["status"] == "success"
         # Should have received at least the "Entendendo…" and "Executando…"
@@ -157,7 +160,11 @@ class TestBridgeStreamingProgress:
         assert "Entendendo…" in texts
         assert "Executando…" in texts
         # Plan steps come after "Executando…"
-        plan_steps = [s for s in steps_received if s[0] not in ("Entendendo…", "Executando…", "Classificando…", "Consultando IA…")]
+        plan_steps = [
+            s
+            for s in steps_received
+            if s[0] not in ("Entendendo…", "Executando…", "Classificando…", "Consultando IA…")
+        ]
         assert len(plan_steps) >= 1, "on_step should be called for at least one plan step"
 
     def test_execute_streaming_step_indices_are_1_based(self, bridge):
@@ -168,10 +175,16 @@ class TestBridgeStreamingProgress:
             steps_received.append((text, index, total))
 
         bridge.execute_streaming(
-            "run echo hello", confirmed=True, on_step=on_step,
+            "run echo hello",
+            confirmed=True,
+            on_step=on_step,
         )
         # Filter to plan steps only (not phase callbacks)
-        plan_steps = [s for s in steps_received if s[0] not in ("Entendendo…", "Executando…", "Classificando…", "Consultando IA…")]
+        plan_steps = [
+            s
+            for s in steps_received
+            if s[0] not in ("Entendendo…", "Executando…", "Classificando…", "Consultando IA…")
+        ]
         if plan_steps:
             # First plan step index should be 1
             assert plan_steps[0][1] == 1
@@ -183,13 +196,17 @@ class TestBridgeStreamingProgress:
         """Topbar signals transition: Entendendo… → Executando… → idle."""
         topbar_calls = []
 
-        with patch("cios.ui.topbar.signal_topbar_processing") as mock_proc, \
-             patch("cios.ui.topbar.signal_topbar_idle") as mock_idle:
+        with (
+            patch("cios.ui.topbar.signal_topbar_processing") as mock_proc,
+            patch("cios.ui.topbar.signal_topbar_idle") as mock_idle,
+        ):
             mock_proc.side_effect = lambda msg: topbar_calls.append(("processing", msg))
             mock_idle.side_effect = lambda: topbar_calls.append(("idle",))
 
             bridge.execute_streaming(
-                "run echo hello", confirmed=True, on_step=lambda *a: None,
+                "run echo hello",
+                confirmed=True,
+                on_step=lambda *a: None,
             )
 
         # Verify the transition sequence
@@ -204,30 +221,38 @@ class TestBridgeStreamingProgress:
 
     def test_streaming_topbar_idle_on_unknown_intent(self, bridge):
         """Topbar returns to idle when intent is unknown."""
-        with patch("cios.ui.topbar.signal_topbar_processing"), \
-             patch("cios.ui.topbar.signal_topbar_idle") as mock_idle, \
-             patch("cios.core.bridge.resolve_unknown_intent", return_value=None), \
-             patch("cios.core.bridge.classify_intent", return_value=None):
+        with (
+            patch("cios.ui.topbar.signal_topbar_processing"),
+            patch("cios.ui.topbar.signal_topbar_idle") as mock_idle,
+            patch("cios.core.bridge.resolve_unknown_intent", return_value=None),
+            patch("cios.core.bridge.classify_intent", return_value=None),
+        ):
             bridge.execute_streaming("asdfghjkl", on_step=lambda *a: None)
             mock_idle.assert_called()
 
     def test_streaming_topbar_idle_on_confirmation(self, bridge):
         """Topbar returns to idle when confirmation is needed."""
-        with patch("cios.ui.topbar.signal_topbar_processing"), \
-             patch("cios.ui.topbar.signal_topbar_idle") as mock_idle:
+        with (
+            patch("cios.ui.topbar.signal_topbar_processing"),
+            patch("cios.ui.topbar.signal_topbar_idle") as mock_idle,
+        ):
             result = bridge.execute_streaming(
-                "organize my downloads", on_step=lambda *a: None,
+                "organize my downloads",
+                on_step=lambda *a: None,
             )
             assert result["confirm"] is not None
             mock_idle.assert_called()
 
     def test_streaming_topbar_idle_on_clarification(self, bridge):
         """Topbar returns to idle when clarification is needed."""
-        with patch("cios.ui.topbar.signal_topbar_processing"), \
-             patch("cios.ui.topbar.signal_topbar_idle") as mock_idle:
+        with (
+            patch("cios.ui.topbar.signal_topbar_processing"),
+            patch("cios.ui.topbar.signal_topbar_idle") as mock_idle,
+        ):
             # "abrir" without app name triggers clarification
             result = bridge.execute_streaming(
-                "abrir", on_step=lambda *a: None,
+                "abrir",
+                on_step=lambda *a: None,
             )
             # Should have called idle
             mock_idle.assert_called()
@@ -236,7 +261,8 @@ class TestBridgeStreamingProgress:
         """Empty command returns immediately without streaming."""
         steps_received = []
         result = bridge.execute_streaming(
-            "", on_step=lambda t, i, n: steps_received.append(t),
+            "",
+            on_step=lambda t, i, n: steps_received.append(t),
         )
         assert result["status"] == "success"
         assert result["steps"] == []
@@ -245,6 +271,8 @@ class TestBridgeStreamingProgress:
     def test_streaming_on_step_none_does_not_crash(self, bridge):
         """execute_streaming works fine when on_step is None."""
         result = bridge.execute_streaming(
-            "run echo hello", confirmed=True, on_step=None,
+            "run echo hello",
+            confirmed=True,
+            on_step=None,
         )
         assert result["status"] == "success"

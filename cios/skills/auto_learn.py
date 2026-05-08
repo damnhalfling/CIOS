@@ -13,11 +13,8 @@ Features:
 
 import json
 import logging
-import os
 import time
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Optional
+from dataclasses import dataclass
 
 from cios.core.config import CIOS_HOME
 
@@ -31,6 +28,7 @@ _SIMILARITY_THRESHOLD = 0.7  # how similar inputs must be to count as "same"
 @dataclass
 class LearnedPattern:
     """A learned shortcut from repeated behavior."""
+
     id: str
     name: str  # user-friendly name
     trigger_phrases: list[str]  # inputs that trigger this pattern
@@ -45,6 +43,7 @@ class LearnedPattern:
 @dataclass
 class PatternSuggestion:
     """A suggestion to create a shortcut."""
+
     intent: str
     params: dict
     example_inputs: list[str]
@@ -64,9 +63,7 @@ class AutoLearner:
         if _LEARNED_PATH.exists():
             try:
                 data = json.loads(_LEARNED_PATH.read_text())
-                self._patterns = [
-                    LearnedPattern(**p) for p in data.get("patterns", [])
-                ]
+                self._patterns = [LearnedPattern(**p) for p in data.get("patterns", [])]
             except Exception as e:
                 logger.warning("Could not load learned patterns: %s", e)
                 self._patterns = []
@@ -96,7 +93,7 @@ class AutoLearner:
         except Exception as e:
             logger.warning("Could not save learned patterns: %s", e)
 
-    def find_shortcut(self, user_input: str) -> Optional[LearnedPattern]:
+    def find_shortcut(self, user_input: str) -> LearnedPattern | None:
         """Check if user input matches a learned pattern."""
         lower = user_input.lower().strip()
         for pattern in self._patterns:
@@ -136,28 +133,29 @@ class AutoLearner:
             groups.setdefault(key, []).append(record)
 
         suggestions = []
-        for key, records in groups.items():
+        for _key, records in groups.items():
             if len(records) < _MIN_REPETITIONS:
                 continue
             # Check if already learned
             intent = records[0].intent
             params = records[0].context
             already_learned = any(
-                p.intent == intent and _params_similar(p.params, params)
-                for p in self._patterns
+                p.intent == intent and _params_similar(p.params, params) for p in self._patterns
             )
             if already_learned:
                 continue
 
             examples = list(set(r.user_input for r in records))[:5]
             suggested_name = _suggest_name(intent, params)
-            suggestions.append(PatternSuggestion(
-                intent=intent,
-                params=params,
-                example_inputs=examples,
-                count=len(records),
-                suggested_name=suggested_name,
-            ))
+            suggestions.append(
+                PatternSuggestion(
+                    intent=intent,
+                    params=params,
+                    example_inputs=examples,
+                    count=len(records),
+                    suggested_name=suggested_name,
+                )
+            )
 
         return suggestions
 

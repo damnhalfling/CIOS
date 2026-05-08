@@ -3,7 +3,6 @@
 Feature: produto-percebido
 """
 
-import os
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -12,7 +11,6 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from cios.ui.splash import update_splash_progress
-
 
 # --- Strategies ---
 
@@ -68,26 +66,18 @@ class TestSplashProgressProtocol:
 
             # Assert exact format: "{stage}|{current}|{total}"
             expected = f"{stage}|{current}|{total}"
-            assert content == expected, (
-                f"Expected '{expected}' but got '{content}'"
-            )
+            assert content == expected, f"Expected '{expected}' but got '{content}'"
 
             # Parse back and verify round-trip
             parts = content.split("|")
-            assert len(parts) == 3, (
-                f"Expected 3 pipe-separated parts, got {len(parts)}: {parts}"
-            )
+            assert len(parts) == 3, f"Expected 3 pipe-separated parts, got {len(parts)}: {parts}"
 
             parsed_stage = parts[0]
             parsed_current = int(parts[1])
             parsed_total = int(parts[2])
 
-            assert parsed_stage == stage, (
-                f"Parsed stage '{parsed_stage}' != original '{stage}'"
-            )
-            assert parsed_current == current, (
-                f"Parsed current {parsed_current} != original {current}"
-            )
-            assert parsed_total == total, (
-                f"Parsed total {parsed_total} != original {total}"
-            )
+            assert parsed_stage == stage, f"Parsed stage '{parsed_stage}' != original '{stage}'"
+            assert (
+                parsed_current == current
+            ), f"Parsed current {parsed_current} != original {current}"
+            assert parsed_total == total, f"Parsed total {parsed_total} != original {total}"

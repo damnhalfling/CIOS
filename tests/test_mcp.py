@@ -1,22 +1,19 @@
 """Tests for the MCP (Model Context Protocol) module."""
 
-from unittest.mock import patch, MagicMock
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 from cios.core.mcp import (
-    SystemContext,
-    ContextSnapshot,
-    WifiState,
     AudioState,
     BatteryState,
+    ContextSnapshot,
+    SystemContext,
     SystemState,
-    _scan_wifi,
+    WifiState,
     _scan_audio,
     _scan_battery,
-    _scan_system,
-    _scan_running_apps,
     _scan_known_networks,
+    _scan_system,
+    _scan_wifi,
 )
 
 
@@ -165,17 +162,19 @@ class TestScanSystem:
     def test_scan_system_metrics(self):
         mock_mem = MagicMock()
         mock_mem.percent = 65.3
-        mock_mem.used = 8 * 1024 ** 3  # 8GB
-        mock_mem.total = 16 * 1024 ** 3  # 16GB
+        mock_mem.used = 8 * 1024**3  # 8GB
+        mock_mem.total = 16 * 1024**3  # 16GB
 
         mock_disk = MagicMock()
         mock_disk.percent = 45.0
-        mock_disk.free = 200 * 1024 ** 3  # 200GB
+        mock_disk.free = 200 * 1024**3  # 200GB
 
-        with patch("psutil.cpu_percent", return_value=25.5), \
-             patch("psutil.cpu_count", return_value=8), \
-             patch("psutil.virtual_memory", return_value=mock_mem), \
-             patch("psutil.disk_usage", return_value=mock_disk):
+        with (
+            patch("psutil.cpu_percent", return_value=25.5),
+            patch("psutil.cpu_count", return_value=8),
+            patch("psutil.virtual_memory", return_value=mock_mem),
+            patch("psutil.disk_usage", return_value=mock_disk),
+        ):
             state = _scan_system()
             assert state.cpu_percent == 25.5
             assert state.cpu_cores == 8
@@ -191,7 +190,9 @@ class TestScanKnownNetworks:
     def test_scan_known_networks(self):
         mock_result = MagicMock()
         mock_result.returncode = 0
-        mock_result.stdout = "Casa:802-11-wireless\nTrabalho:802-11-wireless\nEthernet:802-3-ethernet"
+        mock_result.stdout = (
+            "Casa:802-11-wireless\nTrabalho:802-11-wireless\nEthernet:802-3-ethernet"
+        )
 
         with patch("subprocess.run", return_value=mock_result):
             networks = _scan_known_networks()

@@ -1,9 +1,9 @@
 """Handlers for command execution, self-update, and intelligence intents."""
 
 from cios.core.executor import Executor
+from cios.core.handlers._common import PlanResult, sanitize_error
 from cios.core.intent_parser import Intent
 from cios.core.memory import Memory
-from cios.core.handlers._common import PlanResult, sanitize_error
 from cios.skills import self_update as update_skill
 
 
@@ -13,7 +13,8 @@ def handle_command_exec(intent: Intent, executor: Executor, memory: Memory) -> P
     if not command:
         return PlanResult(
             plan_steps=["No command provided"],
-            results=[], outcome="failure",
+            results=[],
+            outcome="failure",
             summary="What command should I run?",
             error="Missing command",
         )
@@ -41,32 +42,36 @@ def handle_self_update(intent: Intent, executor: Executor, memory: Memory) -> Pl
         version = update_skill.get_current_version()
         return PlanResult(
             plan_steps=["Checking version"],
-            results=[], outcome="success",
-            summary=f"CIOS v{version}")
+            results=[],
+            outcome="success",
+            summary=f"CIOS v{version}",
+        )
 
     if action == "check":
         steps, summary = update_skill.check_update_summary()
-        return PlanResult(
-            plan_steps=steps, results=[],
-            outcome="success", summary=summary)
+        return PlanResult(plan_steps=steps, results=[], outcome="success", summary=summary)
 
     if action == "update":
         info = update_skill.check_update(use_cache=False)
         if not info.has_update:
             return PlanResult(
                 plan_steps=["Verificando atualizações"],
-                results=[], outcome="success",
-                summary=f"Já está na versão mais recente (v{info.current_version})")
+                results=[],
+                outcome="success",
+                summary=f"Já está na versão mais recente (v{info.current_version})",
+            )
 
         steps, ok, msg = update_skill.download_and_install(info)
         return PlanResult(
-            plan_steps=steps, results=[],
-            outcome="success" if ok else "failure",
-            summary=msg)
+            plan_steps=steps, results=[], outcome="success" if ok else "failure", summary=msg
+        )
 
     return PlanResult(
-        plan_steps=["Checking version"], results=[], outcome="failure",
-        summary="Ação de atualização desconhecida")
+        plan_steps=["Checking version"],
+        results=[],
+        outcome="failure",
+        summary="Ação de atualização desconhecida",
+    )
 
 
 def handle_intelligence(intent: Intent, executor: Executor, memory: Memory) -> PlanResult:
@@ -79,22 +84,28 @@ def handle_intelligence(intent: Intent, executor: Executor, memory: Memory) -> P
     if not intelligence.is_logged_in:
         return PlanResult(
             plan_steps=["Verificando Intelligence"],
-            results=[], outcome="failure",
+            results=[],
+            outcome="failure",
             summary="Faça login no CIOS Intelligence para usar este recurso. "
-                    "Use a área de login na sidebar.",
-            voice_mode="full")
+            "Use a área de login na sidebar.",
+            voice_mode="full",
+        )
 
     result = intelligence.query(query, intent=sub_intent)
 
     if result.success:
         return PlanResult(
             plan_steps=["Consultando CIOS Intelligence"],
-            results=[], outcome="success",
+            results=[],
+            outcome="success",
             summary=result.text,
-            voice_mode="full")
+            voice_mode="full",
+        )
     else:
         return PlanResult(
             plan_steps=["Consultando CIOS Intelligence"],
-            results=[], outcome="failure",
+            results=[],
+            outcome="failure",
             summary=result.text,
-            voice_mode="full")
+            voice_mode="full",
+        )

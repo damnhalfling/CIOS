@@ -8,9 +8,8 @@ import time
 import webbrowser
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
-from cios.core.executor import Executor, ExecResult
+from cios.core.executor import ExecResult, Executor
 from cios.core.memory import Memory, SessionContext
 
 logger = logging.getLogger(__name__)
@@ -189,7 +188,7 @@ def _wait_for_port_free(port: int, timeout: float = 3.0, interval: float = 0.2) 
     return not _is_port_in_use(port)
 
 
-def _detect_editor() -> Optional[str]:
+def _detect_editor() -> str | None:
     """Detect the best available code editor.
 
     Checks for ``code`` (VS Code), ``codium`` (VS Codium), then falls back
@@ -229,11 +228,11 @@ def _open_browser(url: str) -> None:
 
 def execute_dev_start(
     executor: Executor,
-    project: Optional[ProjectInfo] = None,
+    project: ProjectInfo | None = None,
     directory: str = ".",
     _retry: bool = False,
-    memory: Optional[Memory] = None,
-) -> tuple[list[str], list[ExecResult], Optional[int]]:
+    memory: Memory | None = None,
+) -> tuple[list[str], list[ExecResult], int | None]:
     """
     Full dev_start flow: detect → install → clear port → start → editor → browser → persist.
     Returns (plan_steps, results, server_pid).
@@ -298,7 +297,10 @@ def execute_dev_start(
             executor.run(f"kill -9 $(lsof -ti:{project.port}) 2>/dev/null || true")
             _wait_for_port_free(project.port, timeout=2.0, interval=0.2)
             retry_plan, retry_results, retry_pid = execute_dev_start(
-                executor, project=project, _retry=True, memory=memory,
+                executor,
+                project=project,
+                _retry=True,
+                memory=memory,
             )
             return plan + retry_plan, results + retry_results, retry_pid
 

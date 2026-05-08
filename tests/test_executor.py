@@ -1,8 +1,6 @@
 """Tests for the Executor module."""
 
-import pytest
-
-from cios.core.executor import Executor, ExecResult
+from cios.core.executor import ExecResult
 
 
 class TestExecResult:
@@ -17,7 +15,9 @@ class TestExecResult:
         assert r.success is False
 
     def test_failure_when_timed_out(self):
-        r = ExecResult(command="sleep 999", returncode=0, stdout="", stderr="", duration=5.0, timed_out=True)
+        r = ExecResult(
+            command="sleep 999", returncode=0, stdout="", stderr="", duration=5.0, timed_out=True
+        )
         assert r.success is False
 
 

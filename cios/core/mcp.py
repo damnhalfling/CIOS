@@ -24,16 +24,14 @@ Usage:
 """
 
 import logging
-import os
 import re
 import shutil
 import subprocess
 import threading
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Optional, Callable
 
 import psutil
 
@@ -44,20 +42,21 @@ logger = logging.getLogger(__name__)
 #  DATA STRUCTURES
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class WifiState:
     connected: bool = False
     ssid: str = ""
-    signal: int = 0        # 0-100
+    signal: int = 0  # 0-100
     ip: str = ""
     device: str = ""
 
 
 @dataclass
 class AudioState:
-    volume: int = 0        # 0-100
+    volume: int = 0  # 0-100
     muted: bool = False
-    sink_name: str = ""    # active output device
+    sink_name: str = ""  # active output device
 
 
 @dataclass
@@ -89,6 +88,7 @@ class BluetoothState:
 @dataclass
 class ContextSnapshot:
     """Complete system state at a point in time."""
+
     wifi: WifiState = field(default_factory=WifiState)
     audio: AudioState = field(default_factory=AudioState)
     battery: BatteryState = field(default_factory=BatteryState)
@@ -103,6 +103,7 @@ class ContextSnapshot:
 #  SCANNERS (lightweight, no LLM)
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def _scan_wifi() -> WifiState:
     """Get current Wi-Fi state via nmcli.
 
@@ -112,7 +113,9 @@ def _scan_wifi() -> WifiState:
     try:
         result = subprocess.run(
             ["nmcli", "-t", "-f", "ACTIVE,SSID,SIGNAL,DEVICE", "dev", "wifi"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0:
             for line in result.stdout.strip().splitlines():
@@ -128,7 +131,9 @@ def _scan_wifi() -> WifiState:
         if state.connected and state.device:
             ip_result = subprocess.run(
                 ["nmcli", "-t", "-f", "IP4.ADDRESS", "dev", "show", state.device],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             if ip_result.returncode == 0:
                 for line in ip_result.stdout.strip().splitlines():
@@ -151,7 +156,9 @@ def _scan_audio() -> AudioState:
     try:
         result = subprocess.run(
             ["pactl", "get-sink-volume", "@DEFAULT_SINK@"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0:
             match = re.search(r"(\d+)%", result.stdout)
@@ -160,14 +167,18 @@ def _scan_audio() -> AudioState:
 
             mute_result = subprocess.run(
                 ["pactl", "get-sink-mute", "@DEFAULT_SINK@"],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             if mute_result.returncode == 0:
                 state.muted = "yes" in mute_result.stdout.lower()
 
             sink_result = subprocess.run(
                 ["pactl", "get-default-sink"],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             if sink_result.returncode == 0:
                 state.sink_name = sink_result.stdout.strip()
@@ -181,7 +192,9 @@ def _scan_audio() -> AudioState:
     try:
         result = subprocess.run(
             ["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0:
             # Output: "Volume: 0.64" or "Volume: 0.64 [MUTED]"
@@ -224,10 +237,10 @@ def _scan_system() -> SystemState:
         cpu_percent=psutil.cpu_percent(interval=0),
         cpu_cores=psutil.cpu_count() or 1,
         mem_percent=round(mem.percent, 1),
-        mem_used_gb=round(mem.used / (1024 ** 3), 1),
-        mem_total_gb=round(mem.total / (1024 ** 3), 1),
+        mem_used_gb=round(mem.used / (1024**3), 1),
+        mem_total_gb=round(mem.total / (1024**3), 1),
         disk_percent=round(disk.percent, 1),
-        disk_free_gb=round(disk.free / (1024 ** 3), 1),
+        disk_free_gb=round(disk.free / (1024**3), 1),
     )
 
 
@@ -238,9 +251,18 @@ def _scan_running_apps() -> list[str]:
         for proc in psutil.process_iter(["name", "pid"]):
             name = proc.info["name"]
             if name and name not in (
-                "python3", "bash", "sh", "openbox", "Xephyr",
-                "systemd", "dbus-daemon", "pipewire", "pulseaudio",
-                "xdg-desktop-portal", "gvfsd", "at-spi-bus-launcher",
+                "python3",
+                "bash",
+                "sh",
+                "openbox",
+                "Xephyr",
+                "systemd",
+                "dbus-daemon",
+                "pipewire",
+                "pulseaudio",
+                "xdg-desktop-portal",
+                "gvfsd",
+                "at-spi-bus-launcher",
             ):
                 clean = name.lower().replace("-", " ").replace("_", " ")
                 if len(clean) > 2:
@@ -259,7 +281,9 @@ def _scan_known_networks() -> list[str]:
     try:
         result = subprocess.run(
             ["nmcli", "-t", "-f", "NAME,TYPE", "con", "show"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0:
             for line in result.stdout.strip().splitlines():
@@ -279,7 +303,9 @@ def _scan_bluetooth() -> BluetoothState:
     try:
         result = subprocess.run(
             ["bluetoothctl", "show"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode != 0:
             return state
@@ -290,7 +316,9 @@ def _scan_bluetooth() -> BluetoothState:
             # Get connected devices (fast — no scan)
             dev_result = subprocess.run(
                 ["bluetoothctl", "devices", "Connected"],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             if dev_result.returncode == 0:
                 for line in dev_result.stdout.strip().splitlines():
@@ -309,9 +337,9 @@ def _scan_bluetooth() -> BluetoothState:
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Polling intervals (adaptive)
-_POLL_ACTIVE = 1.0    # after user action
-_POLL_NORMAL = 5.0    # default
-_POLL_IDLE = 15.0     # no activity for 60s
+_POLL_ACTIVE = 1.0  # after user action
+_POLL_NORMAL = 5.0  # default
+_POLL_IDLE = 15.0  # no activity for 60s
 _IDLE_THRESHOLD = 60  # seconds before switching to idle polling
 
 
@@ -331,7 +359,7 @@ class SystemContext:
         self._state = ContextSnapshot()
         self._lock = threading.Lock()
         self._running = False
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
         self._watcher_threads: list[threading.Thread] = []
         self._watcher_procs: list[subprocess.Popen] = []
         # Adaptive polling
@@ -344,9 +372,9 @@ class SystemContext:
         # Thread pool for parallel execution
         self._pool = ThreadPoolExecutor(max_workers=6, thread_name_prefix="mcp")
         # Progress callback for splash
-        self._on_progress: Optional[Callable[[str, int, int], None]] = None
+        self._on_progress: Callable[[str, int, int], None] | None = None
 
-    def start(self, on_progress: Optional[Callable[[str, int, int], None]] = None) -> None:
+    def start(self, on_progress: Callable[[str, int, int], None] | None = None) -> None:
         """Start background polling and reactive watchers.
 
         Args:
@@ -537,10 +565,17 @@ class SystemContext:
                 # "Connectivity is now 'full'"
                 # "wlp3s0: using connection 'MyWifi'"
                 lower = line.lower()
-                if any(kw in lower for kw in (
-                    "disconnect", "connect", "connectivity", "using connection",
-                    "unavailable", "activated",
-                )):
+                if any(
+                    kw in lower
+                    for kw in (
+                        "disconnect",
+                        "connect",
+                        "connectivity",
+                        "using connection",
+                        "unavailable",
+                        "activated",
+                    )
+                ):
                     logger.debug("Network change detected: %s", line.strip())
                     # Small delay to let NetworkManager settle
                     time.sleep(0.3)

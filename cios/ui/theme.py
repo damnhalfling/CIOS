@@ -129,6 +129,7 @@ GREETING = "Bom dia" if HOUR < 12 else ("Boa tarde" if HOUR < 18 else "Boa noite
 #  COLOR UTILITIES
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def hex2rgb(h: str) -> tuple[int, int, int]:
     """Convert hex color to RGB tuple."""
     h = h.lstrip("#")

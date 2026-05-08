@@ -46,11 +46,23 @@ def _make_active_thread(last_turn_age: float = 10.0, intent: str = "general") ->
 class TestPortuguesePronounDetection:
     """Validates: Requirements 2.1, 2.4"""
 
-    @pytest.mark.parametrize("pronoun", [
-        "esse", "essa", "isso", "este", "esta",
-        "nesse", "nessa", "nisso", "dele", "dela",
-        "aquele", "aquela",
-    ])
+    @pytest.mark.parametrize(
+        "pronoun",
+        [
+            "esse",
+            "essa",
+            "isso",
+            "este",
+            "esta",
+            "nesse",
+            "nessa",
+            "nisso",
+            "dele",
+            "dela",
+            "aquele",
+            "aquela",
+        ],
+    )
     def test_portuguese_pronoun_produces_continue(self, classifier, pronoun):
         """Each Portuguese pronoun as a whole word triggers CONTINUE."""
         thread = _make_active_thread()
@@ -58,11 +70,23 @@ class TestPortuguesePronounDetection:
         result = classifier.classify(user_input, thread)
         assert result == Classification.CONTINUE
 
-    @pytest.mark.parametrize("pronoun", [
-        "esse", "essa", "isso", "este", "esta",
-        "nesse", "nessa", "nisso", "dele", "dela",
-        "aquele", "aquela",
-    ])
+    @pytest.mark.parametrize(
+        "pronoun",
+        [
+            "esse",
+            "essa",
+            "isso",
+            "este",
+            "esta",
+            "nesse",
+            "nessa",
+            "nisso",
+            "dele",
+            "dela",
+            "aquele",
+            "aquela",
+        ],
+    )
     def test_portuguese_pronoun_case_insensitive(self, classifier, pronoun):
         """Pronoun detection is case-insensitive."""
         thread = _make_active_thread()
@@ -79,9 +103,15 @@ class TestPortuguesePronounDetection:
 class TestEnglishPronounDetection:
     """Validates: Requirements 2.1, 2.4"""
 
-    @pytest.mark.parametrize("pronoun", [
-        "that", "this", "it", "those",
-    ])
+    @pytest.mark.parametrize(
+        "pronoun",
+        [
+            "that",
+            "this",
+            "it",
+            "those",
+        ],
+    )
     def test_english_single_word_pronoun_produces_continue(self, classifier, pronoun):
         """Each English single-word pronoun as a whole word triggers CONTINUE."""
         thread = _make_active_thread()
@@ -89,9 +119,13 @@ class TestEnglishPronounDetection:
         result = classifier.classify(user_input, thread)
         assert result == Classification.CONTINUE
 
-    @pytest.mark.parametrize("pronoun", [
-        "the same", "that one",
-    ])
+    @pytest.mark.parametrize(
+        "pronoun",
+        [
+            "the same",
+            "that one",
+        ],
+    )
     def test_english_multi_word_pronoun_produces_continue(self, classifier, pronoun):
         """Multi-word pronouns detected as substrings trigger CONTINUE."""
         thread = _make_active_thread()
@@ -127,12 +161,15 @@ class TestEnglishPronounDetection:
 class TestContinuationPhraseDetection:
     """Validates: Requirements 2.1, 2.4"""
 
-    @pytest.mark.parametrize("phrase", [
-        "e também",
-        "além disso",
-        "and also",
-        "what about",
-    ])
+    @pytest.mark.parametrize(
+        "phrase",
+        [
+            "e também",
+            "além disso",
+            "and also",
+            "what about",
+        ],
+    )
     def test_continuation_phrase_produces_continue(self, classifier, phrase):
         """Each continuation phrase triggers CONTINUE."""
         thread = _make_active_thread()
@@ -140,12 +177,15 @@ class TestContinuationPhraseDetection:
         result = classifier.classify(user_input, thread)
         assert result == Classification.CONTINUE
 
-    @pytest.mark.parametrize("phrase", [
-        "E TAMBÉM",
-        "Além Disso",
-        "AND ALSO",
-        "What About",
-    ])
+    @pytest.mark.parametrize(
+        "phrase",
+        [
+            "E TAMBÉM",
+            "Além Disso",
+            "AND ALSO",
+            "What About",
+        ],
+    )
     def test_continuation_phrase_case_insensitive(self, classifier, phrase):
         """Continuation phrase detection is case-insensitive."""
         thread = _make_active_thread()

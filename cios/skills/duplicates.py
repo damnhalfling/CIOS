@@ -20,8 +20,6 @@ import sqlite3
 import threading
 import time
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Optional
 
 from cios.core.config import CIOS_HOME
 
@@ -49,9 +47,11 @@ CREATE INDEX IF NOT EXISTS idx_md5 ON phash_cache(md5);
 #  DATA STRUCTURES
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class DuplicateFile:
     """A file within a duplicate group."""
+
     path: str
     name: str
     size_bytes: int
@@ -63,6 +63,7 @@ class DuplicateFile:
 @dataclass
 class DuplicateGroup:
     """A group of duplicate files."""
+
     files: list[DuplicateFile] = field(default_factory=list)
     match_type: str = "exact"  # "exact" (MD5) or "similar" (pHash)
     similarity: float = 1.0  # 1.0 = identical, 0.9+ = very similar
@@ -81,7 +82,7 @@ class DuplicateGroup:
         return sum(sizes[1:])
 
     @property
-    def best_file(self) -> Optional[DuplicateFile]:
+    def best_file(self) -> DuplicateFile | None:
         """The 'best' file to keep (largest size = highest quality)."""
         if not self.files:
             return None
@@ -91,6 +92,7 @@ class DuplicateGroup:
 @dataclass
 class DuplicateScanResult:
     """Result of a duplicate scan."""
+
     groups: list[DuplicateGroup] = field(default_factory=list)
     total_files_scanned: int = 0
     total_duplicates: int = 0
@@ -102,7 +104,8 @@ class DuplicateScanResult:
 #  PERCEPTUAL HASH (pHash)
 # ═══════════════════════════════════════════════════════════════════════════
 
-def compute_phash(image_path: str, hash_size: int = 8) -> Optional[str]:
+
+def compute_phash(image_path: str, hash_size: int = 8) -> str | None:
     """Compute perceptual hash of an image.
 
     Algorithm (average hash + gradient):
@@ -143,7 +146,7 @@ def compute_phash(image_path: str, hash_size: int = 8) -> Optional[str]:
         return None
 
 
-def compute_md5(file_path: str) -> Optional[str]:
+def compute_md5(file_path: str) -> str | None:
     """Compute MD5 hash of a file (reads in chunks for large files)."""
     try:
         h = hashlib.md5()
@@ -151,7 +154,7 @@ def compute_md5(file_path: str) -> Optional[str]:
             while chunk := f.read(8192):
                 h.update(chunk)
         return h.hexdigest()
-    except (OSError, IOError) as e:
+    except OSError as e:
         logger.debug("MD5 failed for %s: %s", file_path, e)
         return None
 
@@ -183,6 +186,7 @@ def phash_similarity(hash1: str, hash2: str) -> float:
 #  CACHE
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class _HashCache:
     """SQLite cache for computed hashes (survives restarts)."""
 
@@ -193,7 +197,7 @@ class _HashCache:
         self._lock = threading.Lock()
         self._conn.executescript(_SCHEMA)
 
-    def get(self, file_path: str) -> Optional[tuple[str, str]]:
+    def get(self, file_path: str) -> tuple[str, str] | None:
         """Get cached (phash, md5) for a file if still valid."""
         with self._lock:
             row = self._conn.execute(
@@ -232,7 +236,7 @@ class _HashCache:
             pass
 
 
-_cache: Optional[_HashCache] = None
+_cache: _HashCache | None = None
 
 
 def _get_cache() -> _HashCache:
@@ -246,10 +250,11 @@ def _get_cache() -> _HashCache:
 #  SCANNER
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def scan_duplicates(
-    directories: Optional[list[str]] = None,
+    directories: list[str] | None = None,
     similarity_threshold: float = 0.90,
-    on_progress: Optional[callable] = None,
+    on_progress: callable | None = None,
 ) -> DuplicateScanResult:
     """Scan for duplicate images in given directories.
 
@@ -297,14 +302,16 @@ def scan_duplicates(
 
         try:
             stat = os.stat(file_path)
-            file_hashes.append(DuplicateFile(
-                path=file_path,
-                name=os.path.basename(file_path),
-                size_bytes=stat.st_size,
-                mtime=stat.st_mtime,
-                phash=phash,
-                md5=md5,
-            ))
+            file_hashes.append(
+                DuplicateFile(
+                    path=file_path,
+                    name=os.path.basename(file_path),
+                    size_bytes=stat.st_size,
+                    mtime=stat.st_mtime,
+                    phash=phash,
+                    md5=md5,
+                )
+            )
         except OSError:
             continue
 
@@ -342,10 +349,12 @@ def scan_duplicates(
 def _default_scan_dirs() -> list[str]:
     """Default directories to scan for duplicates."""
     dirs = [
-        "~/Pictures", "~/Imagens",
+        "~/Pictures",
+        "~/Imagens",
         "~/Downloads",
         "~/Desktop",
-        "~/Documents", "~/Documentos",
+        "~/Documents",
+        "~/Documentos",
     ]
     result = []
     for d in dirs:
@@ -388,13 +397,15 @@ def _group_by_md5(files: list[DuplicateFile]) -> list[DuplicateGroup]:
         md5_map.setdefault(f.md5, []).append(f)
 
     groups = []
-    for md5, group_files in md5_map.items():
+    for _md5, group_files in md5_map.items():
         if len(group_files) >= 2:
-            groups.append(DuplicateGroup(
-                files=group_files,
-                match_type="exact",
-                similarity=1.0,
-            ))
+            groups.append(
+                DuplicateGroup(
+                    files=group_files,
+                    match_type="exact",
+                    similarity=1.0,
+                )
+            )
 
     return groups
 
@@ -444,16 +455,16 @@ def _group_by_phash(files: list[DuplicateFile], threshold: float) -> list[Duplic
             sims = []
             for a in range(len(indices)):
                 for b in range(a + 1, len(indices)):
-                    sims.append(phash_similarity(
-                        files[indices[a]].phash, files[indices[b]].phash
-                    ))
+                    sims.append(phash_similarity(files[indices[a]].phash, files[indices[b]].phash))
             avg_sim = sum(sims) / len(sims) if sims else 0.9
 
-            groups.append(DuplicateGroup(
-                files=group_files,
-                match_type="similar",
-                similarity=avg_sim,
-            ))
+            groups.append(
+                DuplicateGroup(
+                    files=group_files,
+                    match_type="similar",
+                    similarity=avg_sim,
+                )
+            )
 
     return groups
 
@@ -461,6 +472,7 @@ def _group_by_phash(files: list[DuplicateFile], threshold: float) -> list[Duplic
 # ═══════════════════════════════════════════════════════════════════════════
 #  UTILITY
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def format_size(bytes_val: int) -> str:
     """Format bytes to human-readable string."""

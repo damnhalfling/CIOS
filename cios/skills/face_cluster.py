@@ -24,8 +24,6 @@ import sqlite3
 import threading
 import time
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Optional
 
 import numpy as np
 
@@ -38,7 +36,8 @@ _DB_PATH = CIOS_HOME / "faces.db"
 _IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
 _SEARCH_DIRS = [
-    "~/Pictures", "~/Imagens",
+    "~/Pictures",
+    "~/Imagens",
     "~/Downloads",
     "~/Desktop",
 ]
@@ -71,9 +70,11 @@ CREATE INDEX IF NOT EXISTS idx_label_name ON cluster_labels(name);
 #  DATA STRUCTURES
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class FaceEntry:
     """A detected face with its embedding and cluster assignment."""
+
     id: int
     file_path: str
     face_index: int
@@ -85,6 +86,7 @@ class FaceEntry:
 @dataclass
 class PersonCluster:
     """A cluster of faces representing one person."""
+
     cluster_id: int
     name: str  # user-assigned name or "Pessoa N"
     face_count: int
@@ -94,6 +96,7 @@ class PersonCluster:
 @dataclass
 class FaceScanResult:
     """Result of a face scan operation."""
+
     total_images_scanned: int = 0
     total_faces_found: int = 0
     new_faces: int = 0
@@ -106,7 +109,7 @@ class FaceScanResult:
 #  DEPENDENCY CHECK
 # ═══════════════════════════════════════════════════════════════════════════
 
-_face_recognition_available: Optional[bool] = None
+_face_recognition_available: bool | None = None
 
 
 def is_face_recognition_available() -> bool:
@@ -117,6 +120,7 @@ def is_face_recognition_available() -> bool:
 
     try:
         import face_recognition  # noqa: F401
+
         _face_recognition_available = True
     except ImportError:
         _face_recognition_available = False
@@ -137,6 +141,7 @@ def get_install_instructions() -> str:
 # ═══════════════════════════════════════════════════════════════════════════
 #  FACE DETECTION + EMBEDDING
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def detect_faces(image_path: str) -> list[tuple[np.ndarray, tuple]]:
     """Detect faces in an image and return (embedding, location) pairs.
@@ -162,7 +167,7 @@ def detect_faces(image_path: str) -> list[tuple[np.ndarray, tuple]]:
         # Compute 128-d embeddings
         encodings = face_recognition.face_encodings(image, locations)
 
-        return list(zip(encodings, locations))
+        return list(zip(encodings, locations, strict=False))
 
     except Exception as e:
         logger.debug("Face detection failed for %s: %s", image_path, e)
@@ -172,6 +177,7 @@ def detect_faces(image_path: str) -> list[tuple[np.ndarray, tuple]]:
 # ═══════════════════════════════════════════════════════════════════════════
 #  DBSCAN CLUSTERING (manual, no sklearn needed)
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def dbscan_cluster(
     embeddings: np.ndarray,
@@ -253,6 +259,7 @@ def _region_query(distances: np.ndarray, point_idx: int, eps: float) -> set:
 #  FACE STORE (SQLite persistence)
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class FaceStore:
     """SQLite-backed store for face embeddings and cluster labels."""
 
@@ -266,9 +273,7 @@ class FaceStore:
     def get_cached_paths(self) -> set[str]:
         """Get all file paths that already have cached embeddings."""
         with self._lock:
-            rows = self._conn.execute(
-                "SELECT DISTINCT file_path FROM face_embeddings"
-            ).fetchall()
+            rows = self._conn.execute("SELECT DISTINCT file_path FROM face_embeddings").fetchall()
         return {row["file_path"] for row in rows}
 
     def is_stale(self, file_path: str) -> bool:
@@ -296,9 +301,7 @@ class FaceStore:
 
         with self._lock:
             # Remove old entries for this file
-            self._conn.execute(
-                "DELETE FROM face_embeddings WHERE file_path = ?", (file_path,)
-            )
+            self._conn.execute("DELETE FROM face_embeddings WHERE file_path = ?", (file_path,))
             # Insert new entries
             for idx, (embedding, location) in enumerate(faces):
                 self._conn.execute(
@@ -320,14 +323,16 @@ class FaceStore:
         for row in rows:
             embedding = np.frombuffer(row["embedding"], dtype=np.float64)
             location = tuple(json.loads(row["location"])) if row["location"] else ()
-            entries.append(FaceEntry(
-                id=row["id"],
-                file_path=row["file_path"],
-                face_index=row["face_index"],
-                embedding=embedding,
-                location=location,
-                cluster_id=row["cluster_id"],
-            ))
+            entries.append(
+                FaceEntry(
+                    id=row["id"],
+                    file_path=row["file_path"],
+                    face_index=row["face_index"],
+                    embedding=embedding,
+                    location=location,
+                    cluster_id=row["cluster_id"],
+                )
+            )
         return entries
 
     def update_clusters(self, assignments: list[tuple[int, int]]) -> None:
@@ -372,12 +377,14 @@ class FaceStore:
             # Get sample paths
             samples = self.get_cluster_files(cid)[:5]
 
-            clusters.append(PersonCluster(
-                cluster_id=cid,
-                name=name,
-                face_count=count,
-                sample_paths=samples,
-            ))
+            clusters.append(
+                PersonCluster(
+                    cluster_id=cid,
+                    name=name,
+                    face_count=count,
+                    sample_paths=samples,
+                )
+            )
 
         return clusters
 
@@ -402,7 +409,7 @@ class FaceStore:
             )
             self._conn.commit()
 
-    def find_cluster_by_name(self, name: str) -> Optional[int]:
+    def find_cluster_by_name(self, name: str) -> int | None:
         """Find a cluster ID by its label name (case-insensitive)."""
         with self._lock:
             row = self._conn.execute(
@@ -428,7 +435,7 @@ class FaceStore:
 #  MAIN OPERATIONS
 # ═══════════════════════════════════════════════════════════════════════════
 
-_store: Optional[FaceStore] = None
+_store: FaceStore | None = None
 
 
 def _get_store() -> FaceStore:
@@ -439,8 +446,8 @@ def _get_store() -> FaceStore:
 
 
 def scan_and_cluster(
-    directories: Optional[list[str]] = None,
-    on_progress: Optional[callable] = None,
+    directories: list[str] | None = None,
+    on_progress: callable | None = None,
 ) -> FaceScanResult:
     """Scan images for faces, compute embeddings, and cluster.
 
@@ -562,6 +569,7 @@ def name_person(cluster_id: int, name: str) -> None:
 # ═══════════════════════════════════════════════════════════════════════════
 #  HELPERS
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def _expand_dirs(dirs: list[str]) -> list[str]:
     result = []

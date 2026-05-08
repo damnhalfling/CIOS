@@ -11,13 +11,11 @@ the system degrades gracefully (regex patterns still work, LLM features disabled
 """
 
 import logging
-import os
 import shutil
 import subprocess
 import time
-import urllib.request
 import urllib.error
-from typing import Optional
+import urllib.request
 
 from cios.core import config
 
@@ -66,6 +64,7 @@ def _has_model(model_name: str) -> bool:
         req = urllib.request.Request(f"{url}/api/tags", method="GET")
         with urllib.request.urlopen(req, timeout=3) as resp:
             import json
+
             data = json.loads(resp.read())
             models = [m.get("name", "") for m in data.get("models", [])]
             base = model_name.split(":")[0]
@@ -170,9 +169,9 @@ def ensure_ollama_running() -> bool:
         _ollama_status["model_available"] = False
         _ollama_status["error"] = f"Modelo '{model}' não encontrado"
         logger.warning(
-            "Ollama running but model '%s' not found. "
-            "Pull with: ollama pull %s",
-            model, model,
+            "Ollama running but model '%s' not found. " "Pull with: ollama pull %s",
+            model,
+            model,
         )
         return False
 
@@ -198,7 +197,9 @@ def refresh_status() -> dict:
     if _ollama_status["running"]:
         model = config.get("ollama_model")
         _ollama_status["model_available"] = _has_model(model)
-        _ollama_status["error"] = "" if _ollama_status["model_available"] else f"Modelo '{model}' ausente"
+        _ollama_status["error"] = (
+            "" if _ollama_status["model_available"] else f"Modelo '{model}' ausente"
+        )
     else:
         _ollama_status["model_available"] = False
         _ollama_status["error"] = "Ollama offline"

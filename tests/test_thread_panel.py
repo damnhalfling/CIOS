@@ -10,19 +10,18 @@ Requirements: 6.1, 6.2, 6.3, 6.4, 7.3, 7.4
 """
 
 import time
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock
 
 import pytest
 
 from cios.core.thread_manager import (
+    PENDING_QUESTION_TIMEOUT,
     ConversationTurn,
     PendingQuestion,
     Thread,
     ThreadManager,
     ThreadStore,
-    PENDING_QUESTION_TIMEOUT,
 )
-
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  Fixtures
@@ -375,7 +374,7 @@ class TestActiveThreadDistinction:
 
     def test_active_thread_uses_hover_background(self):
         """Active thread entries should use BG_HOVER background."""
-        from cios.ui.theme import BG_HOVER, BG_CARD
+        from cios.ui.theme import BG_CARD, BG_HOVER
 
         # ThreadPanel._ACTIVE_BG should be BG_HOVER
         # ThreadPanel._COMPLETED_BG should be BG_CARD
@@ -486,7 +485,7 @@ class TestPendingQuestionIndicator:
         if (
             thread_manager._active_thread is not None
             and thread_manager._active_thread.pending_question is not None
-            and getattr(thread_manager, '_pending_question_mono', None) is not None
+            and getattr(thread_manager, "_pending_question_mono", None) is not None
         ):
             has_pending = True
 

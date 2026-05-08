@@ -1,13 +1,11 @@
 """Skill: process_control — detect port usage, kill processes."""
 
-from typing import Optional
-
 import psutil
 
-from cios.core.executor import Executor, ExecResult
+from cios.core.executor import ExecResult, Executor
 
 
-def find_process_on_port(port: int) -> Optional[dict]:
+def find_process_on_port(port: int) -> dict | None:
     """Find the process listening on a given port."""
     for conn in psutil.net_connections(kind="inet"):
         if conn.laddr.port == port and conn.status == "LISTEN":

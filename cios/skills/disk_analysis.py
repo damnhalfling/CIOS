@@ -4,12 +4,11 @@ No LLM. Direct execution via du, find, and os.stat.
 Designed to feel like magic: "libera espaço" → actionable report.
 """
 
+import logging
 import os
 import shutil
-import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +17,9 @@ logger = logging.getLogger(__name__)
 class DiskHog:
     path: str
     size_bytes: int
-    category: str       # "downloads", "cache", "logs", "node_modules", "trash", "videos", "other"
-    description: str    # human-friendly name
-    cleanable: bool     # safe to suggest deletion?
+    category: str  # "downloads", "cache", "logs", "node_modules", "trash", "videos", "other"
+    description: str  # human-friendly name
+    cleanable: bool  # safe to suggest deletion?
 
 
 @dataclass
@@ -37,9 +36,9 @@ class DiskReport:
 
 def _size_human(b: int) -> str:
     """Convert bytes to human-readable string."""
-    if b >= 1024 ** 3:
+    if b >= 1024**3:
         return f"{b / (1024 ** 3):.1f}GB"
-    if b >= 1024 ** 2:
+    if b >= 1024**2:
         return f"{b / (1024 ** 2):.1f}MB"
     if b >= 1024:
         return f"{b / 1024:.0f}KB"
@@ -53,7 +52,7 @@ def _dir_size(path: str, max_depth: int = 3, timeout_files: int = 50000) -> int:
     try:
         for dirpath, dirnames, filenames in os.walk(path):
             # Skip hidden dirs and symlinks
-            dirnames[:] = [d for d in dirnames if not d.startswith('.')]
+            dirnames[:] = [d for d in dirnames if not d.startswith(".")]
             for f in filenames:
                 count += 1
                 if count > timeout_files:
@@ -93,65 +92,75 @@ def _find_hogs(home: str) -> list[DiskHog]:
         if dirpath.is_dir():
             size = _dir_size(str(dirpath))
             if size > 50 * 1024 * 1024:  # Only report > 50MB
-                hogs.append(DiskHog(
-                    path=str(dirpath),
-                    size_bytes=size,
-                    category=category,
-                    description=description,
-                    cleanable=cleanable,
-                ))
+                hogs.append(
+                    DiskHog(
+                        path=str(dirpath),
+                        size_bytes=size,
+                        category=category,
+                        description=description,
+                        cleanable=cleanable,
+                    )
+                )
 
     # Scan for node_modules (common space hog)
     nm_total = 0
     nm_count = 0
     try:
         for dirpath, dirnames, _ in os.walk(home):
-            dirnames[:] = [d for d in dirnames
-                           if d not in ('.cache', '.local', 'snap', '.venv', '.git')
-                           and not d.startswith('.')]
-            if 'node_modules' in dirnames:
-                nm_path = os.path.join(dirpath, 'node_modules')
+            dirnames[:] = [
+                d
+                for d in dirnames
+                if d not in (".cache", ".local", "snap", ".venv", ".git") and not d.startswith(".")
+            ]
+            if "node_modules" in dirnames:
+                nm_path = os.path.join(dirpath, "node_modules")
                 size = _dir_size(nm_path, max_depth=1)
                 nm_total += size
                 nm_count += 1
-                dirnames.remove('node_modules')  # don't recurse into it
+                dirnames.remove("node_modules")  # don't recurse into it
     except (OSError, PermissionError):
         pass
 
     if nm_total > 100 * 1024 * 1024:  # > 100MB
-        hogs.append(DiskHog(
-            path="~/*/node_modules",
-            size_bytes=nm_total,
-            category="node_modules",
-            description=f"node_modules ({nm_count} projetos)",
-            cleanable=True,
-        ))
+        hogs.append(
+            DiskHog(
+                path="~/*/node_modules",
+                size_bytes=nm_total,
+                category="node_modules",
+                description=f"node_modules ({nm_count} projetos)",
+                cleanable=True,
+            )
+        )
 
     # Scan for .venv directories
     venv_total = 0
     venv_count = 0
     try:
         for dirpath, dirnames, _ in os.walk(home):
-            dirnames[:] = [d for d in dirnames
-                           if d not in ('.cache', '.local', 'snap', 'node_modules')
-                           and not d.startswith('.')]
-            if '.venv' in dirnames:
-                venv_path = os.path.join(dirpath, '.venv')
+            dirnames[:] = [
+                d
+                for d in dirnames
+                if d not in (".cache", ".local", "snap", "node_modules") and not d.startswith(".")
+            ]
+            if ".venv" in dirnames:
+                venv_path = os.path.join(dirpath, ".venv")
                 size = _dir_size(venv_path, max_depth=1)
                 venv_total += size
                 venv_count += 1
-                dirnames.remove('.venv')
+                dirnames.remove(".venv")
     except (OSError, PermissionError):
         pass
 
     if venv_total > 100 * 1024 * 1024:
-        hogs.append(DiskHog(
-            path="~/*/.venv",
-            size_bytes=venv_total,
-            category="cache",
-            description=f"Python venvs ({venv_count} projetos)",
-            cleanable=True,
-        ))
+        hogs.append(
+            DiskHog(
+                path="~/*/.venv",
+                size_bytes=venv_total,
+                category="cache",
+                description=f"Python venvs ({venv_count} projetos)",
+                cleanable=True,
+            )
+        )
 
     # Sort by size descending
     hogs.sort(key=lambda h: h.size_bytes, reverse=True)
@@ -178,11 +187,17 @@ def analyze_disk() -> DiskReport:
     percent = (usage.used / usage.total) * 100
 
     if percent > 90:
-        summary.append(f"⚠ Disk is {percent:.0f}% full — {_size_human(usage.free)} free of {_size_human(usage.total)}")
+        summary.append(
+            f"⚠ Disk is {percent:.0f}% full — {_size_human(usage.free)} free of {_size_human(usage.total)}"
+        )
     elif percent > 75:
-        summary.append(f"Disk is {percent:.0f}% full — {_size_human(usage.free)} free of {_size_human(usage.total)}")
+        summary.append(
+            f"Disk is {percent:.0f}% full — {_size_human(usage.free)} free of {_size_human(usage.total)}"
+        )
     else:
-        summary.append(f"Disk is fine — {_size_human(usage.free)} free of {_size_human(usage.total)}")
+        summary.append(
+            f"Disk is fine — {_size_human(usage.free)} free of {_size_human(usage.total)}"
+        )
 
     if hogs:
         summary.append("")
@@ -207,7 +222,7 @@ def analyze_disk() -> DiskReport:
     )
 
 
-def clean_safe(categories: Optional[list[str]] = None) -> tuple[list[str], int, list[str]]:
+def clean_safe(categories: list[str] | None = None) -> tuple[list[str], int, list[str]]:
     """Clean safe-to-delete directories.
 
     Args:
@@ -255,7 +270,9 @@ def clean_safe(categories: Optional[list[str]] = None) -> tuple[list[str], int, 
                         errors.append(f"Could not remove {item}: {e}")
                 size_after = _dir_size(target)
                 freed += size_before - size_after
-                plan_steps.append(f"Cleaned {os.path.basename(target)}: {_size_human(size_before - size_after)} freed")
+                plan_steps.append(
+                    f"Cleaned {os.path.basename(target)}: {_size_human(size_before - size_after)} freed"
+                )
             except Exception as e:
                 errors.append(f"Error cleaning {target}: {e}")
 

@@ -4,15 +4,14 @@ Feature: produto-percebido, Property 7: Guided flow presents correct options for
 Feature: produto-percebido, Property 8: Conversation context preserves pending question state
 """
 
-from unittest.mock import patch, MagicMock, PropertyMock
+from unittest.mock import MagicMock, patch
 
-from hypothesis import given, settings, assume
+from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from cios.core.bridge import CIOSBridge, PendingQuestion, GuidedFlowStep
+from cios.core.bridge import CIOSBridge
 from cios.core.intent_parser import Intent, IntentType
 from cios.skills.network import WifiNetwork
-
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  STRATEGIES
@@ -21,13 +20,17 @@ from cios.skills.network import WifiNetwork
 # Generate valid SSIDs: non-empty printable strings without newlines or colons
 # (colons are used as nmcli delimiter, so real SSIDs parsed by list_networks
 # won't contain them; newlines would break the display)
-_ssid = st.text(
-    alphabet=st.sampled_from(
-        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_- "
-    ),
-    min_size=1,
-    max_size=32,
-).map(str.strip).filter(lambda s: len(s) > 0 and not s.isdigit())
+_ssid = (
+    st.text(
+        alphabet=st.sampled_from(
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_- "
+        ),
+        min_size=1,
+        max_size=32,
+    )
+    .map(str.strip)
+    .filter(lambda s: len(s) > 0 and not s.isdigit())
+)
 
 # Generate signal strengths in valid range
 _signal = st.integers(min_value=0, max_value=100)
@@ -55,6 +58,7 @@ _wifi_network_list = st.lists(
 #  HELPERS
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def _make_bridge():
     """Create a Bridge instance with MCP fully mocked."""
     with patch("cios.core.mcp.context") as mock_ctx:
@@ -66,6 +70,7 @@ def _make_bridge():
         mock_ctx.force_update_audio = MagicMock()
         mock_ctx.force_update = MagicMock()
         from cios.core.mcp import ContextSnapshot, SystemState
+
         mock_snapshot = ContextSnapshot(
             system=SystemState(
                 cpu_percent=15.0,
@@ -86,6 +91,7 @@ def _make_bridge():
 #  PROPERTY TESTS
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class TestGuidedFlowNetworkOptions:
     """Property 7: Guided flow presents correct options for network connection.
 
@@ -104,8 +110,10 @@ class TestGuidedFlowNetworkOptions:
         """
         bridge = _make_bridge()
         try:
-            with patch("cios.skills.network.list_networks", return_value=networks), \
-                 patch("cios.core.mcp.context") as mock_mcp:
+            with (
+                patch("cios.skills.network.list_networks", return_value=networks),
+                patch("cios.core.mcp.context") as mock_mcp,
+            ):
                 # Not connected, no known networks
                 mock_mcp.wifi.connected = False
                 mock_mcp.known_networks = []
@@ -113,16 +121,16 @@ class TestGuidedFlowNetworkOptions:
                 result = bridge.execute_command("conectar wifi")
 
             # The response should be successful (it's a clarification, not an error)
-            assert result["status"] == "success", (
-                f"Expected success status, got '{result['status']}'"
-            )
+            assert (
+                result["status"] == "success"
+            ), f"Expected success status, got '{result['status']}'"
 
             # All SSIDs should appear in the response text
             response_text = result["result"]
             for net in networks:
-                assert net.ssid in response_text, (
-                    f"SSID '{net.ssid}' not found in response: {response_text}"
-                )
+                assert (
+                    net.ssid in response_text
+                ), f"SSID '{net.ssid}' not found in response: {response_text}"
 
             # A pending question should be set with flow_steps
             pq = bridge._pending_question
@@ -131,9 +139,9 @@ class TestGuidedFlowNetworkOptions:
 
             # The options in the pending question should contain all SSIDs
             expected_ssids = [n.ssid for n in networks]
-            assert pq.options == expected_ssids, (
-                f"Expected options {expected_ssids}, got {pq.options}"
-            )
+            assert (
+                pq.options == expected_ssids
+            ), f"Expected options {expected_ssids}, got {pq.options}"
         finally:
             bridge.close()
 
@@ -149,8 +157,10 @@ class TestGuidedFlowNetworkOptions:
         bridge = _make_bridge()
         try:
             # Step 1: Trigger the guided flow
-            with patch("cios.skills.network.list_networks", return_value=networks), \
-                 patch("cios.core.mcp.context") as mock_mcp:
+            with (
+                patch("cios.skills.network.list_networks", return_value=networks),
+                patch("cios.core.mcp.context") as mock_mcp,
+            ):
                 mock_mcp.wifi.connected = False
                 mock_mcp.known_networks = []
 
@@ -170,9 +180,9 @@ class TestGuidedFlowNetworkOptions:
 
             # The password step should be of type "password"
             pw_step = password_steps[0]
-            assert pw_step.question_type == "password", (
-                f"Expected password step type 'password', got '{pw_step.question_type}'"
-            )
+            assert (
+                pw_step.question_type == "password"
+            ), f"Expected password step type 'password', got '{pw_step.question_type}'"
 
             # Step 2: Answer with the first SSID (unknown network → should ask password)
             first_ssid = networks[0].ssid
@@ -204,13 +214,17 @@ class TestGuidedFlowNetworkOptions:
 
 # Generate answer strings: non-empty printable text that a user might type
 # as an answer to a clarification question.
-_answer_text = st.text(
-    alphabet=st.sampled_from(
-        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_- "
-    ),
-    min_size=1,
-    max_size=30,
-).map(str.strip).filter(lambda s: len(s) > 0)
+_answer_text = (
+    st.text(
+        alphabet=st.sampled_from(
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_- "
+        ),
+        min_size=1,
+        max_size=30,
+    )
+    .map(str.strip)
+    .filter(lambda s: len(s) > 0)
+)
 
 # Generate port numbers as strings (what a user would type when asked "Qual porta?")
 _port_answer = st.integers(min_value=10, max_value=65535).map(str)
@@ -261,6 +275,7 @@ _scenario_index = st.sampled_from(range(len(_CLARIFICATION_SCENARIOS)))
 #  PROPERTY 8 TESTS
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class TestConversationContextPendingQuestion:
     """Property 8: Conversation context preserves pending question state.
 
@@ -292,18 +307,20 @@ class TestConversationContextPendingQuestion:
             )
 
             # Mock parse_intent to return our intent missing the app param
-            with patch("cios.core.bridge.parse_intent", return_value=intent), \
-                 patch("cios.core.bridge.classify_intent", return_value=None), \
-                 patch("cios.core.bridge.resolve_unknown_intent", return_value=None):
+            with (
+                patch("cios.core.bridge.parse_intent", return_value=intent),
+                patch("cios.core.bridge.classify_intent", return_value=None),
+                patch("cios.core.bridge.resolve_unknown_intent", return_value=None),
+            ):
                 result = bridge.execute_command("abrir")
 
             # 1. _pending_question should be set
-            assert bridge._pending_question is not None, (
-                "Expected _pending_question to be set for APP_LAUNCH without app"
-            )
-            assert bridge._pending_question.question_type == "app", (
-                f"Expected question_type='app', got '{bridge._pending_question.question_type}'"
-            )
+            assert (
+                bridge._pending_question is not None
+            ), "Expected _pending_question to be set for APP_LAUNCH without app"
+            assert (
+                bridge._pending_question.question_type == "app"
+            ), f"Expected question_type='app', got '{bridge._pending_question.question_type}'"
 
             # 2. Next input should be processed as an answer, not a new intent
             # Mock the planner execution to capture what intent gets executed
@@ -312,6 +329,7 @@ class TestConversationContextPendingQuestion:
             def mock_execute(intent_arg):
                 executed_intents.append(intent_arg)
                 from cios.core.planner import PlanResult
+
                 return PlanResult(
                     plan_steps=["Abrindo app"],
                     results=[],
@@ -319,24 +337,26 @@ class TestConversationContextPendingQuestion:
                     outcome="success",
                 )
 
-            with patch.object(bridge._planner, "execute", side_effect=mock_execute), \
-                 patch("cios.core.mcp.context") as mock_ctx:
+            with (
+                patch.object(bridge._planner, "execute", side_effect=mock_execute),
+                patch("cios.core.mcp.context") as mock_ctx,
+            ):
                 mock_ctx.notify_activity = MagicMock()
                 mock_ctx.snapshot.return_value = MagicMock()
                 result2 = bridge.execute_command(answer)
 
             # 3. The answer should have filled the 'app' param
-            assert len(executed_intents) == 1, (
-                f"Expected exactly 1 intent execution, got {len(executed_intents)}"
-            )
-            assert executed_intents[0].params.get("app") == answer, (
-                f"Expected app='{answer}', got '{executed_intents[0].params.get('app')}'"
-            )
+            assert (
+                len(executed_intents) == 1
+            ), f"Expected exactly 1 intent execution, got {len(executed_intents)}"
+            assert (
+                executed_intents[0].params.get("app") == answer
+            ), f"Expected app='{answer}', got '{executed_intents[0].params.get('app')}'"
 
             # 4. _pending_question should be cleared after answering
-            assert bridge._pending_question is None, (
-                "Expected _pending_question to be None after answer was processed"
-            )
+            assert (
+                bridge._pending_question is None
+            ), "Expected _pending_question to be None after answer was processed"
         finally:
             bridge.close()
 
@@ -357,18 +377,20 @@ class TestConversationContextPendingQuestion:
                 raw_input="matar processo",
             )
 
-            with patch("cios.core.bridge.parse_intent", return_value=intent), \
-                 patch("cios.core.bridge.classify_intent", return_value=None), \
-                 patch("cios.core.bridge.resolve_unknown_intent", return_value=None):
+            with (
+                patch("cios.core.bridge.parse_intent", return_value=intent),
+                patch("cios.core.bridge.classify_intent", return_value=None),
+                patch("cios.core.bridge.resolve_unknown_intent", return_value=None),
+            ):
                 result = bridge.execute_command("matar processo")
 
             # 1. _pending_question should be set
-            assert bridge._pending_question is not None, (
-                "Expected _pending_question to be set for PROCESS_CONTROL without port"
-            )
-            assert bridge._pending_question.question_type == "port", (
-                f"Expected question_type='port', got '{bridge._pending_question.question_type}'"
-            )
+            assert (
+                bridge._pending_question is not None
+            ), "Expected _pending_question to be set for PROCESS_CONTROL without port"
+            assert (
+                bridge._pending_question.question_type == "port"
+            ), f"Expected question_type='port', got '{bridge._pending_question.question_type}'"
 
             # 2. Next input should be processed as an answer
             executed_intents = []
@@ -376,6 +398,7 @@ class TestConversationContextPendingQuestion:
             def mock_execute(intent_arg):
                 executed_intents.append(intent_arg)
                 from cios.core.planner import PlanResult
+
                 return PlanResult(
                     plan_steps=["Matando processo"],
                     results=[],
@@ -383,25 +406,27 @@ class TestConversationContextPendingQuestion:
                     outcome="success",
                 )
 
-            with patch.object(bridge._planner, "execute", side_effect=mock_execute), \
-                 patch("cios.core.mcp.context") as mock_ctx:
+            with (
+                patch.object(bridge._planner, "execute", side_effect=mock_execute),
+                patch("cios.core.mcp.context") as mock_ctx,
+            ):
                 mock_ctx.notify_activity = MagicMock()
                 mock_ctx.snapshot.return_value = MagicMock()
                 result2 = bridge.execute_command(port_str)
 
             # 3. The answer should have filled the 'port' param as an integer
-            assert len(executed_intents) == 1, (
-                f"Expected exactly 1 intent execution, got {len(executed_intents)}"
-            )
+            assert (
+                len(executed_intents) == 1
+            ), f"Expected exactly 1 intent execution, got {len(executed_intents)}"
             expected_port = int(port_str)
-            assert executed_intents[0].params.get("port") == expected_port, (
-                f"Expected port={expected_port}, got '{executed_intents[0].params.get('port')}'"
-            )
+            assert (
+                executed_intents[0].params.get("port") == expected_port
+            ), f"Expected port={expected_port}, got '{executed_intents[0].params.get('port')}'"
 
             # 4. _pending_question should be cleared
-            assert bridge._pending_question is None, (
-                "Expected _pending_question to be None after answer was processed"
-            )
+            assert (
+                bridge._pending_question is None
+            ), "Expected _pending_question to be None after answer was processed"
         finally:
             bridge.close()
 
@@ -422,18 +447,20 @@ class TestConversationContextPendingQuestion:
                 raw_input="organizar",
             )
 
-            with patch("cios.core.bridge.parse_intent", return_value=intent), \
-                 patch("cios.core.bridge.classify_intent", return_value=None), \
-                 patch("cios.core.bridge.resolve_unknown_intent", return_value=None):
+            with (
+                patch("cios.core.bridge.parse_intent", return_value=intent),
+                patch("cios.core.bridge.classify_intent", return_value=None),
+                patch("cios.core.bridge.resolve_unknown_intent", return_value=None),
+            ):
                 result = bridge.execute_command("organizar")
 
             # 1. _pending_question should be set
-            assert bridge._pending_question is not None, (
-                "Expected _pending_question to be set for FILE_ORGANIZE without target"
-            )
-            assert bridge._pending_question.question_type == "target", (
-                f"Expected question_type='target', got '{bridge._pending_question.question_type}'"
-            )
+            assert (
+                bridge._pending_question is not None
+            ), "Expected _pending_question to be set for FILE_ORGANIZE without target"
+            assert (
+                bridge._pending_question.question_type == "target"
+            ), f"Expected question_type='target', got '{bridge._pending_question.question_type}'"
 
             # 2. Next input should be processed as an answer, not a new intent
             # For FILE_ORGANIZE, after filling target, it needs confirmation.
@@ -445,6 +472,7 @@ class TestConversationContextPendingQuestion:
             def mock_execute(intent_arg):
                 executed_intents.append(intent_arg)
                 from cios.core.planner import PlanResult
+
                 return PlanResult(
                     plan_steps=["Organizando arquivos"],
                     results=[],
@@ -452,24 +480,26 @@ class TestConversationContextPendingQuestion:
                     outcome="success",
                 )
 
-            with patch.object(bridge._planner, "execute", side_effect=mock_execute), \
-                 patch("cios.core.mcp.context") as mock_ctx:
+            with (
+                patch.object(bridge._planner, "execute", side_effect=mock_execute),
+                patch("cios.core.mcp.context") as mock_ctx,
+            ):
                 mock_ctx.notify_activity = MagicMock()
                 mock_ctx.snapshot.return_value = MagicMock()
                 result2 = bridge.execute_command(answer)
 
             # 3. The answer should have filled the 'target' param
-            assert len(executed_intents) == 1, (
-                f"Expected exactly 1 intent execution, got {len(executed_intents)}"
-            )
-            assert executed_intents[0].params.get("target") == answer, (
-                f"Expected target='{answer}', got '{executed_intents[0].params.get('target')}'"
-            )
+            assert (
+                len(executed_intents) == 1
+            ), f"Expected exactly 1 intent execution, got {len(executed_intents)}"
+            assert (
+                executed_intents[0].params.get("target") == answer
+            ), f"Expected target='{answer}', got '{executed_intents[0].params.get('target')}'"
 
             # 4. _pending_question should be cleared
-            assert bridge._pending_question is None, (
-                "Expected _pending_question to be None after answer was processed"
-            )
+            assert (
+                bridge._pending_question is None
+            ), "Expected _pending_question to be None after answer was processed"
         finally:
             bridge.close()
 
@@ -483,20 +513,24 @@ class TestConversationContextPendingQuestion:
 
         **Validates: Requirements 5.4**
         """
-        scenario_name, intent_factory, question_type, param_key = _CLARIFICATION_SCENARIOS[scenario_idx]
+        scenario_name, intent_factory, question_type, param_key = _CLARIFICATION_SCENARIOS[
+            scenario_idx
+        ]
         bridge = _make_bridge()
         try:
             intent = intent_factory()
 
             # Step 1: Trigger clarification
-            with patch("cios.core.bridge.parse_intent", return_value=intent), \
-                 patch("cios.core.bridge.classify_intent", return_value=None), \
-                 patch("cios.core.bridge.resolve_unknown_intent", return_value=None):
+            with (
+                patch("cios.core.bridge.parse_intent", return_value=intent),
+                patch("cios.core.bridge.classify_intent", return_value=None),
+                patch("cios.core.bridge.resolve_unknown_intent", return_value=None),
+            ):
                 bridge.execute_command(intent.raw_input)
 
-            assert bridge._pending_question is not None, (
-                f"Scenario '{scenario_name}': expected _pending_question to be set"
-            )
+            assert (
+                bridge._pending_question is not None
+            ), f"Scenario '{scenario_name}': expected _pending_question to be set"
 
             # Step 2: Send the answer — parse_intent should NOT be called
             parse_intent_calls = []
@@ -512,6 +546,7 @@ class TestConversationContextPendingQuestion:
 
             def mock_execute(intent_arg):
                 from cios.core.planner import PlanResult
+
                 return PlanResult(
                     plan_steps=["Step"],
                     results=[],
@@ -519,9 +554,11 @@ class TestConversationContextPendingQuestion:
                     outcome="success",
                 )
 
-            with patch("cios.core.bridge.parse_intent", side_effect=tracking_parse_intent), \
-                 patch.object(bridge._planner, "execute", side_effect=mock_execute), \
-                 patch("cios.core.mcp.context") as mock_ctx:
+            with (
+                patch("cios.core.bridge.parse_intent", side_effect=tracking_parse_intent),
+                patch.object(bridge._planner, "execute", side_effect=mock_execute),
+                patch("cios.core.mcp.context") as mock_ctx,
+            ):
                 mock_ctx.notify_activity = MagicMock()
                 mock_ctx.snapshot.return_value = MagicMock()
                 bridge.execute_command(actual_answer)

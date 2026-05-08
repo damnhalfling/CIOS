@@ -5,15 +5,14 @@ Feature: produto-percebido
 
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from cios.core.memory import Memory, SessionContext
+from cios.core.executor import ExecResult, Executor
 from cios.core.intent_parser import Intent, IntentType
-from cios.core.executor import Executor, ExecResult
-
+from cios.core.memory import Memory, SessionContext
 
 # --- Strategies ---
 
@@ -51,12 +50,15 @@ _session_context = st.builds(
 
 def _make_memory(db_path: Path) -> Memory:
     """Create a Memory instance backed by the given DB path."""
-    with patch("cios.core.config.DB_PATH", db_path), \
-         patch("cios.core.config.ensure_dirs", lambda: None):
+    with (
+        patch("cios.core.config.DB_PATH", db_path),
+        patch("cios.core.config.ensure_dirs", lambda: None),
+    ):
         return Memory()
 
 
 # --- Property Tests ---
+
 
 class TestSessionContextRoundTrip:
     """Property 3: Session context round-trip preserves all fields.
@@ -229,7 +231,7 @@ class TestSessionRestoration:
                 fake_dev_plan = [
                     f"Starting server ({ctx.start_command})",
                     f"Server running on port {ctx.server_port}",
-                    f"Editor opened (code)",
+                    "Editor opened (code)",
                     f"Browser opened (http://localhost:{ctx.server_port})",
                     "Session saved",
                 ]
@@ -243,14 +245,18 @@ class TestSessionRestoration:
                     )
                 ]
 
-                with patch("cios.core.handlers.dev._is_port_in_use", return_value=server_running), \
-                     patch("cios.core.handlers.dev._detect_editor", return_value="code"), \
-                     patch("cios.core.handlers.dev._open_editor") as mock_editor, \
-                     patch("cios.core.handlers.dev._open_browser") as mock_browser, \
-                     patch("os.path.exists", return_value=True), \
-                     patch("cios.core.handlers.dev.detect_project") as mock_detect, \
-                     patch("cios.core.handlers.dev.execute_dev_start", return_value=(fake_dev_plan, fake_dev_results, 12345)) as mock_dev_start:
-
+                with (
+                    patch("cios.core.handlers.dev._is_port_in_use", return_value=server_running),
+                    patch("cios.core.handlers.dev._detect_editor", return_value="code"),
+                    patch("cios.core.handlers.dev._open_editor") as mock_editor,
+                    patch("cios.core.handlers.dev._open_browser") as mock_browser,
+                    patch("os.path.exists", return_value=True),
+                    patch("cios.core.handlers.dev.detect_project") as mock_detect,
+                    patch(
+                        "cios.core.handlers.dev.execute_dev_start",
+                        return_value=(fake_dev_plan, fake_dev_results, 12345),
+                    ) as mock_dev_start,
+                ):
                     result = planner._handle_continue_project(intent)
 
                 plan_text = " ".join(result.plan_steps).lower()
@@ -273,19 +279,18 @@ class TestSessionRestoration:
                     mock_dev_start.assert_called_once()
 
                 # (c) Always includes editor open
-                assert "editor" in plan_text, (
-                    f"Expected editor step in plan, got: {result.plan_steps}"
-                )
+                assert (
+                    "editor" in plan_text
+                ), f"Expected editor step in plan, got: {result.plan_steps}"
 
                 # (d) Always includes browser open
-                assert "browser" in plan_text, (
-                    f"Expected browser step in plan, got: {result.plan_steps}"
-                )
+                assert (
+                    "browser" in plan_text
+                ), f"Expected browser step in plan, got: {result.plan_steps}"
 
                 # Outcome should be success
                 assert result.outcome == "success", (
-                    f"Expected success outcome, got: {result.outcome} "
-                    f"(error: {result.error})"
+                    f"Expected success outcome, got: {result.outcome} " f"(error: {result.error})"
                 )
             finally:
                 mem.close()
