@@ -99,9 +99,7 @@ def main() -> None:
 
         run_gui()
     except ImportError:
-        logging.error(
-            "Tkinter not available. Install with: sudo apt install python3-tk"
-        )
+        logging.error("Tkinter not available. Install with: sudo apt install python3-tk")
         # Exit with special code 77 so session script knows it's a tkinter issue
         sys.exit(77)
     except Exception as e:
