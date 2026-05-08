@@ -170,6 +170,45 @@ fi
 
 echo "[CIOS] ✓ AI environment ready"
 
+# ── Install voice tools (optional — STT/TTS) ──
+echo "[CIOS] Setting up voice (optional)..."
+
+# Install piper TTS (local, offline)
+if ! command -v piper &>/dev/null; then
+    echo "[CIOS] Installing piper (TTS)..."
+    PIPER_VERSION="2023.11.14-2"
+    PIPER_URL="https://github.com/rhasspy/piper/releases/download/${PIPER_VERSION}/piper_linux_x86_64.tar.gz"
+    if curl -fsSL "$PIPER_URL" -o /tmp/piper.tar.gz 2>/dev/null; then
+        tar -xzf /tmp/piper.tar.gz -C /usr/local/bin/ --strip-components=1 piper/piper 2>/dev/null || true
+        rm -f /tmp/piper.tar.gz
+        # Download PT-BR voice model
+        mkdir -p /usr/share/piper/voices
+        VOICE_URL="https://huggingface.co/rhasspy/piper-voices/resolve/main/pt/pt_BR/faber/medium/pt_BR-faber-medium.onnx"
+        curl -fsSL "$VOICE_URL" -o /usr/share/piper/voices/pt_BR-faber-medium.onnx 2>/dev/null || true
+        curl -fsSL "${VOICE_URL}.json" -o /usr/share/piper/voices/pt_BR-faber-medium.onnx.json 2>/dev/null || true
+        echo "[CIOS] ✓ Piper TTS installed"
+    else
+        echo "[CIOS] ⚠ Could not download piper. TTS will be unavailable."
+    fi
+fi
+
+# Install whisper.cpp (local STT)
+if ! command -v whisper-cpp &>/dev/null && ! command -v whisper &>/dev/null; then
+    echo "[CIOS] Installing whisper (STT)..."
+    # Try pip install (openai-whisper is simpler to install)
+    if [ -d /usr/share/cios/.venv ]; then
+        /usr/share/cios/.venv/bin/pip install --quiet openai-whisper 2>/dev/null && {
+            # Create symlink so VoiceManager finds it
+            ln -sf /usr/share/cios/.venv/bin/whisper /usr/local/bin/whisper 2>/dev/null || true
+            echo "[CIOS] ✓ Whisper STT installed"
+        } || {
+            echo "[CIOS] ⚠ Could not install whisper. STT will be unavailable."
+        }
+    fi
+fi
+
+echo "[CIOS] ✓ Voice setup complete"
+
 # ── Apply LightDM branding if LightDM is installed (both modes) ──
 if [ -d /etc/lightdm ] && command -v lightdm &>/dev/null; then
     CIOS_CONF="/usr/share/cios/config"

@@ -119,11 +119,15 @@ class VoiceManager:
             # Stop any current speech
             self.stop_speaking()
 
-            # Use piper for TTS
-            # piper reads from stdin and outputs WAV to stdout
-            # We pipe it to aplay for playback
+            # Find voice model
+            voice_model = self._find_voice_model()
+            if voice_model:
+                cmd = f'echo "{text}" | piper --model {voice_model} --output-raw | aplay -r 22050 -f S16_LE -c 1 -q'
+            else:
+                cmd = f'echo "{text}" | piper --output-raw | aplay -r 22050 -f S16_LE -c 1 -q'
+
             self._tts_process = subprocess.Popen(
-                f'echo "{text}" | piper --output-raw | aplay -r 22050 -f S16_LE -c 1 -q',
+                cmd,
                 shell=True,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
@@ -136,6 +140,22 @@ class VoiceManager:
         finally:
             self._speaking = False
             self._tts_process = None
+
+    def _find_voice_model(self) -> str | None:
+        """Find the best voice model for the current language."""
+        import glob
+
+        voice_dirs = [
+            "/usr/share/piper/voices",
+            os.path.expanduser("~/.local/share/piper/voices"),
+        ]
+        lang_prefix = "pt_BR" if self._lang == "pt" else "en_US"
+
+        for d in voice_dirs:
+            matches = glob.glob(f"{d}/{lang_prefix}*.onnx")
+            if matches:
+                return matches[0]
+        return None
 
     def stop_speaking(self) -> None:
         """Interrupt current speech."""

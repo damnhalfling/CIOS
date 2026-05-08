@@ -1613,6 +1613,11 @@ class CIOSApp:
         if self._voice.is_listening:
             return
 
+        # Signal topbar that mic is active
+        from cios.ui.topbar import signal_topbar_idle, signal_topbar_mic
+
+        signal_topbar_mic()
+
         # Visual feedback: mic button glows
         self._anim.color([self._mic_outer, self._mic_btn], "bg", ACCENT, T_FAST)
         self._mic_btn.configure(text=" 🔴 ", fg="#fff")
@@ -1625,6 +1630,9 @@ class CIOSApp:
         self._entry.configure(fg=ACCENT_LT)
 
         def on_result(text: str | None):
+            # Signal topbar that mic is done
+            signal_topbar_idle()
+
             # Reset mic button
             self.root.after(
                 0,
