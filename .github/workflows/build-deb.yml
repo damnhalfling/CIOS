@@ -22,13 +22,16 @@ jobs:
           python-version: '3.12'
 
       - name: Install ruff
-        run: pip install ruff==0.8.6
+        run: pip install ruff==0.8.6 mypy==1.14.1
 
       - name: Ruff check (lint)
         run: ruff check cios/ tests/
 
       - name: Ruff format (formatting)
         run: ruff format --check cios/ tests/
+
+      - name: Mypy (type check core)
+        run: mypy cios/core/ --ignore-missing-imports --no-error-summary --exclude "cios/core/(intent_parser|mcp|intelligence)\.py" || true
 
   test:
     runs-on: ubuntu-latest

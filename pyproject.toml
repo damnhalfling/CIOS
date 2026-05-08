@@ -20,6 +20,7 @@ test = [
 dev = [
     "ruff==0.8.6",
     "pre-commit==4.0.1",
+    "mypy==1.14.1",
 ]
 
 [tool.setuptools.packages.find]
@@ -102,3 +103,33 @@ known-first-party = ["cios"]
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+# ── Mypy (type checking) ───────────────────────────────────────────
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = false
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+check_untyped_defs = false
+disallow_untyped_defs = false
+ignore_missing_imports = true
+no_implicit_optional = true
+exclude = [
+    "tests/",
+    "cios/ui/",
+    "cios/infra/",
+    "cios/skills/",
+]
+
+[[tool.mypy.overrides]]
+module = "cios.core.intent_parser"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "cios.core.mcp"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "cios.core.intelligence"
+ignore_errors = true
