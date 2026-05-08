@@ -494,6 +494,19 @@ if [ ! -x "$VENV" ]; then
     echo "WARNING: venv not found, using system python: $VENV" >> "$LOGFILE"
 fi
 
+# Verify tkinter is accessible (venv may need --system-site-packages)
+if [ -x "/usr/share/cios/.venv/bin/python3" ]; then
+    if ! /usr/share/cios/.venv/bin/python3 -c "import tkinter" 2>/dev/null; then
+        echo "WARNING: tkinter not available in venv, recreating with --system-site-packages" >> "$LOGFILE"
+        rm -rf /usr/share/cios/.venv
+        python3 -m venv --system-site-packages /usr/share/cios/.venv 2>/dev/null
+        /usr/share/cios/.venv/bin/pip install --quiet prompt_toolkit rich psutil 2>/dev/null || true
+        /usr/share/cios/.venv/bin/pip install --quiet -e /usr/share/cios 2>/dev/null || true
+        VENV="/usr/share/cios/.venv/bin/python3"
+        echo "Venv recreated successfully" >> "$LOGFILE"
+    fi
+fi
+
 if [ -z "$VENV" ]; then
     echo "FATAL: No python3 found!" >> "$LOGFILE"
     xterm -e "echo 'CIOS: python3 not found. Check installation.'; bash" &
@@ -581,7 +594,14 @@ export NO_AT_BRIDGE=1
 export GTK_A11Y=none
 export PYTHONPATH="/usr/share/cios:${PYTHONPATH:-}"
 VENV="/usr/share/cios/.venv/bin/python3"
-[ ! -x "$VENV" ] && VENV="python3"
+if [ ! -x "$VENV" ]; then
+    VENV="python3"
+elif ! $VENV -c "import tkinter" 2>/dev/null; then
+    rm -rf /usr/share/cios/.venv
+    python3 -m venv --system-site-packages /usr/share/cios/.venv 2>/dev/null
+    /usr/share/cios/.venv/bin/pip install --quiet prompt_toolkit rich psutil 2>/dev/null || true
+    /usr/share/cios/.venv/bin/pip install --quiet -e /usr/share/cios 2>/dev/null || true
+fi
 $VENV -m cios.ui.splash &
 $VENV -m cios.main &
 AUTOSTART
