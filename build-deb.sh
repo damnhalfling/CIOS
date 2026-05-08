@@ -158,9 +158,14 @@ fi
 # Pull default model if Ollama is available
 if command -v ollama &>/dev/null; then
     echo "[CIOS] Pulling default model (mistral)..."
-    ollama pull mistral 2>/dev/null &
-    OLLAMA_PULL_PID=$!
-    # Don't wait — let it download in background during rest of install
+    # Start ollama serve temporarily for the pull
+    ollama serve &>/dev/null &
+    OLLAMA_SERVE_PID=$!
+    sleep 2
+    ollama pull mistral 2>/dev/null || {
+        echo "[CIOS] ⚠ Could not pull mistral model now. Will retry on first boot."
+    }
+    kill $OLLAMA_SERVE_PID 2>/dev/null || true
 fi
 
 echo "[CIOS] ✓ AI environment ready"
