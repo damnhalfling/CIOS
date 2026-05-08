@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════
-#  Harmoni — Openbox autostart
+#  CIOS — Openbox autostart
 #  Executado automaticamente quando Openbox inicia
-#  Shows splash → starts Harmoni → splash closes
+#  Shows splash → starts CIOS → splash closes
 #
 #  Optimized: splash starts BEFORE heavy Python imports,
 #  progress updates shown in real-time via file protocol.
@@ -14,33 +14,22 @@ xsetroot -solid '#0a0a0f' 2>/dev/null || true
 # Disable accessibility bridge (removes startup delay)
 export NO_AT_BRIDGE=1
 export GTK_A11Y=none
+export PYTHONPATH="/usr/share/cios:${PYTHONPATH:-}"
 
 # Find Python
-VENV="/usr/share/harmoni/.venv/bin/python3"
+VENV="/usr/share/cios/.venv/bin/python3"
 if [ ! -x "$VENV" ]; then
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    PROJECT_DIR="$(dirname "$(dirname "${SCRIPT_DIR}")")"
-    if [ -x "${PROJECT_DIR}/.venv/bin/python3" ]; then
-        VENV="${PROJECT_DIR}/.venv/bin/python3"
-    elif [ -x "${HOME}/.local/bin/python3" ]; then
-        VENV="${HOME}/.local/bin/python3"
-    else
-        VENV="python3"
-    fi
+    VENV="python3"
+elif ! $VENV -c "import tkinter" 2>/dev/null; then
+    VENV="python3"
 fi
 
 # Show splash immediately (before heavy Python imports)
-$VENV -m harmoni.splash &
+$VENV -m cios.ui.splash &
 SPLASH_PID=$!
 
-# Start Harmoni (it will signal splash to close when ready)
-if [ -x "${HOME}/.local/bin/harmoni" ]; then
-    "${HOME}/.local/bin/harmoni" &
-elif command -v harmoni &>/dev/null; then
-    harmoni &
-else
-    $VENV -m harmoni.main &
-fi
+# Start CIOS
+$VENV -m cios.main &
 
 # Safety: kill splash after 10s if app didn't signal
 (sleep 10 && kill $SPLASH_PID 2>/dev/null) &

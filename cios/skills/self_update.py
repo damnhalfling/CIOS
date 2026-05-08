@@ -222,7 +222,7 @@ def download_and_install(info: UpdateInfo) -> tuple[list[str], bool, str]:
     # Install with sudo
     steps.append("Instalando…")
     try:
-        # Stop running harmoni processes (except this one)
+        # Stop running cios processes (except this one)
         my_pid = os.getpid()
         subprocess.run(
             f"pgrep -f 'python.*cios\\.main' | grep -v {my_pid} | xargs -r kill 2>/dev/null || true",

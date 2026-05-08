@@ -1,1 +1,1 @@
-"""Harmoni test suite."""
+"""CIOS test suite."""
