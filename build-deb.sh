@@ -122,7 +122,7 @@ if [ ! -d /usr/share/cios/.venv ]; then
     python3 -m venv --system-site-packages /usr/share/cios/.venv 2>/dev/null || {
         echo "[CIOS] ⚠ Could not create venv. Will use system Python."
         pip3 install --quiet --break-system-packages \
-            prompt_toolkit==3.0.48 rich==13.9.4 psutil==6.1.1 2>/dev/null || true
+            prompt_toolkit==3.0.48 rich==13.9.4 psutil==6.1.1 Pillow 2>/dev/null || true
     }
 fi
 
@@ -137,7 +137,8 @@ if [ -d /usr/share/cios/.venv ]; then
     /usr/share/cios/.venv/bin/pip install --quiet \
         prompt_toolkit==3.0.48 \
         rich==13.9.4 \
-        psutil==6.1.1 2>/dev/null || true
+        psutil==6.1.1 \
+        Pillow 2>/dev/null || true
 
     /usr/share/cios/.venv/bin/pip install --quiet -e /usr/share/cios 2>/dev/null || true
 fi
