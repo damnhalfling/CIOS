@@ -565,6 +565,24 @@ while true; do
 
     kill $SPLASH_PID 2>/dev/null || true
 
+    # Exit code 77 = tkinter not available, fall back to CLI in xterm
+    if [ $EXIT_CODE -eq 77 ]; then
+        echo "Tkinter not available, launching CLI in xterm" >> "$LOGFILE"
+        # Try to fix tkinter first
+        sudo apt-get install -y python3-tk 2>/dev/null || true
+        # If fix worked, retry GUI
+        if $VENV -c "import tkinter" 2>/dev/null; then
+            echo "python3-tk installed successfully, retrying GUI" >> "$LOGFILE"
+            continue
+        fi
+        # Otherwise launch CLI in terminal
+        xterm -fa "Monospace" -fs 11 -bg "#0a0a0f" -fg "#fafafa" \
+            -T "CIOS" -e "$VENV -m cios --cli" 2>/dev/null || \
+            x-terminal-emulator -e "$VENV -m cios --cli" 2>/dev/null || \
+            $VENV -m cios --cli
+        break
+    fi
+
     if [ $EXIT_CODE -eq 0 ]; then
         break
     fi

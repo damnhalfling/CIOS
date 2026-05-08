@@ -99,28 +99,15 @@ def main() -> None:
 
         run_gui()
     except ImportError:
-        logging.warning("Tkinter not available, falling back to CLI mode in xterm")
-        import subprocess
-
-        # Launch CLI in a terminal emulator (xterm is always available in X sessions)
-        terminal = None
-        for term in ["xterm", "x-terminal-emulator", "xfce4-terminal", "gnome-terminal"]:
-            try:
-                subprocess.run(["which", term], capture_output=True, check=True)
-                terminal = term
-                break
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                continue
-
-        if terminal:
-            subprocess.run([terminal, "-e", f"{sys.executable} -m cios --cli"])
-        else:
-            print("\n  Tkinter não encontrado e nenhum terminal disponível.")
-            print("  Instale com: sudo apt install python3-tk")
-            sys.exit(1)
+        logging.error(
+            "Tkinter not available. Install with: sudo apt install python3-tk"
+        )
+        # Exit with special code 77 so session script knows it's a tkinter issue
+        sys.exit(77)
     except Exception as e:
         logging.exception("Fatal error in GUI mode")
         print(f"\n[FATAL] {e}", file=sys.stderr)
+        sys.exit(1)
         sys.exit(1)
 
 
