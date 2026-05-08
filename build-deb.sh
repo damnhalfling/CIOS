@@ -146,6 +146,25 @@ fi
 chmod +x /usr/local/bin/cios-session 2>/dev/null || true
 echo "[CIOS] ✓ Python environment ready"
 
+# ── Install Ollama (local LLM) ──
+if ! command -v ollama &>/dev/null; then
+    echo "[CIOS] Installing Ollama (local AI)..."
+    curl -fsSL https://ollama.com/install.sh | sh 2>/dev/null || {
+        echo "[CIOS] ⚠ Could not install Ollama. Local AI will be unavailable."
+        echo "[CIOS]   Install manually later: curl -fsSL https://ollama.com/install.sh | sh"
+    }
+fi
+
+# Pull default model if Ollama is available
+if command -v ollama &>/dev/null; then
+    echo "[CIOS] Pulling default model (mistral)..."
+    ollama pull mistral 2>/dev/null &
+    OLLAMA_PULL_PID=$!
+    # Don't wait — let it download in background during rest of install
+fi
+
+echo "[CIOS] ✓ AI environment ready"
+
 # ── Apply LightDM branding if LightDM is installed (both modes) ──
 if [ -d /etc/lightdm ] && command -v lightdm &>/dev/null; then
     CIOS_CONF="/usr/share/cios/config"
