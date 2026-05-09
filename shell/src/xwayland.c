@@ -234,10 +234,10 @@ static void handle_new_xwayland_surface(struct wl_listener *listener, void *data
 
     /* Set up listeners */
     surface->map.notify = handle_xwayland_surface_map;
-    wl_signal_add(&xsurface->events.map, &surface->map);
+    wl_signal_add(&xsurface->surface->events.map, &surface->map);
 
     surface->unmap.notify = handle_xwayland_surface_unmap;
-    wl_signal_add(&xsurface->events.unmap, &surface->unmap);
+    wl_signal_add(&xsurface->surface->events.unmap, &surface->unmap);
 
     surface->destroy.notify = handle_xwayland_surface_destroy;
     wl_signal_add(&xsurface->events.destroy, &surface->destroy);

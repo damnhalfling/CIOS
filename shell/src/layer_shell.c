@@ -91,8 +91,9 @@ static void layer_shell_arrange_output(struct CiosServer *server,
         .height = height,
     };
 
-    /* Let wlroots scene layer surface helper arrange and apply exclusive zones */
-    wlr_scene_output_set_usable_area(output->scene_output, &usable_area);
+    /* In wlroots 0.18, usable area is calculated by the compositor directly.
+     * Layer surfaces with exclusive zones reduce the usable area. */
+    /* TODO: iterate layer surfaces and subtract exclusive zones */
 
     /* Apply the calculated usable area to our output struct */
     output->usable_x = usable_area.x;
