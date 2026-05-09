@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-rc*'
 
 permissions:
   contents: write
@@ -70,7 +71,16 @@ jobs:
 
       - name: Extract version from tag
         id: version
-        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        run: |
+          # Strip 'v' prefix: v1.2.0-rc1 → 1.2.0-rc1
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          # Detect if this is an RC release
+          if [[ "$VERSION" == *"-rc"* ]]; then
+            echo "IS_RC=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "IS_RC=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -80,7 +90,22 @@ jobs:
       - name: Build .deb package
         run: bash build-deb.sh "${{ steps.version.outputs.VERSION }}"
 
-      - name: Delete all previous releases
+      - name: Delete previous RC releases (RC only)
+        if: steps.version.outputs.IS_RC == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Cleaning old RC releases..."
+          RELEASES=$(gh release list --limit 100 --json tagName -q '.[].tagName')
+          for TAG in $RELEASES; do
+            if [[ "$TAG" == *"-rc"* ]]; then
+              echo "Deleting RC release $TAG..."
+              gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
+            fi
+          done
+
+      - name: Delete all previous releases (stable only)
+        if: steps.version.outputs.IS_RC == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -92,7 +117,8 @@ jobs:
           done
           echo "All previous releases deleted."
 
-      - name: Delete old tags from remote
+      - name: Delete old tags from remote (stable only)
+        if: steps.version.outputs.IS_RC == 'false'
         run: |
           CURRENT_TAG="${GITHUB_REF_NAME}"
           for TAG in $(git tag -l); do
@@ -108,4 +134,4 @@ jobs:
           files: cios_${{ steps.version.outputs.VERSION }}_amd64.deb
           generate_release_notes: true
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.version.outputs.IS_RC == 'true' }}

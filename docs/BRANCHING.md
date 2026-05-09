@@ -64,25 +64,39 @@ git checkout dev
 git commit -m "feat: implement ipc.c"
 git push origin dev
 
+# Gerar RC para testar
+git tag v1.1.0-rc1
+git push origin v1.1.0-rc1
+# → CI roda, gera .deb, publica como pre-release
+
 # Feature grande
 git checkout -b feat/wayland-compositor
 # ... trabalha por dias ...
 git push origin feat/wayland-compositor
-# Quando pronto: merge → dev
+# Quando pronto: merge → dev, tag RC
 
-# Domingo (release)
+# Domingo (release estável)
 git checkout main
 git merge dev
 git tag v1.1.0
 git push origin main --tags
+# → CI roda, gera .deb, publica como release estável
 ```
 
 ---
 
 ## CI/CD
 
-- Push em `dev`: roda lint + testes (sem release)
-- Push tag `v*` em `main`: lint → test → build .deb → GitHub Release
+Mesmo pipeline para stable e RC:
+
+| Trigger | Pipeline | Release |
+|---------|----------|---------|
+| Tag `v1.2.0` na `main` | lint → test → build → release | **Stable** (latest) |
+| Tag `v1.2.0-rc1` na `dev` | lint → test → build → release | **Pre-release** (RC) |
+
+- RC releases limpam apenas RCs anteriores (não tocam na stable)
+- Stable releases limpam TUDO (RCs + stables anteriores)
+- Ambos geram .deb e GitHub Release
 
 ---
 
