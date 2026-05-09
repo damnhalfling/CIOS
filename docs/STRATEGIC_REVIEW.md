@@ -1,6 +1,6 @@
 # CIOS — Avaliação Estratégica
 
-> Atualizado: Maio 2026 — v1.0.0-rc.1.1
+> Atualizado: Maio 2026 — v1.1.0-rc3
 
 ---
 
@@ -32,16 +32,17 @@ Esse é o momento onde projetos morrem ou viram algo grande.
 
 ## O que já funciona (131 itens)
 
-- 21 skills de sistema (wifi, áudio, arquivos, pacotes, janelas, clipboard, bateria, brilho, bluetooth, dev start, file search, etc.)
-- 148+ patterns de intenção (PT/EN)
+- 26 skills de sistema (wifi, áudio, arquivos, pacotes, janelas, clipboard, bateria, brilho, bluetooth, dev start, file search, gallery, screen capture, etc.)
+- 171 patterns de intenção (PT/EN)
 - Hybrid classifier (regex → cache → Ollama)
 - Voz offline (whisper.cpp + piper)
-- Desktop completo (sessão X, topbar, hotkey, multi-monitor)
+- Desktop completo (compositor Wayland próprio, topbar, hotkey, multi-monitor)
 - UX conversacional (3 turnos, clarificação, pronomes)
 - Error recovery (19 tipos com sugestões)
 - Auto-learning engine
-- 323 testes passando
+- 398 testes passando
 - .deb instalável
+- Compositor Wayland (cios-shell, wlroots 0.18, XWayland)
 
 ---
 
@@ -122,4 +123,4 @@ NÃO adicionar features. Fechar o loop.
 
 ---
 
-*Atualizado: Maio 2026 — v1.0.0-rc.1.1*
+*Atualizado: Maio 2026 — v1.1.0-rc3*

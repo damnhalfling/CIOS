@@ -105,7 +105,7 @@ No wasted steps. No wrong guesses.
 
 Real system execution. 26 skills, zero abstraction.
 
-Wi-Fi (nmcli) · Audio (pactl) · Files · Processes · Packages (apt) · Windows (EWMH) · Clipboard · Battery · Brightness · Dev environments · Disk analysis · Auto-learning · File search · Workflow start · Explore system · Gallery management · Favorites & albums · Duplicate detection · Face clustering · Screen capture · Image editing
+Wi-Fi (nmcli) · Audio (pactl) · Files · Processes · Packages (apt) · Windows (compositor IPC) · Clipboard (wl-clipboard) · Battery · Brightness · Dev environments · Disk analysis · Auto-learning · File search · Workflow start · Explore system · Gallery management · Favorites & albums · Duplicate detection · Face clustering · Screen capture · Image editing
 
 **No LLM for critical actions.** Pattern matching handles 80%+ of intents. Hybrid classifier (regex → cache → LLM) ensures natural language works while keeping latency low.
 
@@ -124,7 +124,7 @@ Your voice stays on your machine. Always.
 
 ## A real system, not an app
 
-- Independent X session — replaces your desktop
+- Custom Wayland compositor (cios-shell) — replaces your desktop
 - Single-surface interface: prompt at bottom, results above, system status on the right
 - No sidebar, no menus, no page navigation — just intent
 - Minimal top bar (clock, battery, wifi, volume, CPU)
@@ -132,12 +132,13 @@ Your voice stays on your machine. Always.
 - Multi-monitor support (secondary screen shows system context)
 - Global hotkey (Ctrl+Space)
 - Boot splash with seamless transition to main interface
+- XWayland support for legacy X11 apps (browser, editor, terminal)
 - Onboarding wizard on first login
 
 **No GNOME. No KDE. Just intent.**
 
 ```
-Boot → Display Manager → "CIOS" → Splash → Ready
+Boot → Display Manager → "CIOS" → Compositor → Splash → Ready
 ```
 
 ## Conversational by design
@@ -214,15 +215,16 @@ curl -sL https://raw.githubusercontent.com/damnhalfling/cios/main/install-cios.s
 ```
 
 ```bash
-# Or manual (IMPORTANT: use install script to prevent session logout)
-sudo bash install-cios.sh ./cios_0.14.0_amd64.deb
+# Or download the .deb from releases
+wget https://github.com/damnhalfling/CIOS/releases/latest/download/cios_1.1.0-rc3_amd64.deb
+sudo apt install ./cios_1.1.0-rc3_amd64.deb
 sudo reboot
 ```
 
 Select **CIOS** at the login screen. That's it.
 
 The installer offers two modes:
-1. **Session only** — adds CIOS alongside GNOME/KDE
+1. **Session only** — adds CIOS alongside GNOME/KDE (Wayland session)
 2. **Full replacement** — switches to LightDM with CIOS theme + Plymouth boot splash (logo on boot, no text)
 
 After install, say **"update cios"** anytime to get the latest version automatically.
@@ -230,10 +232,10 @@ After install, say **"update cios"** anytime to get the latest version automatic
 ## Test without leaving your desktop
 
 ```bash
-sudo apt install xserver-xephyr openbox wmctrl xdotool
-Xephyr :2 -screen 1280x720 &
-DISPLAY=:2 openbox &
-DISPLAY=:2 .venv/bin/cios
+# Run compositor nested inside your current session (Wayland or X11)
+WLR_BACKENDS=wayland cios-shell --log-level debug
+# Or via X11 backend:
+WLR_BACKENDS=x11 cios-shell --log-level debug
 ```
 
 ## Execution modes
@@ -273,7 +275,7 @@ In practice: if no LLM is available, all regex-matched intents (the vast majorit
 
 ## Status
 
-- ✅ Independent X session — running on real hardware
+- ✅ Custom Wayland compositor (wlroots 0.18) — running on real hardware
 - ✅ 26 skills — Wi-Fi, audio, files, packages, windows, clipboard, dev environments, self-update, file search, workflow start, gallery management, duplicates, face clustering, screen capture
 - ✅ Hybrid intent classifier — regex + LLM cache with stemming + auto-learning
 - ✅ Voice offline — STT + TTS, fully local
@@ -288,6 +290,7 @@ In practice: if no LLM is available, all regex-matched intents (the vast majorit
 - ✅ Media gallery — favorites, albums, duplicates, face clustering, date/text search, editing
 - ✅ Screen capture — screenshot (full/window/region) + screen recording
 - ✅ XDG user directories — auto-created on login
+- ✅ XWayland — full support for X11 apps (browser, editor, terminal)
 
 **This is not a prototype. It runs.**
 
@@ -297,6 +300,7 @@ In practice: if no LLM is available, all regex-matched intents (the vast majorit
 - ⏳ Voice module (STT/TTS as alternative I/O)
 - ⏳ Google Workspace MCP (Calendar, Gmail, Drive)
 - ⏳ Custom Debian-based distribution
+- ✅ ~~Wayland compositor~~ — done (wlroots 0.18, XWayland, layer-shell)
 
 ## Architecture (for contributors)
 
@@ -339,7 +343,7 @@ cios-os/
 │   ├── main.py                 # Entry point (6 modes)
 │   ├── core/
 │   │   ├── bridge.py           # UI ↔ backend (sync + streaming + conversation)
-│   │   ├── intent_parser.py    # 180+ regex patterns PT/EN
+│   │   ├── intent_parser.py    # 170+ regex patterns PT/EN
 │   │   ├── intent_classifier.py # Hybrid LLM classifier + cache + stemming
 │   │   ├── planner.py          # 30 handlers + MCO + _resilient_call()
 │   │   ├── handlers/           # Intent handlers (gallery, media, screen, etc.)
@@ -349,7 +353,7 @@ cios-os/
 │   │   ├── model_router.py     # LLM routing (Ollama default, full fallback chain)
 │   │   ├── config.py           # Persistent settings (~/.cios/) + XDG dirs
 │   │   ├── memory.py           # SQLite history
-│   │   └── error_recovery.py   # 17 error types + actionable suggestions
+│   │   └── error_recovery.py   # 19 error types + actionable suggestions
 │   ├── skills/                 # 26 system skills
 │   │   ├── gallery_store.py    # Favorites, albums, trash (SQLite)
 │   │   ├── gallery_search.py   # Date + text/CLIP search
@@ -360,10 +364,13 @@ cios-os/
 │   │   └── ...                 # network, audio, bluetooth, etc.
 │   ├── ui/                     # GUI, CLI, hotkey, topbar, splash, gallery, viewer
 │   └── infra/                  # Daemon, voice, multi-monitor
-├── session/                    # X session config (Openbox) + XDG setup
-├── tests/                      # 468 tests
-├── .github/workflows/          # CI: test → build → release
-├── build-deb.sh                # .deb package builder
+├── shell/                      # Wayland compositor (C, wlroots 0.18)
+│   ├── src/                    # main.c, server.c, output.c, input.c, ipc.c, ...
+│   └── meson.build             # Build system
+├── session/                    # Wayland session config + XDG setup
+├── tests/                      # 398 tests
+├── .github/workflows/          # CI: test → build compositor → build .deb → release
+├── build-deb.sh                # .deb package builder (compiles compositor + Python)
 ├── install-cios.sh             # One-line installer
 └── pyproject.toml
 ```
@@ -377,10 +384,10 @@ cd cios-os
 python3 -m venv .venv
 .venv/bin/pip install -e ".[test]"
 .venv/bin/cios              # GUI
-.venv/bin/pytest tests/ -v      # 468 tests
+.venv/bin/pytest tests/ -v      # 398 tests
 ```
 
-**Requirements:** Python 3.10+ · Linux (Ubuntu/Debian) · Optional: Ollama, xclip, xbindkeys, brightnessctl
+**Requirements:** Python 3.10+ · Linux (Ubuntu/Debian) · Optional: Ollama, wl-clipboard, brightnessctl
 
 ## Open source
 
@@ -502,8 +509,9 @@ curl -sL https://raw.githubusercontent.com/damnhalfling/cios/main/install-cios.s
 ```
 
 ```bash
-# Ou manual (IMPORTANTE: use o install script para evitar logout durante instalação)
-sudo bash install-cios.sh ./cios_0.14.0_amd64.deb
+# Ou baixe o .deb da release
+wget https://github.com/damnhalfling/CIOS/releases/latest/download/cios_1.1.0-rc3_amd64.deb
+sudo apt install ./cios_1.1.0-rc3_amd64.deb
 sudo reboot
 ```
 
@@ -534,4 +542,4 @@ cios --setup      # Re-executar setup
 
 ---
 
-*CIOS v0.14.3 — May 2026*
+*CIOS v1.1.0-rc3 — May 2026*

@@ -1,7 +1,7 @@
 # CIOS — Roadmap
 
 > Substituindo apps por intenção.
-> Atualizado: Maio 2026 — v1.0.0-rc.1.1
+> Atualizado: Maio 2026 — v1.1.0-rc3
 
 ---
 
@@ -102,28 +102,24 @@ Se não for 100% confiável → fluxo guiado. Se for confiável → automático.
 |------|----------|--------|
 | Intelligence Client (P4) | Client no OS que consome api.harmoni-ia.com | AGORA |
 | Módulo de Voz (P6) | STT/TTS como I/O agnóstico (mic → texto → pipeline → TTS) | Após P4 |
-| Wayland compositor | Compositor próprio (wlroots-based) | Antes de distribuição |
+| ~~Wayland compositor~~ | ~~Compositor próprio (wlroots-based)~~ | ✅ CONCLUÍDO |
 | Distribuição | 1-liner, AppImage, distro própria | Quando tiver impacto |
 
 ---
 
-## Nota: Migração X11 → Wayland
+## Nota: Migração X11 → Wayland ✅ CONCLUÍDA
 
-**Decisão:** manter X11 agora, migrar quando for hora de distribuir.
+**Status:** Compositor Wayland próprio (cios-shell) implementado e funcional.
 
-**Por que migrar (eventualmente):**
-- CIOS roda apps reais (editor, browser) — isolamento de segurança faz sentido
-- Compositor próprio = controle total sobre window placement, hotkeys, segurança
-- Distros estão convergindo pra Wayland como padrão
-
-**O que muda:**
-- Openbox → compositor wlroots-based próprio (CIOS É o compositor)
-- `wmctrl` → protocolos Wayland nativos (controle direto, sem hack)
-- `xclip` → `wl-copy`/`wl-paste`
+**O que foi feito:**
+- Openbox → **cios-shell** (compositor wlroots 0.18, C puro)
+- `wmctrl` → IPC via Unix socket (JSON protocol)
+- `xclip` → `wl-copy`/`wl-paste` (com fallback X11)
 - Hotkey global → layer-shell protocol
-- Tkinter → continua via XWayland (ou migra pra widget toolkit nativo)
+- Tkinter → continua via XWayland
+- XWayland habilitado para apps legados (browser, editor, terminal)
 
-**O que NÃO muda (zero impacto):**
+**O que NÃO mudou (zero impacto):**
 - Skills core (nmcli, pactl, apt, bluetoothctl, psutil)
 - MCP, planner, intent parser, humanizer, memory
 - Toda a camada cognitiva
@@ -132,7 +128,7 @@ Se não for 100% confiável → fluxo guiado. Se for confiável → automático.
 
 ---
 
-## Números (v1.0.0-rc.1.1)
+## Números (v1.1.0-rc3)
 
 | Métrica | Valor |
 |---------|-------|
@@ -144,6 +140,7 @@ Se não for 100% confiável → fluxo guiado. Se for confiável → automático.
 | Property tests (Hypothesis) | 22 |
 | Modos de execução | 6 |
 | Itens concluídos | 175+ |
+| Compositor | cios-shell (wlroots 0.18, C) |
 
 ---
 
@@ -171,4 +168,4 @@ Ver `docs/BRANCHING.md` para detalhes.
 
 ---
 
-*Atualizado: Maio 2026 — v1.0.0-rc.1.1*
+*Atualizado: Maio 2026 — v1.1.0-rc3*
