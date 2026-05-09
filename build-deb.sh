@@ -122,6 +122,9 @@ echo "║       CIOS — Installer                   ║"
 echo "╚═══════════════════════════════════════════╝"
 echo ""
 
+# ── Update shared library cache (bundled wlroots + wayland) ──
+ldconfig 2>/dev/null || true
+
 # ── Create Python venv + install deps ──
 echo "[CIOS] Setting up Python environment..."
 
@@ -572,6 +575,14 @@ cp -r cios/skills/*.py "${PKG_DIR}${INSTALL_DIR}/cios/skills/"
 echo "→ Installing cios-shell compositor..."
 cp shell/build/cios-shell "${PKG_DIR}/usr/bin/cios-shell"
 chmod 755 "${PKG_DIR}/usr/bin/cios-shell"
+
+# ── Bundle wlroots shared library (not available in Ubuntu repos) ──
+echo "→ Bundling libwlroots-0.18..."
+mkdir -p "${PKG_DIR}/usr/lib/x86_64-linux-gnu"
+cp /usr/lib/x86_64-linux-gnu/libwlroots-0.18.so "${PKG_DIR}/usr/lib/x86_64-linux-gnu/"
+# Also bundle the wayland 1.23 libs (system may have 1.22)
+cp /usr/lib/x86_64-linux-gnu/libwayland-server.so.0* "${PKG_DIR}/usr/lib/x86_64-linux-gnu/"
+cp /usr/lib/x86_64-linux-gnu/libwayland-client.so.0* "${PKG_DIR}/usr/lib/x86_64-linux-gnu/"
 
 # ── Session files ──
 echo "→ Copying session files..."
