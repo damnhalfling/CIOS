@@ -4,4 +4,4 @@ revision = 0.18.1
 clone-recursive = false
 
 [provide]
-wlroots = wlroots_dep
+dependency_names = wlroots

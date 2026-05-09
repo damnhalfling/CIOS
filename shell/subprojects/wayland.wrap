@@ -4,5 +4,4 @@ revision = 1.23.0
 clone-recursive = false
 
 [provide]
-wayland-server = wayland_server
-wayland-client = wayland_client
+dependency_names = wayland-server, wayland-client, wayland-egl
