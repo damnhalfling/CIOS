@@ -153,24 +153,18 @@ def _wayland_move_window(
     return steps, False, resp.get("error", "IPC failed") if resp else "No IPC response"
 
 
-def _wayland_tile_window(
-    window: WindowInfo, position: str
-) -> tuple[list[str], bool, str | None]:
+def _wayland_tile_window(window: WindowInfo, position: str) -> tuple[list[str], bool, str | None]:
     """Tile a surface via compositor IPC."""
     steps = [f"Tiling: {window.title[:30]} → {position}"]
 
     if position == "maximize":
-        resp = _ipc_send(
-            {"cmd": "configure_surface", "id": window.wid, "maximized": True}
-        )
+        resp = _ipc_send({"cmd": "configure_surface", "id": window.wid, "maximized": True})
         if resp and resp.get("ok"):
             return steps, True, None
         return steps, False, resp.get("error", "IPC failed") if resp else "No IPC response"
 
     if position == "minimize":
-        resp = _ipc_send(
-            {"cmd": "configure_surface", "id": window.wid, "minimized": True}
-        )
+        resp = _ipc_send({"cmd": "configure_surface", "id": window.wid, "minimized": True})
         if resp and resp.get("ok"):
             return steps, True, None
         return steps, False, resp.get("error", "IPC failed") if resp else "No IPC response"
