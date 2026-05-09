@@ -1,0 +1,49 @@
+#!/bin/bash
+# ═══════════════════════════════════════════════════
+#  Hook: Configure silent boot chain
+#  GRUB → Plymouth → LightDM with zero visible text.
+# ═══════════════════════════════════════════════════
+set -euo pipefail
+
+echo ">>> [0400] Configuring silent boot chain..."
+
+# ── GRUB Configuration ─────────────────────────────────────────────
+mkdir -p /etc/default
+cat > /etc/default/grub << 'EOF'
+GRUB_DEFAULT=0
+GRUB_TIMEOUT=0
+GRUB_TIMEOUT_STYLE=hidden
+GRUB_DISTRIBUTOR="CIOS"
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash loglevel=0 vt.global_cursor_default=0 rd.udev.log_priority=3 systemd.show_status=false"
+GRUB_CMDLINE_LINUX=""
+EOF
+
+# ── Plymouth Configuration ─────────────────────────────────────────
+# Set CIOS theme if available, otherwise use spinner
+if [ -d "/usr/share/plymouth/themes/cios" ]; then
+    plymouth-set-default-theme cios 2>/dev/null || true
+else
+    plymouth-set-default-theme spinner 2>/dev/null || true
+fi
+
+# ── Initramfs Configuration ────────────────────────────────────────
+# Enable framebuffer for immediate Plymouth display
+mkdir -p /etc/initramfs-tools/conf.d
+echo "FRAMEBUFFER=y" > /etc/initramfs-tools/conf.d/splash
+
+# Add KMS modules for early GPU initialization
+cat >> /etc/initramfs-tools/modules << 'EOF'
+# KMS GPU drivers for early framebuffer
+i915
+amdgpu
+nouveau
+radeon
+EOF
+
+# Rebuild initramfs with new configuration
+update-initramfs -u 2>/dev/null || true
+
+# ── NetworkManager ─────────────────────────────────────────────────
+systemctl enable NetworkManager 2>/dev/null || true
+
+echo ">>> [0400] Silent boot chain configured."

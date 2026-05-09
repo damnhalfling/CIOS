@@ -1,0 +1,38 @@
+#!/bin/bash
+# ═══════════════════════════════════════════════════
+#  Hook: Configure LightDM autologin
+#  Sets up automatic login to the CIOS session.
+# ═══════════════════════════════════════════════════
+set -euo pipefail
+
+echo ">>> [0300] Configuring LightDM autologin..."
+
+# Create LightDM configuration directory
+mkdir -p /etc/lightdm
+
+# Write LightDM main configuration
+cat > /etc/lightdm/lightdm.conf << 'EOF'
+[Seat:*]
+autologin-user=cios
+autologin-user-timeout=0
+user-session=cios
+greeter-session=lightdm-gtk-greeter
+EOF
+
+# Configure greeter with CIOS branding
+mkdir -p /etc/lightdm
+cat > /etc/lightdm/lightdm-gtk-greeter.conf << 'EOF'
+[greeter]
+theme-name=Adwaita-dark
+icon-theme-name=Adwaita
+background=#0a0a0f
+user-background=false
+font-name=Sans 11
+xft-antialias=true
+xft-hintstyle=hintfull
+EOF
+
+# Ensure LightDM is enabled
+systemctl enable lightdm 2>/dev/null || true
+
+echo ">>> [0300] LightDM autologin configured."

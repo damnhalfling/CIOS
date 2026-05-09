@@ -1,0 +1,22 @@
+#!/bin/bash
+# CIOS Live ISO — live-build auto-configuration
+# This script is called by `lb config` to set all build parameters.
+
+lb config noauto \
+    --distribution bookworm \
+    --architecture amd64 \
+    --archive-areas "main contrib non-free non-free-firmware" \
+    --binary-images iso-hybrid \
+    --bootloaders "grub-efi,syslinux" \
+    --memtest none \
+    --iso-application "CIOS" \
+    --iso-publisher "CIOS Project" \
+    --iso-volume "CIOS Live" \
+    --firmware-binary true \
+    --firmware-chroot true \
+    --updates true \
+    --security true \
+    --apt-indices false \
+    --apt-recommends false \
+    --debootstrap-options "--variant=minbase" \
+    "${@}"

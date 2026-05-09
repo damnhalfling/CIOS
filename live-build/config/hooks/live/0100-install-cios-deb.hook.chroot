@@ -1,0 +1,44 @@
+#!/bin/bash
+# ═══════════════════════════════════════════════════
+#  Hook: Install CIOS .deb package
+#  Runs inside chroot during live-build.
+# ═══════════════════════════════════════════════════
+set -euo pipefail
+
+echo ">>> [0100] Installing CIOS .deb package..."
+
+# Find the .deb in the packages directory (placed by build-iso.sh)
+DEB_FILE=$(find /packages.chroot/ -name 'cios_*.deb' 2>/dev/null | head -1)
+
+if [ -z "$DEB_FILE" ]; then
+    # Fallback: check standard live-build location
+    DEB_FILE=$(find / -maxdepth 3 -name 'cios_*.deb' 2>/dev/null | head -1)
+fi
+
+if [ -z "$DEB_FILE" ]; then
+    echo "ERROR: CIOS .deb package not found!"
+    exit 1
+fi
+
+echo "    Found: $DEB_FILE"
+
+# Install the .deb (may have unmet dependencies)
+dpkg -i "$DEB_FILE" || true
+
+# Resolve dependencies
+apt-get install -f -y --no-install-recommends
+
+# Verify installation
+echo "    Verifying venv..."
+if [ ! -d "/usr/share/cios/.venv" ]; then
+    echo "ERROR: CIOS venv not created at /usr/share/cios/.venv"
+    exit 1
+fi
+
+echo "    Verifying cios module..."
+if ! /usr/share/cios/.venv/bin/python -c "import cios" 2>/dev/null; then
+    echo "ERROR: cios module not importable from venv"
+    exit 1
+fi
+
+echo ">>> [0100] CIOS .deb installed successfully."

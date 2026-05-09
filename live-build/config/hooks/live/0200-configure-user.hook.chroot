@@ -1,0 +1,32 @@
+#!/bin/bash
+# ═══════════════════════════════════════════════════
+#  Hook: Configure live user account
+#  Creates the 'cios' user with appropriate permissions.
+# ═══════════════════════════════════════════════════
+set -euo pipefail
+
+echo ">>> [0200] Configuring live user 'cios'..."
+
+# Create user with no password
+useradd \
+    --create-home \
+    --shell /bin/bash \
+    --disabled-password \
+    --gecos "CIOS Live User" \
+    cios 2>/dev/null || true
+
+# Add to required groups
+usermod -aG audio,video,netdev,plugdev,sudo cios
+
+# Configure passwordless sudo
+cat > /etc/sudoers.d/cios-live << 'EOF'
+# CIOS Live Session — passwordless sudo
+cios ALL=(ALL) NOPASSWD: ALL
+EOF
+chmod 0440 /etc/sudoers.d/cios-live
+
+# Create CIOS config directory
+mkdir -p /home/cios/.cios
+chown -R cios:cios /home/cios/.cios
+
+echo ">>> [0200] User 'cios' configured successfully."

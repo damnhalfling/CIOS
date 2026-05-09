@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# ═══════════════════════════════════════════════════
+#  CIOS — Live ISO Installer Wrapper
+#  Runs the standard CIOS installer from the live session.
+#  Downloads the latest .deb from GitHub and installs permanently.
+# ═══════════════════════════════════════════════════
+set -euo pipefail
+
+# Check network connectivity
+if ! ping -c 1 -W 3 github.com &>/dev/null; then
+    echo ""
+    echo "  ❌ Sem conexão com a internet."
+    echo "     Conecte-se ao Wi-Fi ou Ethernet e tente novamente."
+    echo ""
+    echo "  ❌ No internet connection."
+    echo "     Connect to Wi-Fi or Ethernet and try again."
+    echo ""
+    exit 1
+fi
+
+# Download and run the latest installer
+INSTALLER_URL="https://raw.githubusercontent.com/damnhalfling/cios/main/install-cios.sh"
+
+echo "  ⬇ Baixando instalador / Downloading installer..."
+curl -fsSL "$INSTALLER_URL" | sudo bash

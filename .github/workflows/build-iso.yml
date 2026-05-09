@@ -1,0 +1,84 @@
+name: Build Live ISO
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+-iso'
+
+jobs:
+  build-iso:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          echo ">>> Freeing disk space..."
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache
+          sudo rm -rf /usr/share/swift
+          sudo apt-get remove -y '^dotnet-.*' '^llvm-.*' 'php.*' azure-cli \
+            google-cloud-cli google-chrome-stable firefox powershell \
+            mono-devel 2>/dev/null || true
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+          df -h /
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            live-build \
+            debootstrap \
+            dpkg-dev \
+            debhelper \
+            python3-venv \
+            python3-pip
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          # Tag format: v1.2.3-iso → version: 1.2.3
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          VERSION="${VERSION%-iso}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo ">>> Building ISO for version: $VERSION"
+
+      - name: Build ISO
+        run: |
+          sudo ./live-build/build-iso.sh "${{ steps.version.outputs.version }}"
+
+      - name: Upload ISO to Release
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          files: live-build/cios-${{ steps.version.outputs.version }}-amd64.iso
+          tag_name: ${{ github.ref_name }}
+          name: "CIOS ${{ steps.version.outputs.version }} Live ISO"
+          body: |
+            ## CIOS Live ISO v${{ steps.version.outputs.version }}
+
+            Bootable live ISO image. Write to USB with:
+            ```bash
+            sudo dd if=cios-${{ steps.version.outputs.version }}-amd64.iso of=/dev/sdX bs=4M status=progress
+            ```
+
+            Supports UEFI and Legacy BIOS boot.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            live-build/.build/
+            live-build/chroot.log
+          retention-days: 7
