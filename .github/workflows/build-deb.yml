@@ -109,7 +109,7 @@ jobs:
         run: |
           git clone --depth=1 --branch 1.23.0 https://gitlab.freedesktop.org/wayland/wayland.git /tmp/wayland
           cd /tmp/wayland
-          meson setup build --prefix=/usr -Ddocumentation=false -Dtests=false -Ddtd_validation=false
+          meson setup build --prefix=/usr --libdir=lib/x86_64-linux-gnu -Ddocumentation=false -Dtests=false -Ddtd_validation=false
           ninja -C build
           sudo ninja -C build install
           sudo ldconfig
@@ -118,13 +118,15 @@ jobs:
         run: |
           git clone --depth=1 --branch 0.18.1 https://gitlab.freedesktop.org/wlroots/wlroots.git /tmp/wlroots
           cd /tmp/wlroots
-          meson setup build --prefix=/usr
+          meson setup build --prefix=/usr --libdir=lib/x86_64-linux-gnu
           ninja -C build
           sudo ninja -C build install
           sudo ldconfig
 
       - name: Build .deb package
         run: bash build-deb.sh "${{ steps.version.outputs.VERSION }}"
+        env:
+          PKG_CONFIG_PATH: /usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig
 
       - name: Delete previous RC releases (RC only)
         if: steps.version.outputs.IS_RC == 'true'
