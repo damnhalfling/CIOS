@@ -564,10 +564,8 @@ def switch_desktop(desktop: int) -> tuple[list[str], bool, str | None]:
 def _get_screen_size() -> tuple[int, int]:
     """Get screen dimensions."""
     if _is_wayland():
-        # Ask compositor for output dimensions
-        resp = _ipc_send({"cmd": "list_surfaces"})
-        # Fallback: use environment or default
-        # TODO: add get_outputs IPC command
+        # TODO: add get_outputs IPC command to compositor
+        # For now, fall through to xdpyinfo (works via XWayland)
         pass
 
     try:
