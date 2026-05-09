@@ -1,0 +1,8 @@
+[wrap-git]
+url = https://gitlab.freedesktop.org/wayland/wayland.git
+revision = 1.23.0
+clone-recursive = false
+
+[provide]
+wayland-server = wayland_server
+wayland-client = wayland_client

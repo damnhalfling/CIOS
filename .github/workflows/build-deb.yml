@@ -97,7 +97,8 @@ jobs:
             libxcb-composite0-dev libxcb-icccm4-dev libxcb-image0-dev \
             libxcb-render0-dev libxcb-render-util0-dev libxcb-xfixes0-dev \
             libxcb-xinput-dev libxcb-dri3-dev libxcb-present-dev \
-            libxcb-res0-dev libxcb-shm0-dev hwdata libxcb-ewmh-dev
+            libxcb-res0-dev libxcb-shm0-dev hwdata libxcb-ewmh-dev \
+            libffi-dev libxml2-dev libexpat1-dev
           # Install newer Meson (wlroots 0.18 requires c23 support → Meson 1.5+)
           pip install meson>=1.5.0
           # These may not be in default repos — install if available
