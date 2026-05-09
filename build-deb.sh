@@ -23,10 +23,7 @@ echo "→ Building CIOS Shell (Wayland compositor)..."
 if [ -d shell ]; then
     pushd shell > /dev/null
     rm -rf build
-    meson setup build --prefix=/usr \
-      --force-fallback-for=wlroots,wayland-server,wayland-client,libliftoff,libdisplay-info \
-      -Dwayland:documentation=false -Dwayland:tests=false \
-      -Dwayland:dtd_validation=false
+    meson setup build --prefix=/usr
     ninja -C build
     popd > /dev/null
     echo "→ ✓ cios-shell compiled"

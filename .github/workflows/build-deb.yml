@@ -90,7 +90,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build pkg-config \
+          sudo apt-get install -y ninja-build pkg-config git \
             libwayland-dev wayland-protocols libxkbcommon-dev \
             libinput-dev libpixman-1-dev libdrm-dev libseat-dev \
             libxcb1-dev xwayland libgbm-dev libvulkan-dev \
@@ -99,11 +99,29 @@ jobs:
             libxcb-xinput-dev libxcb-dri3-dev libxcb-present-dev \
             libxcb-res0-dev libxcb-shm0-dev hwdata libxcb-ewmh-dev \
             libffi-dev libxml2-dev libexpat1-dev \
-            libegl-dev libgles-dev
+            libegl1-mesa-dev libgles2-mesa-dev libcairo2-dev
           # Install newer Meson (wlroots 0.18 requires c23 support → Meson 1.5+)
           pip install meson>=1.5.0
           # These may not be in default repos — install if available
           sudo apt-get install -y libdisplay-info-dev libliftoff-dev 2>/dev/null || true
+
+      - name: Build and install wayland 1.23 (system has 1.22)
+        run: |
+          git clone --depth=1 --branch 1.23.0 https://gitlab.freedesktop.org/wayland/wayland.git /tmp/wayland
+          cd /tmp/wayland
+          meson setup build --prefix=/usr -Ddocumentation=false -Dtests=false -Ddtd_validation=false
+          ninja -C build
+          sudo ninja -C build install
+          sudo ldconfig
+
+      - name: Build and install wlroots 0.18.1
+        run: |
+          git clone --depth=1 --branch 0.18.1 https://gitlab.freedesktop.org/wlroots/wlroots.git /tmp/wlroots
+          cd /tmp/wlroots
+          meson setup build --prefix=/usr
+          ninja -C build
+          sudo ninja -C build install
+          sudo ldconfig
 
       - name: Build .deb package
         run: bash build-deb.sh "${{ steps.version.outputs.VERSION }}"
