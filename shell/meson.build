@@ -17,7 +17,7 @@ libinput = dependency('libinput')
 libdrm = dependency('libdrm')
 libseat = dependency('libseat')
 xcb = dependency('xcb')
-wlroots = dependency('wlroots')
+wlroots = dependency('wlroots-0.18')
 
 shell_deps = [
   wayland_server,
