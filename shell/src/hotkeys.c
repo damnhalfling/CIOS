@@ -22,7 +22,7 @@
 
 #include <wayland-server-core.h>
 #include <wlr/types/wlr_keyboard.h>
-#include <wlr/types/wlr_xwayland.h>
+#include <wlr/xwayland.h>
 
 #include "log.h"
 #include "server.h"

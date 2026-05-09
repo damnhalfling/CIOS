@@ -8,6 +8,9 @@ project(
   ],
 )
 
+# wlroots requires this define to use its headers
+add_project_arguments('-DWLR_USE_UNSTABLE', language: 'c')
+
 # Dependencies
 wayland_server = dependency('wayland-server')
 wayland_protocols = dependency('wayland-protocols')
@@ -18,6 +21,7 @@ libdrm = dependency('libdrm')
 libseat = dependency('libseat')
 xcb = dependency('xcb')
 wlroots = dependency('wlroots-0.18')
+xwayland_dep = dependency('xwayland', required: false)
 
 shell_deps = [
   wayland_server,
