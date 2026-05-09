@@ -1,0 +1,33 @@
+Source: cios-shell
+Section: x11
+Priority: optional
+Maintainer: CIOS Team <cios@localhost>
+Build-Depends: debhelper-compat (= 13),
+               meson,
+               ninja-build,
+               pkg-config,
+               libwayland-dev,
+               wayland-protocols,
+               libxkbcommon-dev,
+               libinput-dev,
+               libpixman-1-dev,
+               libdrm-dev,
+               libseat-dev,
+               libxcb1-dev,
+               xwayland
+Standards-Version: 4.6.2
+Homepage: https://github.com/cios-os/cios-os
+
+Package: cios-shell
+Architecture: any
+Depends: ${shlibs:Depends},
+         ${misc:Depends},
+         libwayland-server0,
+         libxkbcommon0,
+         libinput10,
+         libseat1,
+         xwayland
+Description: CIOS Wayland Compositor
+ Minimal Wayland compositor for the CIOS runtime. Uses wlroots 0.18+
+ with DRM/KMS backend, XWayland support, layer-shell for topbar,
+ and a JSON IPC protocol for runtime communication.

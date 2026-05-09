@@ -517,4 +517,14 @@ FUTURO    → Distribuição
 
 ---
 
-*Atualizado: Maio 2026 — v0.16.0*
+*Atualizado: Maio 2026 — v1.0.0*
+
+---
+
+## Branching & Release
+
+- **main** — versão estável, release semanal (domingo)
+- **dev** — desenvolvimento diário, RC
+- **feat/*** — features isoladas
+
+Ver `docs/BRANCHING.md` para detalhes.
