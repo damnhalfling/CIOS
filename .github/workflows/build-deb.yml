@@ -121,6 +121,8 @@ jobs:
           meson setup build --prefix=/usr --libdir=lib/x86_64-linux-gnu -Dxwayland=enabled
           ninja -C build
           sudo ninja -C build install
+          # Protocol headers are generated in build dir — copy them to include dir
+          sudo find build -name "*-protocol.h" -exec cp {} /usr/include/wlroots-0.18/ \;
           sudo ldconfig
           # Verify wlroots is findable
           pkg-config --modversion wlroots-0.18 || { echo "wlroots-0.18.pc not found, searching..."; find /usr -name "wlroots*.pc" 2>/dev/null; exit 1; }

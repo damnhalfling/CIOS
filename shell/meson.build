@@ -23,6 +23,12 @@ xcb = dependency('xcb')
 wlroots = dependency('wlroots-0.18')
 xwayland_dep = dependency('xwayland', required: false)
 
+# wlroots protocol headers need to be in the include path for relative includes
+add_project_arguments(
+  '-I/usr/include/wlroots-0.18',
+  language: 'c',
+)
+
 shell_deps = [
   wayland_server,
   wayland_protocols,
