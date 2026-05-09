@@ -1,12 +1,12 @@
-# Harmoni — Avaliação Estratégica
+# CIOS — Avaliação Estratégica
 
-> Atualizado: Maio 2026 — v0.12.0
+> Atualizado: Maio 2026 — v1.0.0-rc.1.1
 
 ---
 
 ## Posicionamento
 
-**Harmoni** — Substituindo apps por intenção.
+**CIOS** — Substituindo apps por intenção.
 
 Não é "um sistema melhor". É um novo modelo de interação.
 
@@ -73,7 +73,7 @@ O momento que quebra a cabeça:
 
 ## Diferencial
 
-| Aspecto | Concorrentes | Harmoni |
+| Aspecto | Concorrentes | CIOS |
 |---------|-------------|---------|
 | Hardware | Precisam de hardware novo (2028+) | Roda em qualquer Linux hoje |
 | Modelo | Cloud-first | Local-first |
@@ -122,4 +122,4 @@ NÃO adicionar features. Fechar o loop.
 
 ---
 
-*Atualizado: Maio 2026 — v0.12.0*
+*Atualizado: Maio 2026 — v1.0.0-rc.1.1*

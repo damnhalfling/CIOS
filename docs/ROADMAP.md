@@ -1,7 +1,7 @@
-# Harmoni OS — Roadmap
+# CIOS — Roadmap
 
 > Substituindo apps por intenção.
-> Atualizado: Maio 2026 — v0.15.0
+> Atualizado: Maio 2026 — v1.0.0-rc.1.1
 
 ---
 
@@ -60,7 +60,7 @@ Se não for 100% confiável → fluxo guiado. Se for confiável → automático.
 - ✅ Hotkey overlay com mesma identidade visual
 - ✅ Splash com transição contínua para GUI
 - ✅ Multi-monitor: janela principal no primário, tela secundária interativa
-- ✅ Plymouth boot splash (logo Harmoni, sem texto de boot)
+- ✅ Plymouth boot splash (logo CIOS, sem texto de boot)
 - ✅ Installer com opção de substituição completa (LightDM + Plymouth)
 - ✅ Modal de confirmação com focus correto (Enter confirma, não reenvia)
 
@@ -112,12 +112,12 @@ Se não for 100% confiável → fluxo guiado. Se for confiável → automático.
 **Decisão:** manter X11 agora, migrar quando for hora de distribuir.
 
 **Por que migrar (eventualmente):**
-- Harmoni roda apps reais (editor, browser) — isolamento de segurança faz sentido
+- CIOS roda apps reais (editor, browser) — isolamento de segurança faz sentido
 - Compositor próprio = controle total sobre window placement, hotkeys, segurança
 - Distros estão convergindo pra Wayland como padrão
 
 **O que muda:**
-- Openbox → compositor wlroots-based próprio (Harmoni É o compositor)
+- Openbox → compositor wlroots-based próprio (CIOS É o compositor)
 - `wmctrl` → protocolos Wayland nativos (controle direto, sem hack)
 - `xclip` → `wl-copy`/`wl-paste`
 - Hotkey global → layer-shell protocol
@@ -132,15 +132,15 @@ Se não for 100% confiável → fluxo guiado. Se for confiável → automático.
 
 ---
 
-## Números (v0.15.0)
+## Números (v1.0.0-rc.1.1)
 
 | Métrica | Valor |
 |---------|-------|
-| Skills | 22 (+media_player) |
-| Intent patterns | 170+ (PT/EN) |
+| Skills | 26 |
+| Intent patterns | 171 (PT/EN) |
 | Traduções humanizer | 230+ (PT/EN) |
 | Tipos de erro | 19 |
-| Testes | 608+ |
+| Testes | 398 |
 | Property tests (Hypothesis) | 22 |
 | Modos de execução | 6 |
 | Itens concluídos | 175+ |
@@ -171,4 +171,4 @@ Ver `docs/BRANCHING.md` para detalhes.
 
 ---
 
-*Atualizado: Maio 2026 — v1.0.0*
+*Atualizado: Maio 2026 — v1.0.0-rc.1.1*

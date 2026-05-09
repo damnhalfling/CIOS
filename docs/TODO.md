@@ -1,6 +1,6 @@
 # CIOS — TODO
 
-> Atualizado: Maio 2026 — v0.16.0
+> Atualizado: Maio 2026 — v1.0.0-rc.1.1
 
 ---
 

@@ -87,6 +87,20 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y meson ninja-build pkg-config \
+            libwayland-dev wayland-protocols libxkbcommon-dev \
+            libinput-dev libpixman-1-dev libdrm-dev libseat-dev \
+            libxcb1-dev xwayland libgbm-dev libvulkan-dev \
+            libxcb-composite0-dev libxcb-icccm4-dev libxcb-image0-dev \
+            libxcb-render0-dev libxcb-render-util0-dev libxcb-xfixes0-dev \
+            libxcb-xinput-dev libxcb-dri3-dev libxcb-present-dev \
+            libxcb-res0-dev libxcb-shm0-dev hwdata libxcb-ewmh-dev
+          # These may not be in default repos — install if available
+          sudo apt-get install -y libdisplay-info-dev libliftoff-dev 2>/dev/null || true
+
       - name: Build .deb package
         run: bash build-deb.sh "${{ steps.version.outputs.VERSION }}"
 

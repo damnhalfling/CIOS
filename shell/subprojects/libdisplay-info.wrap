@@ -1,0 +1,7 @@
+[wrap-git]
+url = https://gitlab.freedesktop.org/emersion/libdisplay-info.git
+revision = 0.2.0
+depth = 1
+
+[provide]
+libdisplay-info = di_dep

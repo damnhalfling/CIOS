@@ -2,11 +2,11 @@
 # ═══════════════════════════════════════════════════
 #  CIOS — Build .deb package
 #  Usage: bash build-deb.sh [VERSION]
-#  Example: bash build-deb.sh 0.3.0
+#  Example: bash build-deb.sh 1.1.0-rc1
 # ═══════════════════════════════════════════════════
 set -euo pipefail
 
-VERSION="${1:-0.3.0}"
+VERSION="${1:-1.1.0-rc1}"
 PKG_NAME="cios"
 PKG_DIR="${PKG_NAME}_${VERSION}_amd64"
 INSTALL_DIR="/usr/share/cios"
@@ -18,6 +18,20 @@ echo "╚═══════════════════════�
 # ── Clean previous build ──
 rm -rf "${PKG_DIR}" "${PKG_DIR}.deb"
 
+# ── Build Wayland compositor ──
+echo "→ Building CIOS Shell (Wayland compositor)..."
+if [ -d shell ]; then
+    pushd shell > /dev/null
+    rm -rf build
+    meson setup build --prefix=/usr --wrap-mode=forcefallback
+    ninja -C build
+    popd > /dev/null
+    echo "→ ✓ cios-shell compiled"
+else
+    echo "ERROR: shell/ directory not found. Cannot build compositor."
+    exit 1
+fi
+
 # ── Create directory structure ──
 mkdir -p "${PKG_DIR}/DEBIAN"
 mkdir -p "${PKG_DIR}${INSTALL_DIR}/cios/core"
@@ -28,10 +42,10 @@ mkdir -p "${PKG_DIR}${INSTALL_DIR}/cios/skills"
 mkdir -p "${PKG_DIR}${INSTALL_DIR}/assets"
 mkdir -p "${PKG_DIR}${INSTALL_DIR}/config"
 mkdir -p "${PKG_DIR}/usr/local/bin"
-mkdir -p "${PKG_DIR}/usr/share/xsessions"
+mkdir -p "${PKG_DIR}/usr/bin"
+mkdir -p "${PKG_DIR}/usr/share/wayland-sessions"
 mkdir -p "${PKG_DIR}/usr/share/plymouth/themes/cios"
 mkdir -p "${PKG_DIR}/usr/share/backgrounds"
-mkdir -p "${PKG_DIR}/etc/xdg/openbox-cios"
 
 # ── DEBIAN/control ──
 cat > "${PKG_DIR}/DEBIAN/control" << EOF
@@ -40,15 +54,18 @@ Version: ${VERSION}
 Section: x11
 Priority: optional
 Architecture: amd64
-Depends: python3 (>= 3.10), python3-pip, python3-venv, python3-tk, xorg, lightdm, lightdm-gtk-greeter, openbox, wmctrl, xdotool, x11-xserver-utils, curl
-Recommends: pipewire-pulse | pulseaudio-utils, network-manager, i3lock, plymouth
+Depends: python3 (>= 3.10), python3-pip, python3-venv, python3-tk, xwayland, lightdm, lightdm-gtk-greeter, libwayland-server0, libxkbcommon0, libinput10, libseat1, libpixman-1-0, libdrm2, x11-xserver-utils, curl
+Recommends: pipewire-pulse | pulseaudio-utils, network-manager, i3lock, plymouth, wl-clipboard
 Suggests: slick-greeter, plymouth-themes
 Maintainer: damnhalfling <damnhalfling@github.com>
-Description: CIOS — AI-first desktop interface
+Description: CIOS — AI-first desktop interface (Wayland)
  A AI-first layer that replaces apps with intent-driven
  execution on top of Linux. Speak intent, get results.
  .
- Can be installed as an additional X session alongside
+ Uses a custom Wayland compositor (cios-shell) based on
+ wlroots 0.18+ with XWayland support for legacy apps.
+ .
+ Can be installed as an additional session alongside
  GNOME/KDE, or as the default desktop with custom login.
 Homepage: https://github.com/damnhalfling/cios
 EOF
@@ -280,9 +297,8 @@ esac
 POLICY
     chmod 755 /usr/sbin/policy-rc.d
 
-    # LightDM and Xorg are already installed as package dependencies
-    # Just need to configure them
-    echo "[CIOS] ✓ Xorg + LightDM already installed (package deps)"
+    # LightDM — configure for Wayland session
+    echo "[CIOS] ✓ Wayland compositor installed"
 
     # Remove DM restart block
     rm -f /usr/sbin/policy-rc.d
@@ -307,11 +323,11 @@ POLICY
         GREETER="lightdm-gtk-greeter"
     fi
 
-    # Write lightdm.conf with correct greeter
+    # Write lightdm.conf — use wayland session
     cat > /etc/lightdm/lightdm.conf << LDMCONF
 [Seat:*]
 greeter-session=$GREETER
-user-session=cios
+user-session=cios-shell
 greeter-hide-users=false
 allow-guest=false
 LDMCONF
@@ -413,7 +429,7 @@ GTKCONF
     echo ""
     echo "  Boot: logo CIOS (Plymouth)"
     echo "  Login: LightDM com tema CIOS"
-    echo "  Desktop: CIOS"
+    echo "  Desktop: CIOS (Wayland compositor)"
     echo ""
     echo "  Reboot: sudo reboot"
     echo "  Reverter: sudo apt remove cios && sudo reboot"
@@ -464,6 +480,7 @@ else
     echo "  ✓ CIOS instalado (sessão adicional)"
     echo ""
     echo "  Reboot e selecione 'CIOS' na tela de login."
+    echo "  (Sessão Wayland com compositor próprio)"
     echo "  sudo reboot"
     echo "═══════════════════════════════════════════"
     echo ""
@@ -550,28 +567,40 @@ cp -r cios/ui/*.py "${PKG_DIR}${INSTALL_DIR}/cios/ui/"
 cp -r cios/infra/*.py "${PKG_DIR}${INSTALL_DIR}/cios/infra/"
 cp -r cios/skills/*.py "${PKG_DIR}${INSTALL_DIR}/cios/skills/"
 
+# ── Install compositor binary ──
+echo "→ Installing cios-shell compositor..."
+cp shell/build/cios-shell "${PKG_DIR}/usr/bin/cios-shell"
+chmod 755 "${PKG_DIR}/usr/bin/cios-shell"
+
 # ── Session files ──
 echo "→ Copying session files..."
 
-# Session script
+# Wayland session desktop entry (for LightDM/GDM session picker)
+cat > "${PKG_DIR}/usr/share/wayland-sessions/cios-shell.desktop" << 'WSESSION'
+[Desktop Entry]
+Name=CIOS
+Comment=CIOS — AI-first desktop (Wayland)
+Exec=/usr/local/bin/cios-session
+Type=Application
+DesktopNames=CIOS
+WSESSION
+
+# Session script (launches compositor which launches CIOS runtime)
 cat > "${PKG_DIR}/usr/local/bin/cios-session" << 'SESSION'
 #!/bin/bash
-# CIOS X Session — optimized boot
-# Zero flicker. Splash with real progress. Crash recovery.
+# CIOS Wayland Session — compositor + runtime
+# The compositor (cios-shell) starts the CIOS Python runtime as a child process.
 
 export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
-export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+export PATH="/usr/bin:/usr/local/bin:/bin:/usr/sbin:/sbin:$PATH"
 export NO_AT_BRIDGE=1
 export GTK_A11Y=none
 
 LOGFILE="$HOME/.cios/session.log"
 mkdir -p "$HOME/.cios"
 
-echo "=== CIOS session starting $(date) ===" >> "$LOGFILE"
-
-# Set background IMMEDIATELY (prevents any flash)
-xsetroot -solid '#0a0a0f' 2>/dev/null || true
-xsetroot -cursor_name left_ptr 2>/dev/null || true
+echo "=== CIOS Wayland session starting $(date) ===" >> "$LOGFILE"
 
 # Find Python — try venv first, then system
 VENV="/usr/share/cios/.venv/bin/python3"
@@ -580,7 +609,7 @@ if [ ! -x "$VENV" ]; then
     echo "WARNING: venv not found, using system python: $VENV" >> "$LOGFILE"
 fi
 
-# Verify tkinter is accessible — if venv can't import it, fall back to system python
+# Verify tkinter is accessible
 if [ -x "/usr/share/cios/.venv/bin/python3" ]; then
     if ! /usr/share/cios/.venv/bin/python3 -c "import tkinter" 2>/dev/null; then
         echo "WARNING: tkinter not available in venv, falling back to system python" >> "$LOGFILE"
@@ -590,8 +619,6 @@ fi
 
 if [ -z "$VENV" ]; then
     echo "FATAL: No python3 found!" >> "$LOGFILE"
-    xterm -e "echo 'CIOS: python3 not found. Check installation.'; bash" &
-    wait
     exit 1
 fi
 
@@ -601,69 +628,38 @@ export PYTHONPATH="/usr/share/cios:${PYTHONPATH:-}"
 # Verify cios module is importable
 if ! $VENV -c "import cios" 2>/dev/null; then
     echo "FATAL: Cannot import cios module" >> "$LOGFILE"
-    echo "Python: $VENV" >> "$LOGFILE"
-    echo "PYTHONPATH: $PYTHONPATH" >> "$LOGFILE"
     $VENV -c "import cios" >> "$LOGFILE" 2>&1
-    xterm -e "echo 'CIOS: module not found. Run: sudo apt install -f'; tail -10 $LOGFILE; echo; bash" &
-    wait
     exit 1
 fi
 
-# Show splash BEFORE Openbox (user sees brand instantly)
-$VENV -m cios.ui.splash &
-SPLASH_PID=$!
-
-# Start Openbox in parallel
-OPENBOX_CONF="/etc/xdg/openbox-cios"
-if command -v openbox &>/dev/null; then
-    openbox --config-file "${OPENBOX_CONF}/rc.xml" &
-    echo "Openbox started (PID $!)" >> "$LOGFILE"
-else
-    echo "WARNING: openbox not found, trying without WM" >> "$LOGFILE"
-fi
-
-# Start CIOS (crash recovery loop)
+# ── Launch compositor ──
+# cios-shell starts the CIOS runtime as its child process (--runtime flag)
 CRASH_COUNT=0
 while true; do
-    echo "Starting CIOS at $(date)" >> "$LOGFILE"
-    $VENV -m cios.main >> "$LOGFILE" 2>&1
+    echo "Starting cios-shell at $(date)" >> "$LOGFILE"
+
+    # The compositor launches CIOS Python runtime internally via --runtime
+    /usr/bin/cios-shell --runtime "$VENV -m cios.main" >> "$LOGFILE" 2>&1
     EXIT_CODE=$?
-    echo "CIOS exited with code $EXIT_CODE at $(date)" >> "$LOGFILE"
 
-    kill $SPLASH_PID 2>/dev/null || true
+    echo "cios-shell exited with code $EXIT_CODE at $(date)" >> "$LOGFILE"
 
-    # Exit code 77 = tkinter not available, fall back to CLI in xterm
-    if [ $EXIT_CODE -eq 77 ]; then
-        echo "Tkinter not available, launching CLI in xterm" >> "$LOGFILE"
-        # Try to fix tkinter first
-        sudo apt-get install -y python3-tk 2>/dev/null || true
-        # If fix worked, retry GUI
-        if $VENV -c "import tkinter" 2>/dev/null; then
-            echo "python3-tk installed successfully, retrying GUI" >> "$LOGFILE"
-            continue
-        fi
-        # Otherwise launch CLI in terminal
-        xterm -fa "Monospace" -fs 11 -bg "#0a0a0f" -fg "#fafafa" \
-            -T "CIOS" -e "$VENV -m cios --cli" 2>/dev/null || \
-            x-terminal-emulator -e "$VENV -m cios --cli" 2>/dev/null || \
-            $VENV -m cios --cli
-        break
-    fi
-
+    # Clean exit
     if [ $EXIT_CODE -eq 0 ]; then
         break
     fi
 
     CRASH_COUNT=$((CRASH_COUNT + 1))
     if [ $CRASH_COUNT -ge 3 ]; then
-        echo "Too many crashes, opening terminal" >> "$LOGFILE"
-        xterm -e "echo 'CIOS crashed 3x. Check ~/.cios/session.log'; tail -30 $LOGFILE; echo; bash" &
-        wait
+        echo "Too many crashes ($CRASH_COUNT), giving up" >> "$LOGFILE"
+        # Fallback: try to open a terminal so user can debug
+        if command -v xterm &>/dev/null; then
+            xterm -e "echo 'CIOS crashed 3x. Check ~/.cios/session.log'; tail -30 $LOGFILE; echo; bash" &
+            wait
+        fi
         break
     fi
 
-    $VENV -m cios.ui.splash &
-    SPLASH_PID=$!
     sleep 1
 done
 
@@ -671,45 +667,13 @@ echo "=== Session ended $(date) ===" >> "$LOGFILE"
 SESSION
 chmod 755 "${PKG_DIR}/usr/local/bin/cios-session"
 
-# X session desktop entry
-cat > "${PKG_DIR}/usr/share/xsessions/cios.desktop" << 'XSESSION'
-[Desktop Entry]
-Name=CIOS
-Comment=AI-first desktop interface
-Exec=/usr/local/bin/cios-session
-Type=Application
-DesktopNames=CIOS
-XSESSION
-
-# Openbox config
-cp session/rc.xml "${PKG_DIR}/etc/xdg/openbox-cios/rc.xml"
-
-# Openbox autostart (fallback)
-cat > "${PKG_DIR}/etc/xdg/openbox-cios/autostart" << 'AUTOSTART'
-#!/bin/bash
-# Fallback autostart — used if session script doesn't handle it
-xsetroot -solid '#0a0a0f' 2>/dev/null || true
-export NO_AT_BRIDGE=1
-export GTK_A11Y=none
-export PYTHONPATH="/usr/share/cios:${PYTHONPATH:-}"
-VENV="/usr/share/cios/.venv/bin/python3"
-if [ ! -x "$VENV" ]; then
-    VENV="python3"
-elif ! $VENV -c "import tkinter" 2>/dev/null; then
-    VENV="python3"
-fi
-$VENV -m cios.ui.splash &
-$VENV -m cios.main &
-AUTOSTART
-chmod 755 "${PKG_DIR}/etc/xdg/openbox-cios/autostart"
-
 # ── LightDM config (bundled, applied only in full replacement mode) ──
 echo "→ Bundling LightDM configs..."
 
 cat > "${PKG_DIR}${INSTALL_DIR}/config/lightdm.conf" << 'LIGHTDM'
 [Seat:*]
 greeter-session=slick-greeter
-user-session=cios
+user-session=cios-shell
 greeter-hide-users=false
 allow-guest=false
 LIGHTDM

@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://github.com/damnhalfling/cios/releases"><img src="https://img.shields.io/github/v/release/damnhalfling/cios" alt="Release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/damnhalfling/cios" alt="License" /></a>
-  <img src="https://img.shields.io/badge/tests-468%20passing-brightgreen" alt="Tests" />
+  <img src="https://img.shields.io/badge/tests-398%20passing-brightgreen" alt="Tests" />
 </p>
 
 <p align="center">
@@ -281,7 +281,7 @@ In practice: if no LLM is available, all regex-matched intents (the vast majorit
 - ✅ Auto-learning engine
 - ✅ .deb installable package (session-only or full replacement mode)
 - ✅ Plymouth boot splash (logo on boot, no text)
-- ✅ 468 tests passing (including 13 property-based tests)
+- ✅ 398 tests passing (including 13 property-based tests)
 - ✅ Onboarding wizard
 - ✅ Conversational UX with 3-turn context
 - ✅ Project auto-creation ("work on project X" creates it if not found)
@@ -303,7 +303,7 @@ In practice: if no LLM is available, all regex-matched intents (the vast majorit
 ```
 User Input → Intent Parser → Classifier → MCO → Planner → Executor → Humanizer → UI
                   │              │          │       │          │            │
-            180+ Patterns    Cache +      MCP     26 Skills   Shell      Translates
+            170+ Patterns    Cache +      MCP     26 Skills   Shell      Translates
             (PT/EN)         LLM +       (live    + Auto-     Control    to human
                            Stemming     state)   Learner      │        language
                                                             Memory
@@ -312,7 +312,7 @@ User Input → Intent Parser → Classifier → MCO → Planner → Executor →
 <details>
 <summary><strong>Core components</strong></summary>
 
-- **Intent Parser** — 180+ regex patterns (PT/EN), hybrid LLM classifier with cache + stemming for natural language
+- **Intent Parser** — 170+ regex patterns (PT/EN), hybrid LLM classifier with cache + stemming for natural language
 - **Intent Classifier** — SQLite-cached LLM classifications, fuzzy matching with light PT stemming, auto-learning from successful executions
 - **MCP** — Live system state with reactive watchers (nmcli monitor, pactl subscribe) + adaptive polling (1s/5s/15s)
 - **MCO** — Decision layer: resolves from MCP state instantly when possible
@@ -321,7 +321,7 @@ User Input → Intent Parser → Classifier → MCO → Planner → Executor →
 - **Humanizer** — 220+ translations PT/EN, all technical output becomes plain language
 - **Model Router** — Ollama (local, default) with fallback support
 - **Memory** — SQLite store of intents, commands, and outcomes
-- **Error Recovery** — 17 error types classified with actionable suggestions (PT/EN)
+- **Error Recovery** — 19 error types classified with actionable suggestions (PT/EN)
 - **Bridge** — 3-turn conversation context, clarification, pronoun resolution, post-action validation
 - **Gallery Store** — SQLite persistence for favorites, albums, trash, face embeddings, duplicate cache
 - **Voice** — STT (whisper.cpp) + TTS (piper), both local and offline
