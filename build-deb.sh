@@ -20,6 +20,7 @@ rm -rf "${PKG_DIR}" "${PKG_DIR}.deb"
 
 # ── Build Wayland compositor ──
 echo "→ Building CIOS Shell (Wayland compositor)..."
+export PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
 if [ -d shell ]; then
     pushd shell > /dev/null
     rm -rf build

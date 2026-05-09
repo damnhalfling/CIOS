@@ -122,6 +122,8 @@ jobs:
           ninja -C build
           sudo ninja -C build install
           sudo ldconfig
+          # Verify wlroots is findable
+          pkg-config --modversion wlroots || { echo "wlroots.pc not found, searching..."; find /usr -name "wlroots.pc" 2>/dev/null; exit 1; }
 
       - name: Build .deb package
         run: bash build-deb.sh "${{ steps.version.outputs.VERSION }}"
