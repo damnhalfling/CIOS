@@ -104,6 +104,31 @@ static void handle_xdg_surface_destroy(struct wl_listener *listener, void *data)
 }
 
 /* ═══════════════════════════════════════════════════════════════
+ *  Deferred configure — fires 1ms after toplevel creation
+ * ═══════════════════════════════════════════════════════════════ */
+
+static int handle_deferred_configure(void *data) {
+    struct CiosSurface *surface = data;
+    struct CiosServer *server = surface->server;
+
+    if (!surface->xdg_toplevel) {
+        return 0;
+    }
+
+    int width = 640, height = 448;
+    if (server->primary_output) {
+        width = server->primary_output->usable_width;
+        height = server->primary_output->usable_height;
+    }
+
+    wlr_xdg_toplevel_set_size(surface->xdg_toplevel, width, height);
+    wlr_xdg_toplevel_set_activated(surface->xdg_toplevel, true);
+
+    surface->map_timer = NULL;
+    return 0;  /* Don't repeat */
+}
+
+/* ═══════════════════════════════════════════════════════════════
  *  New XDG toplevel handler
  * ═══════════════════════════════════════════════════════════════ */
 
@@ -154,11 +179,16 @@ static void handle_new_xdg_toplevel(struct wl_listener *listener, void *data) {
     surface->destroy.notify = handle_xdg_surface_destroy;
     wl_signal_add(&toplevel->base->events.destroy, &surface->destroy);
 
-    /* NOTE: Do NOT call wlr_xdg_toplevel_set_size() here!
-     * The xdg_surface is not yet initialized at this point and calling
-     * set_size causes a segfault in libwlroots (null pointer at offset 0x160).
-     * GTK4 will commit its first frame without needing an explicit configure
-     * from us — it uses its own default size and then we can resize on map. */
+    /* Schedule configure on next event loop iteration (1ms timer).
+     * Cannot call set_size directly here — xdg_surface is not yet initialized.
+     * But GTK4 needs a configure to know the window size before committing.
+     * The 1ms delay ensures the surface is initialized by the time we configure. */
+    surface->map_timer = wl_event_loop_add_timer(
+        wl_display_get_event_loop(server->display),
+        handle_deferred_configure, surface);
+    if (surface->map_timer) {
+        wl_event_source_timer_update(surface->map_timer, 1);
+    }
 
     LOG_INFO("new xdg toplevel: s_%u (pid: %d)", surface->id, pid);
 }
