@@ -61,8 +61,8 @@ Version: ${VERSION}
 Section: x11
 Priority: optional
 Architecture: amd64
-Depends: python3 (>= 3.10), python3-pip, python3-venv, python3-gi, gir1.2-gtk-4.0, xwayland, greetd, libxkbcommon0, libinput10, libseat1, seatd, libpixman-1-0, libdrm2, libgles2, libegl1, libgbm1, dmsetup, libcap2, plymouth, plymouth-themes, x11-xserver-utils, curl
-Recommends: pipewire-pulse | pulseaudio-utils, network-manager, i3lock, wl-clipboard
+Depends: python3 (>= 3.10), python3-pip, python3-venv, python3-gi, gir1.2-gtk-4.0, greetd, libxkbcommon0, libinput10, libseat1, seatd, libpixman-1-0, libdrm2, libgles2, libegl1, libgbm1, dmsetup, libcap2, plymouth, plymouth-themes, curl
+Recommends: xwayland, pipewire-pulse | pulseaudio-utils, network-manager, wl-clipboard
 Maintainer: damnhalfling <damnhalfling@github.com>
 Description: CIOS — AI-first desktop interface (Wayland)
  A AI-first layer that replaces apps with intent-driven
