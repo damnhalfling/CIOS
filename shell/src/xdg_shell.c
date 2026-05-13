@@ -153,7 +153,8 @@ static void handle_new_xdg_toplevel(struct wl_listener *listener, void *data) {
 
     /* Send initial configure to the toplevel — GTK4 won't render until it
      * receives this. Set size to usable area (fullscreen minus topbar).
-     * Must be done AFTER listeners are registered and surface is in the list. */
+     * wlr_xdg_toplevel_set_size triggers a configure automatically when
+     * the surface is ready — no need to call schedule_configure manually. */
     int width = 640, height = 448;  /* defaults */
     if (server->primary_output) {
         width = server->primary_output->usable_width;
@@ -161,7 +162,6 @@ static void handle_new_xdg_toplevel(struct wl_listener *listener, void *data) {
     }
     wlr_xdg_toplevel_set_size(toplevel, width, height);
     wlr_xdg_toplevel_set_activated(toplevel, true);
-    wlr_xdg_surface_schedule_configure(toplevel->base);
 
     LOG_INFO("new xdg toplevel: s_%u (pid: %d, configured %dx%d)", surface->id, pid, width, height);
 }

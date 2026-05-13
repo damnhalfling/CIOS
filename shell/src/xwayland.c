@@ -13,6 +13,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 
 #include <wayland-server-core.h>
@@ -249,12 +250,22 @@ static void handle_new_xwayland_surface(struct wl_listener *listener, void *data
 /*
  * Initialize XWayland — create wlr_xwayland instance, set DISPLAY env var,
  * and listen for new surface events.
+ *
+ * XWayland is optional — if the Xwayland binary is not installed or fails
+ * to start, the compositor continues without X11 app support.
  */
 void xwayland_init(struct CiosServer *server) {
+    /* Check if Xwayland binary exists before trying to create it */
+    if (access("/usr/bin/Xwayland", X_OK) != 0) {
+        LOG_INFO("Xwayland not installed, skipping X11 support");
+        server->xwayland = NULL;
+        return;
+    }
+
     server->xwayland = wlr_xwayland_create(server->display,
         server->compositor, false);
     if (!server->xwayland) {
-        LOG_ERROR("failed to create wlr_xwayland");
+        LOG_WARN("failed to create wlr_xwayland (X11 apps unavailable)");
         return;
     }
 
