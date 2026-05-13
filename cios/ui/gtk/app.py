@@ -231,6 +231,17 @@ class CIOSApplication(Gtk.Application):
 
         threading.Thread(target=init_bridge, daemon=True).start()
 
+        # Start IPC listener for compositor events (hotkey, logout)
+        from cios.ui.gtk.ipc_listener import IPCListener
+
+        self._ipc_listener = IPCListener(
+            on_hotkey=self._on_hotkey_triggered,
+            on_logout=self._on_logout_requested,
+        )
+        self._ipc_listener.start()
+
+        threading.Thread(target=init_bridge, daemon=True).start()
+
     def _on_bridge_ready(self):
         """Called when bridge is initialized."""
         self._input.set_sensitive(True)
@@ -248,6 +259,17 @@ class CIOSApplication(Gtk.Application):
         """Handle hotkey overlay submission."""
         self._input.set_text(text)
         self._on_submit()
+
+    def _on_hotkey_triggered(self):
+        """Called when Ctrl+Space is pressed (via compositor IPC)."""
+        if self._hotkey_overlay.get_visible():
+            self._hotkey_overlay.hide_overlay()
+        else:
+            self._hotkey_overlay.show_overlay()
+
+    def _on_logout_requested(self):
+        """Called when Super+Q is pressed (via compositor IPC)."""
+        self.quit()
 
     def _on_submit(self, *args):
         """Handle command submission."""
@@ -272,6 +294,13 @@ class CIOSApplication(Gtk.Application):
                     data = self._bridge.execute_command(text, confirmed=False)
                     result = data.get("result", "Concluído.")
                     status = data.get("status", "success")
+
+                    # Check if result contains gallery data
+                    gallery = data.get("gallery")
+                    if gallery:
+                        GLib.idle_add(self._show_gallery, gallery)
+                        GLib.idle_add(self._finish_execution)
+                        return
                 else:
                     result = "Sistema ainda inicializando…"
                     status = "error"
@@ -282,6 +311,13 @@ class CIOSApplication(Gtk.Application):
             GLib.idle_add(self._show_result, result, status)
 
         threading.Thread(target=execute, daemon=True).start()
+
+    def _finish_execution(self):
+        """Reset UI state after execution (no result to show)."""
+        self._input.set_sensitive(True)
+        self._input.grab_focus()
+        self._busy = False
+        self._thread_panel.refresh()
 
     def _show_result(self, result: str, status: str):
         """Display execution result."""
@@ -300,6 +336,45 @@ class CIOSApplication(Gtk.Application):
 
         # Refresh thread panel
         self._thread_panel.refresh()
+
+    def _show_gallery(self, gallery_data: dict):
+        """Display gallery grid in the feed area."""
+        from cios.ui.gtk.gallery import GalleryComponent
+
+        # Remove previous gallery if any
+        if hasattr(self, "_active_gallery") and self._active_gallery:
+            self._feed_box.remove(self._active_gallery)
+
+        self._active_gallery = GalleryComponent(
+            gallery_data=gallery_data,
+            on_image_click=self._open_image_viewer,
+        )
+        self._feed_box.append(self._active_gallery)
+        self._greeting.set_visible(False)
+        self._result_label.set_visible(False)
+
+    def _open_image_viewer(self, files: list, index: int):
+        """Open full-size image viewer."""
+        from cios.ui.gtk.image_viewer import ImageViewer
+
+        # Replace main content with viewer
+        if hasattr(self, "_active_viewer") and self._active_viewer:
+            return  # Already open
+
+        self._active_viewer = ImageViewer(
+            files=files,
+            start_index=index,
+            on_close=self._close_image_viewer,
+        )
+        self._stack.add_named(self._active_viewer, "viewer")
+        self._stack.set_visible_child_name("viewer")
+
+    def _close_image_viewer(self):
+        """Close image viewer and return to main."""
+        if hasattr(self, "_active_viewer") and self._active_viewer:
+            self._stack.remove(self._active_viewer)
+            self._active_viewer = None
+        self._stack.set_visible_child_name("main")
 
     def _send_ipc_ready(self):
         """Send 'ready' command to compositor via IPC socket to dismiss splash."""
@@ -328,7 +403,9 @@ class CIOSApplication(Gtk.Application):
 
     def _apply_css(self, win):
         """Apply application-wide CSS."""
+        from cios.ui.gtk.gallery import GalleryComponent as GalleryCSS
         from cios.ui.gtk.hotkey_overlay import HotkeyOverlay
+        from cios.ui.gtk.image_viewer import ImageViewer as ViewerCSS
         from cios.ui.gtk.sidebar import Sidebar
         from cios.ui.gtk.thread_panel import ThreadPanel
         from cios.ui.gtk.topbar import Topbar
@@ -394,6 +471,8 @@ class CIOSApplication(Gtk.Application):
             + Sidebar.get_css()
             + ThreadPanel.get_css()
             + HotkeyOverlay.get_css()
+            + GalleryCSS.get_css()
+            + ViewerCSS.get_css()
         )
         Gtk.StyleContext.add_provider_for_display(
             win.get_display(), css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
