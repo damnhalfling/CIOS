@@ -123,10 +123,17 @@ class CIOSGreeter(Gtk.Application):
         center_box.set_size_request(360, -1)
         overlay.add_overlay(center_box)
 
-        # Logo text (TODO: replace with actual logo image)
-        logo = Gtk.Label(label="CIOS")
-        logo.add_css_class("logo")
-        center_box.append(logo)
+        # Logo (PNG if available, fallback to text)
+        logo_path = "/usr/share/pixmaps/cios-logo.png"
+        if os.path.isfile(logo_path):
+            logo = Gtk.Image.new_from_file(logo_path)
+            logo.set_pixel_size(120)
+            logo.set_halign(Gtk.Align.CENTER)
+            center_box.append(logo)
+        else:
+            logo = Gtk.Label(label="CIOS")
+            logo.add_css_class("logo")
+            center_box.append(logo)
 
         subtitle = Gtk.Label(label="Intent-first computing")
         subtitle.add_css_class("subtitle")
@@ -321,9 +328,11 @@ class CIOSGreeter(Gtk.Application):
                 border: none;
                 box-shadow: none;
                 text-shadow: none;
+                min-width: 200px;
             }}
             .login-btn:hover {{
                 background: {ACCENT_LT};
+                color: white;
             }}
             .error-msg {{
                 color: {RED_ACCENT};

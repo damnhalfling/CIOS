@@ -347,6 +347,22 @@ GREETD
     # Ensure system boots to graphical target
     systemctl set-default graphical.target 2>/dev/null || true
 
+    # Customize /etc/os-release to show CIOS identity
+    if [ ! -f /etc/os-release.bak.cios ]; then
+        cp /etc/os-release /etc/os-release.bak.cios
+    fi
+    cat > /etc/os-release << 'OSREL'
+PRETTY_NAME="CIOS 1.1"
+NAME="CIOS"
+VERSION_ID="1.1"
+VERSION="1.1 (Wayland)"
+ID=cios
+ID_LIKE=debian
+HOME_URL="https://github.com/damnhalfling/CIOS"
+BUG_REPORT_URL="https://github.com/damnhalfling/CIOS/issues"
+OSREL
+    echo "[CIOS] ✓ /etc/os-release customized"
+
     # Ensure all non-root users are in video/render/input groups (DRM access)
     for user in $(awk -F: '$3 >= 1000 && $3 < 65000 {print $1}' /etc/passwd); do
         usermod -aG video,render,input "$user" 2>/dev/null || true

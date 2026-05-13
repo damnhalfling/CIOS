@@ -203,6 +203,13 @@ class CIOSApplication(Gtk.Application):
         examples.set_halign(Gtk.Align.START)
         box.append(examples)
 
+        # AI setup hint
+        ai_hint = Gtk.Label(label="💡 Para IA local, execute depois: sudo cios-setup-ai")
+        ai_hint.add_css_class("result")
+        ai_hint.set_halign(Gtk.Align.START)
+        ai_hint.set_margin_top(16)
+        box.append(ai_hint)
+
         btn = Gtk.Button(label="Iniciar CIOS")
         btn.add_css_class("send-btn")
         btn.set_halign(Gtk.Align.CENTER)
