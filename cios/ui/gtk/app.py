@@ -54,9 +54,6 @@ class CIOSApplication(Gtk.Application):
         # Apply CSS
         self._apply_css(self._win)
 
-        # Send IPC ready to dismiss compositor splash
-        self._send_ipc_ready()
-
         # Use a stack to switch between onboarding and main UI
         self._stack = Gtk.Stack()
         self._stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
@@ -75,6 +72,15 @@ class CIOSApplication(Gtk.Application):
         else:
             self._stack.set_visible_child_name("main")
             self._start_bridge()
+
+        # Start IPC listener early (dismisses compositor splash on connect)
+        from cios.ui.gtk.ipc_listener import IPCListener
+
+        self._ipc_listener = IPCListener(
+            on_hotkey=self._on_hotkey_triggered,
+            on_logout=self._on_logout_requested,
+        )
+        self._ipc_listener.start()
 
         self._win.present()
 
@@ -238,15 +244,6 @@ class CIOSApplication(Gtk.Application):
 
         threading.Thread(target=init_bridge, daemon=True).start()
 
-        # Start IPC listener for compositor events (hotkey, logout)
-        from cios.ui.gtk.ipc_listener import IPCListener
-
-        self._ipc_listener = IPCListener(
-            on_hotkey=self._on_hotkey_triggered,
-            on_logout=self._on_logout_requested,
-        )
-        self._ipc_listener.start()
-
         threading.Thread(target=init_bridge, daemon=True).start()
 
     def _on_bridge_ready(self):
@@ -254,8 +251,6 @@ class CIOSApplication(Gtk.Application):
         self._input.set_sensitive(True)
         self._input.grab_focus()
         self._thread_panel.set_bridge(self._bridge)
-        # Notify compositor that runtime is ready (removes splash overlay)
-        self._send_ipc_ready()
 
     def _on_suggestion(self, cmd: str):
         """Handle suggestion chip click."""
