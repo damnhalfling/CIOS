@@ -13,7 +13,8 @@ class Sidebar(Gtk.Box):
 
     def __init__(self, on_suggestion=None):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=16)
-        self.set_size_request(240, -1)
+        self.set_size_request(220, -1)
+        self.set_hexpand(False)
         self.add_css_class("sidebar")
         self.set_margin_top(16)
         self.set_margin_end(16)
