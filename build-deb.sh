@@ -173,14 +173,54 @@ fi
 chmod +x /usr/local/bin/cios-session 2>/dev/null || true
 echo "[CIOS] ✓ Python environment ready"
 
-# ── Heavy AI/voice components deferred to post-login ──
-# Ollama, Mistral model, Whisper, Piper are large downloads that block
-# installation. They are installed by /usr/local/bin/cios-setup-ai which
-# runs automatically on first login (with sudo) or can be triggered manually.
-echo "[CIOS] ✓ AI components will be installed on first login (cios-setup-ai)"
+# ── Install Ollama + Mistral (with progress feedback) ──
+echo ""
+echo "┌─────────────────────────────────────────────┐"
+echo "│  Instalando IA local (Ollama + Mistral)      │"
+echo "│  Isso pode levar 10-30 minutos.              │"
+echo "│  Não interrompa a instalação.                 │"
+echo "└─────────────────────────────────────────────┘"
+echo ""
 
-echo "[CIOS] ✓ Voice setup deferred to first login"
+# Install Ollama
+if ! command -v ollama &>/dev/null; then
+    echo "[CIOS] [1/2] Baixando Ollama..."
+    if curl -fsSL https://ollama.com/install.sh | sh; then
+        echo "[CIOS] ✓ Ollama instalado"
+    else
+        echo "[CIOS] ⚠ Falha ao instalar Ollama. Execute depois: curl -fsSL https://ollama.com/install.sh | sh"
+    fi
+else
+    echo "[CIOS] ✓ Ollama já instalado"
+fi
 
+# Pull Mistral model (with progress — ollama pull shows download %)
+if command -v ollama &>/dev/null; then
+    echo "[CIOS] [2/2] Baixando modelo Mistral (~4GB)..."
+    echo "[CIOS]       O progresso aparece abaixo:"
+    echo ""
+
+    # Start ollama serve temporarily
+    ollama serve &>/dev/null &
+    OLLAMA_PID=$!
+    sleep 3
+
+    # Pull with visible progress (ollama pull shows % in real-time)
+    if ollama pull mistral; then
+        echo ""
+        echo "[CIOS] ✓ Modelo Mistral instalado"
+    else
+        echo ""
+        echo "[CIOS] ⚠ Falha ao baixar Mistral. Execute depois: ollama pull mistral"
+    fi
+
+    kill $OLLAMA_PID 2>/dev/null || true
+else
+    echo "[CIOS] ⚠ Ollama não disponível, modelo não baixado"
+fi
+
+echo ""
+echo "[CIOS] ✓ IA local configurada"
 echo ""
 
 # ── Installation mode ──
