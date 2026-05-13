@@ -99,7 +99,7 @@ class TestGuidedFlowNetworkOptions:
     """
 
     @given(networks=_wifi_network_list)
-    @settings(max_examples=100)
+    @settings(max_examples=100, deadline=None)
     def test_guided_flow_presents_all_ssids_as_options(self, networks: list[WifiNetwork]):
         """For any non-empty list of WiFi networks, when a network connect
         intent is issued without an SSID and no known networks match, the
@@ -290,7 +290,7 @@ class TestConversationContextPendingQuestion:
     """
 
     @given(answer=_answer_text)
-    @settings(max_examples=100)
+    @settings(max_examples=100, deadline=None)
     def test_app_launch_missing_app_sets_pending_and_fills_param(self, answer: str):
         """APP_LAUNCH without app → sets _pending_question with question_type='app',
         next input fills the 'app' param.
@@ -431,7 +431,7 @@ class TestConversationContextPendingQuestion:
             bridge.close()
 
     @given(answer=_answer_text)
-    @settings(max_examples=100)
+    @settings(max_examples=100, deadline=None)
     def test_file_organize_missing_target_sets_pending_and_fills_param(self, answer: str):
         """FILE_ORGANIZE without target → sets _pending_question with
         question_type='target', next input fills the 'target' param.

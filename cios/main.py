@@ -33,20 +33,15 @@ def main() -> None:
 
     # Onboarding check (first run)
     if "--setup" in sys.argv:
-        from cios.ui.onboarding import run_onboarding
+        from cios.ui.gtk.onboarding import run_onboarding
 
         run_onboarding()
         return
 
     # Check if first run (no --cli, --daemon, etc.)
     if not any(arg.startswith("--") for arg in sys.argv[1:]):
-        from cios.ui.onboarding import needs_onboarding
-
-        if needs_onboarding():
-            from cios.ui.onboarding import run_onboarding
-
-            if not run_onboarding():
-                return
+        # Onboarding check is handled in the GUI section below
+        pass
 
     # Daemon mode
     if "--daemon" in sys.argv or "-d" in sys.argv:
@@ -91,21 +86,31 @@ def main() -> None:
             sys.exit(1)
         return
 
-    # Native Tkinter GUI (default)
+    # Native GUI (default) — try GTK4 first (Wayland-native), fallback to Tkinter
     try:
-        import tkinter  # noqa: F401 — test availability
+        import gi
 
-        from cios.ui.gui import run_gui
+        gi.require_version("Gtk", "4.0")
+        from gi.repository import Gtk  # noqa: F401 — test availability
+
+        # GTK4 available — use Wayland-native UI
+        from cios.ui.gtk.app import run_gui
 
         run_gui()
-    except ImportError:
-        logging.error("Tkinter not available. Install with: sudo apt install python3-tk")
-        # Exit with special code 77 so session script knows it's a tkinter issue
-        sys.exit(77)
+    except (ImportError, ValueError):
+        # GTK4 not available — try Tkinter (X11)
+        try:
+            import tkinter  # noqa: F401
+
+            from cios.ui.gui import run_gui as run_gui_tk
+
+            run_gui_tk()
+        except ImportError:
+            logging.error("No GUI toolkit available (need python3-gi or python3-tk)")
+            sys.exit(77)
     except Exception as e:
         logging.exception("Fatal error in GUI mode")
         print(f"\n[FATAL] {e}", file=sys.stderr)
-        sys.exit(1)
         sys.exit(1)
 
 

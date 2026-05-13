@@ -49,6 +49,7 @@ shell_sources = files(
   'src/input.c',
   'src/hotkeys.c',
   'src/xwayland.c',
+  'src/xdg_shell.c',
   'src/layer_shell.c',
   'src/process.c',
   'src/ipc.c',

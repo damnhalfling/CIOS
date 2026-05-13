@@ -1,7 +1,7 @@
 # CIOS — Roadmap
 
 > Substituindo apps por intenção.
-> Atualizado: Maio 2026 — v1.1.0-rc3
+> Atualizado: Maio 2026 — v1.1.0-rc5
 
 ---
 
@@ -103,7 +103,11 @@ Se não for 100% confiável → fluxo guiado. Se for confiável → automático.
 | Intelligence Client (P4) | Client no OS que consome api.harmoni-ia.com | AGORA |
 | Módulo de Voz (P6) | STT/TTS como I/O agnóstico (mic → texto → pipeline → TTS) | Após P4 |
 | ~~Wayland compositor~~ | ~~Compositor próprio (wlroots-based)~~ | ✅ CONCLUÍDO |
-| Distribuição | 1-liner, AppImage, distro própria | Quando tiver impacto |
+| ~~Distribuição base~~ | ~~greetd + Plymouth + .deb funcional~~ | ✅ CONCLUÍDO |
+| Greeter gráfico | Trocar agreety por greeter Wayland visual | Próximo |
+| ISO própria | Live-build com instalador CIOS | Após greeter |
+| First-boot wizard | "Bem-vindo ao CIOS" + config inicial | Após ISO |
+| Update mechanism | "CIOS 1.2 disponível" na UI | Após wizard |
 
 ---
 
@@ -118,17 +122,25 @@ Se não for 100% confiável → fluxo guiado. Se for confiável → automático.
 - Hotkey global → layer-shell protocol
 - Tkinter → continua via XWayland
 - XWayland habilitado para apps legados (browser, editor, terminal)
+- LightDM → **greetd** (display manager Wayland-native)
+- Libs bundled em `/usr/lib/cios/` via RPATH (sem conflito com sistema)
+- Plymouth boot splash funcional
+- Instalação limpa via .deb (sem downloads pesados)
+- Componentes de IA deferidos para pós-login (`sudo cios-setup-ai`)
+
+**Stack de sessão:**
+```
+GRUB (0s) → Plymouth → greetd (login) → cios-session → cios-shell (Wayland)
+```
 
 **O que NÃO mudou (zero impacto):**
 - Skills core (nmcli, pactl, apt, bluetoothctl, psutil)
 - MCP, planner, intent parser, humanizer, memory
 - Toda a camada cognitiva
 
-**Estimativa:** ~2-4 semanas de trabalho focado. Acoplamento X11 é localizado (UI + 3 skills).
-
 ---
 
-## Números (v1.1.0-rc3)
+## Números (v1.1.0-rc5)
 
 | Métrica | Valor |
 |---------|-------|
@@ -136,11 +148,14 @@ Se não for 100% confiável → fluxo guiado. Se for confiável → automático.
 | Intent patterns | 171 (PT/EN) |
 | Traduções humanizer | 230+ (PT/EN) |
 | Tipos de erro | 19 |
-| Testes | 398 |
+| Testes | 615 |
 | Property tests (Hypothesis) | 22 |
 | Modos de execução | 6 |
 | Itens concluídos | 175+ |
 | Compositor | cios-shell (wlroots 0.18, C) |
+| Display Manager | greetd + agreety |
+| Boot splash | Plymouth (tema custom) |
+| Libs bundled | ~40 (via ldd, RPATH isolado) |
 
 ---
 
@@ -168,4 +183,4 @@ Ver `docs/BRANCHING.md` para detalhes.
 
 ---
 
-*Atualizado: Maio 2026 — v1.1.0-rc3*
+*Atualizado: Maio 2026 — v1.1.0-rc5*

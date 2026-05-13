@@ -55,6 +55,14 @@ if [ ! -f "$DEB_FILE" ]; then
     exit 1
 fi
 
+# Move .deb to /tmp if in a restricted directory (avoids apt _apt user warning)
+if ! sudo -u _apt test -r "$DEB_FILE" 2>/dev/null; then
+    TMP_DEB="/tmp/$(basename "$DEB_FILE")"
+    cp "$DEB_FILE" "$TMP_DEB"
+    chmod 644 "$TMP_DEB"
+    DEB_FILE="$TMP_DEB"
+fi
+
 # ══════════════════════════════════════════════════════════════
 #  INSTALLATION MODE SELECTION
 # ══════════════════════════════════════════════════════════════

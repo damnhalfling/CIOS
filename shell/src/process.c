@@ -79,6 +79,8 @@ static pid_t do_spawn(char **argv) {
          * are inherited. We explicitly set CIOS_SHELL=1 to signal the
          * runtime that it's running under the shell. */
         setenv("CIOS_SHELL", "1", 1);
+        /* Force GTK4 to use Wayland backend (not X11 via DISPLAY) */
+        setenv("GDK_BACKEND", "wayland", 1);
 
         /* Execute the runtime command */
         execvp(argv[0], argv);

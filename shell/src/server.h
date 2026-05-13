@@ -13,6 +13,7 @@
 #include <wlr/xwayland.h>
 #include <wlr/types/wlr_seat.h>
 #include <wlr/types/wlr_layer_shell_v1.h>
+#include <wlr/types/wlr_xdg_shell.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <time.h>
@@ -40,6 +41,7 @@ struct CiosServer {
     struct wlr_xwayland *xwayland;
     struct wlr_seat *seat;
     struct wlr_layer_shell_v1 *layer_shell;
+    struct wlr_xdg_shell *xdg_shell;
 
     /* Scene layers (z-order: bg < bottom < normal < top < overlay) */
     struct wlr_scene_tree *layer_bg;
@@ -75,6 +77,7 @@ struct CiosServer {
     struct wl_listener new_output;
     struct wl_listener new_xwayland_surface;
     struct wl_listener new_layer_surface;
+    struct wl_listener new_xdg_toplevel;
     struct wl_listener new_input;
     struct wl_listener cursor_motion;
     struct wl_listener cursor_motion_absolute;
@@ -90,6 +93,7 @@ struct CiosSurface {
     struct wl_list link;           /* CiosServer::surfaces */
     struct CiosServer *server;
     struct wlr_xwayland_surface *xsurface;
+    struct wlr_xdg_toplevel *xdg_toplevel;
     struct wlr_scene_tree *scene_tree;
     uint32_t id;                   /* opaque surface ID (s_1, s_2, ...) */
     struct wlr_scene_tree *layer;  /* which layer tree it belongs to */
@@ -183,6 +187,10 @@ void input_init(struct CiosServer *server);
 
 /* xwayland.c */
 void xwayland_init(struct CiosServer *server);
+
+/* xdg_shell.c */
+void xdg_shell_init(struct CiosServer *server);
+void server_focus_xdg_surface(struct CiosServer *server, struct CiosSurface *surface);
 
 /* layer_shell.c */
 void layer_shell_init(struct CiosServer *server);

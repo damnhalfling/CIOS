@@ -1,6 +1,6 @@
 # CIOS — TODO
 
-> Atualizado: Maio 2026 — v1.1.0-rc3
+> Atualizado: Maio 2026 — v1.1.0-rc5
 
 ---
 
@@ -97,6 +97,33 @@
 | 280 | Criação automática no login (session script) | ✅ |
 | 281 | Criação via ensure_dirs() no boot do CIOS | ✅ |
 | 282 | user-dirs.dirs config (freedesktop spec) | ✅ |
+
+---
+
+## 🟡 EM ANDAMENTO — Distribuição (Distro Boot)
+
+### Stack de sessão ✅
+| # | Task | Status |
+|---|------|--------|
+| 500 | Compositor Wayland (cios-shell, wlroots 0.18) | ✅ |
+| 501 | greetd como display manager (Wayland-native) | ✅ |
+| 502 | Plymouth boot splash (tema CIOS) | ✅ |
+| 503 | GRUB invisível (0s timeout, silent boot) | ✅ |
+| 504 | Libs bundled via ldd + RPATH (sem conflito sistema) | ✅ |
+| 505 | seatd para acesso DRM/input | ✅ |
+| 506 | Instalação .deb sem downloads pesados | ✅ |
+| 507 | cios-setup-ai (Ollama/Mistral/Whisper pós-login) | ✅ |
+
+### Pendente
+| # | Task | Prioridade |
+|---|------|-----------|
+| 510 | Greeter gráfico (trocar agreety por Wayland visual) | Alta |
+| 511 | /etc/os-release customizado ("CIOS" não "Debian") | Média |
+| 512 | First-boot wizard ("Bem-vindo ao CIOS") | Média |
+| 513 | Update mechanism na UI | Média |
+| 514 | ISO de instalação própria (live-build) | Alta |
+| 515 | Recovery mode no GRUB | Baixa |
+| 516 | Esconder terminal do usuário comum | Baixa |
 
 ---
 
@@ -271,7 +298,7 @@ API em produção: `https://api.cios-ia.com/` (Maestro v2.33.0).
 
 | # | Task | Tipo | Fase |
 |---|------|------|------|
-| 360 | Compositor wlroots-based mínimo | Infra | 3 |
+| 360 | Compositor wlroots-based mínimo | Infra | ✅ |
 | 361 | Window placement por intenção (não por drag) | UX | 3 |
 | 362 | Overlays nativos (sem hack X11) | UI | 3 |
 | 363 | Transições controladas pelo sistema (não pelo WM) | UX | 3 |

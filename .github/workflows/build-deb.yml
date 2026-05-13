@@ -99,7 +99,8 @@ jobs:
             libxcb-xinput-dev libxcb-dri3-dev libxcb-present-dev \
             libxcb-res0-dev libxcb-shm0-dev hwdata libxcb-ewmh-dev \
             libffi-dev libxml2-dev libexpat1-dev \
-            libegl1-mesa-dev libgles2-mesa-dev libcairo2-dev
+            libegl1-mesa-dev libgles2-mesa-dev libcairo2-dev \
+            patchelf
           # Install newer Meson (wlroots 0.18 requires c23 support → Meson 1.5+)
           pip install meson>=1.5.0
           # These may not be in default repos — install if available
@@ -113,6 +114,34 @@ jobs:
           ninja -C build
           sudo ninja -C build install
           sudo ldconfig
+
+      - name: Build and install libdisplay-info
+        run: |
+          if ! pkg-config --exists libdisplay-info; then
+            echo "Building libdisplay-info from source..."
+            git clone --depth=1 --branch 0.2.0 https://gitlab.freedesktop.org/emersion/libdisplay-info.git /tmp/libdisplay-info
+            cd /tmp/libdisplay-info
+            meson setup build --prefix=/usr --libdir=lib/x86_64-linux-gnu
+            ninja -C build
+            sudo ninja -C build install
+            sudo ldconfig
+          else
+            echo "libdisplay-info already available via apt"
+          fi
+
+      - name: Build and install libliftoff
+        run: |
+          if ! pkg-config --exists libliftoff; then
+            echo "Building libliftoff from source..."
+            git clone --depth=1 --branch v0.5.0 https://gitlab.freedesktop.org/emersion/libliftoff.git /tmp/libliftoff
+            cd /tmp/libliftoff
+            meson setup build --prefix=/usr --libdir=lib/x86_64-linux-gnu
+            ninja -C build
+            sudo ninja -C build install
+            sudo ldconfig
+          else
+            echo "libliftoff already available via apt"
+          fi
 
       - name: Build and install wlroots 0.18.1
         run: |

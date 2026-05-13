@@ -25,6 +25,7 @@
 #include <wlr/types/wlr_seat.h>
 #include <wlr/types/wlr_subcompositor.h>
 #include <wlr/types/wlr_xcursor_manager.h>
+#include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/xwayland.h>
 
 #include "log.h"
@@ -204,6 +205,12 @@ bool server_init(struct CiosServer *server) {
      * Requirements: 5.1, 5.2, 10.4
      */
     layer_shell_init(server);
+
+    /*
+     * Initialize XDG shell — registers xdg-shell protocol for native
+     * Wayland clients (GTK4, Qt6, etc.) to create windows.
+     */
+    xdg_shell_init(server);
 
     /*
      * Start the backend — begins listening for DRM/KMS events,
