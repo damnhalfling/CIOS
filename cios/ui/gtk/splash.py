@@ -50,7 +50,7 @@ def show_splash() -> None:
         win = Gtk.ApplicationWindow(application=app)
         win.set_title("CIOS")
         win.set_decorated(False)
-        win.fullscreen()
+        win.set_default_size(4096, 4096)
 
         # Main container
         overlay = Gtk.Overlay()

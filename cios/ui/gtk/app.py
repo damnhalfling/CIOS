@@ -52,7 +52,8 @@ class CIOSApplication(Gtk.Application):
 
         self._win = Gtk.ApplicationWindow(application=self)
         self._win.set_title("CIOS")
-        self._win.fullscreen()
+        self._win.set_decorated(False)
+        self._win.set_default_size(4096, 4096)
 
         # Apply CSS
         self._apply_css(self._win)

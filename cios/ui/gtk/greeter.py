@@ -99,7 +99,7 @@ class CIOSGreeter(Gtk.Application):
         win = Gtk.ApplicationWindow(application=self)
         win.set_title("CIOS")
         win.set_decorated(False)
-        win.fullscreen()
+        win.set_default_size(4096, 4096)
 
         # Apply CSS
         self._apply_css(win)
