@@ -47,6 +47,9 @@ class CIOSApplication(Gtk.Application):
     def do_activate(self):
         from cios.ui.gtk.onboarding import needs_onboarding
 
+        # Keep app alive even if GTK thinks there's no work
+        self.hold()
+
         self._win = Gtk.ApplicationWindow(application=self)
         self._win.set_title("CIOS")
         self._win.fullscreen()
