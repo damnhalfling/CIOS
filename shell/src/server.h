@@ -68,6 +68,7 @@ struct CiosServer {
     bool splash_active;                /* true until runtime sends "ready" */
     struct wlr_scene_rect *splash_overlay; /* overlay rect covering screen during boot */
     struct wl_event_source *splash_timer;  /* 200ms fade timer */
+    struct wl_event_source *splash_safety_timer; /* 5s safety timeout */
 
     /* Subsystems */
     struct CiosProcess *proc_runtime;

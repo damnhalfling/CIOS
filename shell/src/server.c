@@ -39,6 +39,19 @@ static const float bg_color[4] = {
     1.0f,
 };
 
+/**
+ * Safety timeout: if runtime never sends "ready", remove splash after 5s.
+ * Prevents permanent black screen if the runtime crashes during startup.
+ */
+static int splash_safety_timeout_cb(void *data) {
+    struct CiosServer *server = data;
+    if (server->splash_active) {
+        LOG_WARN("splash safety timeout — runtime did not send ready in 5s, removing splash");
+        server_begin_splash_fade(server);
+    }
+    return 0;
+}
+
 bool server_init(struct CiosServer *server) {
     struct wl_display *display = server->display;
 
@@ -144,17 +157,37 @@ bool server_init(struct CiosServer *server) {
      * runtime sends the "ready" command. The splash is the same #0a0a0f
      * color as the background — a seamless dark screen.
      *
+     * Skip splash for greeter sessions — the greeter IS the first visible
+     * thing, no need to hide it behind a splash overlay.
+     *
      * Requirements: 7.2 (splash as first frame), 7.3 (fade on ready)
      */
-    server->splash_active = true;
+    bool is_greeter = (strstr(server->runtime_cmd, "greeter") != NULL);
+    server->splash_active = !is_greeter;
     server->splash_timer = NULL;
-    server->splash_overlay = wlr_scene_rect_create(
-        server->layer_overlay, 8192, 8192, bg_color);
-    if (!server->splash_overlay) {
-        LOG_WARN("failed to create splash overlay rect");
-        server->splash_active = false;
+    server->splash_safety_timer = NULL;
+
+    if (server->splash_active) {
+        server->splash_overlay = wlr_scene_rect_create(
+            server->layer_overlay, 8192, 8192, bg_color);
+        if (!server->splash_overlay) {
+            LOG_WARN("failed to create splash overlay rect");
+            server->splash_active = false;
+        } else {
+            LOG_INFO("splash overlay active — waiting for runtime ready");
+
+            /* Safety timeout: if runtime never sends "ready" (crash, hang),
+             * remove splash after 5 seconds so the user isn't stuck on black screen */
+            struct wl_event_loop *loop = wl_display_get_event_loop(display);
+            server->splash_safety_timer = wl_event_loop_add_timer(
+                loop, splash_safety_timeout_cb, server);
+            if (server->splash_safety_timer) {
+                wl_event_source_timer_update(server->splash_safety_timer, 5000);
+            }
+        }
     } else {
-        LOG_INFO("splash overlay active — waiting for runtime ready");
+        server->splash_overlay = NULL;
+        LOG_INFO("greeter mode — splash disabled");
     }
 
     /*
@@ -279,6 +312,10 @@ void server_destroy(struct CiosServer *server) {
     if (server->splash_timer) {
         wl_event_source_remove(server->splash_timer);
         server->splash_timer = NULL;
+    }
+    if (server->splash_safety_timer) {
+        wl_event_source_remove(server->splash_safety_timer);
+        server->splash_safety_timer = NULL;
     }
 
     /*
@@ -419,6 +456,12 @@ void server_begin_splash_fade(struct CiosServer *server) {
         return;
     }
 
+    /* Cancel safety timer since ready was received */
+    if (server->splash_safety_timer) {
+        wl_event_source_remove(server->splash_safety_timer);
+        server->splash_safety_timer = NULL;
+    }
+
     LOG_INFO("starting splash fade (200ms)");
 
     struct wl_event_loop *loop = wl_display_get_event_loop(server->display);
@@ -438,18 +481,13 @@ void server_begin_splash_fade(struct CiosServer *server) {
 }
 
 /**
- * Reveal all surfaces that were hidden during the boot splash.
- * Iterates the surfaces list and enables their scene tree nodes.
+ * Reveal all surfaces after the boot splash.
+ * Since surfaces are no longer hidden during splash (the overlay covers
+ * them visually), this function just logs completion.
  *
  * Requirements: 7.3
  */
 void server_reveal_surfaces(struct CiosServer *server) {
-    struct CiosSurface *surface;
-    wl_list_for_each(surface, &server->surfaces, link) {
-        if (surface->scene_tree) {
-            wlr_scene_node_set_enabled(&surface->scene_tree->node, true);
-            surface->visible = true;
-        }
-    }
-    LOG_INFO("all surfaces revealed after splash fade");
+    (void)server;
+    LOG_INFO("splash removed — surfaces now visible");
 }

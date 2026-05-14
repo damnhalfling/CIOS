@@ -20,7 +20,7 @@ import sys
 import gi
 
 gi.require_version("Gtk", "4.0")
-from gi.repository import Gtk  # noqa: E402
+from gi.repository import GLib, Gtk  # noqa: E402
 
 # ═══════════════════════════════════════════════════════════════
 #  greetd IPC protocol
@@ -104,17 +104,21 @@ class CIOSGreeter(Gtk.Application):
         # Apply CSS
         self._apply_css(win)
 
-        # Dismiss compositor splash overlay
-        self._send_compositor_ready()
-
         # Main overlay (for gradient corners)
         overlay = Gtk.Overlay()
         win.set_child(overlay)
 
-        # Background with gradient corners (Cairo)
-        bg_area = Gtk.DrawingArea()
-        bg_area.set_draw_func(self._draw_background, None)
-        overlay.set_child(bg_area)
+        # Background — try Cairo gradients, fallback to solid color via CSS
+        try:
+            import cairo  # noqa: F401 — test availability
+
+            bg_area = Gtk.DrawingArea()
+            bg_area.set_draw_func(self._draw_background, None)
+            overlay.set_child(bg_area)
+        except ImportError:
+            # pycairo not available — use solid background (CSS handles it)
+            bg_area = Gtk.Box()
+            overlay.set_child(bg_area)
 
         # Center login box
         center_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24)
@@ -176,6 +180,17 @@ class CIOSGreeter(Gtk.Application):
 
         win.present()
 
+        # Dismiss compositor splash overlay.
+        # Send ready immediately (surface may already be committed by GTK
+        # after present()), and also after a short delay as fallback.
+        self._send_compositor_ready()
+        GLib.timeout_add(300, self._dismiss_splash)
+
+    def _dismiss_splash(self):
+        """Send ready signal to compositor after window is mapped."""
+        self._send_compositor_ready()
+        return False  # one-shot timer
+
     def _on_username_activate(self, entry):
         """Tab to password when Enter pressed on username."""
         self._password_entry.grab_focus()
@@ -235,7 +250,11 @@ class CIOSGreeter(Gtk.Application):
 
     def _send_compositor_ready(self):
         """Send 'ready' to compositor to dismiss splash overlay."""
-        runtime_dir = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+        runtime_dir = os.environ.get("XDG_RUNTIME_DIR")
+        if not runtime_dir:
+            runtime_dir = f"/run/user/{os.getuid()}"
+            # Ensure directory exists for greeter user
+            os.makedirs(runtime_dir, mode=0o700, exist_ok=True)
         sock_path = os.path.join(runtime_dir, "cios-shell.sock")
         try:
             s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -368,8 +387,15 @@ def run_greeter():
         print("ERROR: GREETD_SOCK not set. Must be launched by greetd.", file=sys.stderr)
         sys.exit(1)
 
-    app = CIOSGreeter()
-    app.run(None)
+    try:
+        app = CIOSGreeter()
+        app.run(None)
+    except Exception as e:
+        print(f"GREETER FATAL: {e}", file=sys.stderr)
+        import traceback
+
+        traceback.print_exc(file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -46,13 +46,10 @@ static void handle_xdg_surface_map(struct wl_listener *listener, void *data) {
             server->primary_output->usable_y);
     }
 
-    /* If splash is active, hide until ready */
-    if (server->splash_active) {
-        wlr_scene_node_set_enabled(&surface->scene_tree->node, false);
-        surface->visible = false;
-    } else {
-        surface->visible = true;
-    }
+    /* Always visible — the splash overlay (OVERLAY layer) covers the screen
+     * visually during boot. No need to disable individual surface nodes.
+     * This prevents race conditions where surfaces map after reveal. */
+    surface->visible = true;
 
     /* Focus this surface */
     server_focus_xdg_surface(server, surface);
@@ -154,9 +151,17 @@ static void handle_new_xdg_toplevel(struct wl_listener *listener, void *data) {
     surface->destroy.notify = handle_xdg_surface_destroy;
     wl_signal_add(&toplevel->base->events.destroy, &surface->destroy);
 
-    /* Do NOT send configure here — xdg_surface is not initialized yet.
-     * GTK4 with fullscreen() will commit its first frame at its own size.
-     * We resize to usable_area in the map handler (when surface is ready). */
+    /* Send initial configure to tell the client what size to use.
+     * Without this, GTK4 Wayland clients wait indefinitely for a configure
+     * before committing their first frame (deadlock). */
+    if (server->primary_output) {
+        wlr_xdg_toplevel_set_size(toplevel,
+            server->primary_output->usable_width,
+            server->primary_output->usable_height);
+    } else {
+        /* No output yet — send 0,0 which means "use your preferred size" */
+        wlr_xdg_toplevel_set_size(toplevel, 0, 0);
+    }
 
     LOG_INFO("new xdg toplevel: s_%u (pid: %d)", surface->id, pid);
 }

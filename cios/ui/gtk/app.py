@@ -248,8 +248,6 @@ class CIOSApplication(Gtk.Application):
 
         threading.Thread(target=init_bridge, daemon=True).start()
 
-        threading.Thread(target=init_bridge, daemon=True).start()
-
     def _on_bridge_ready(self):
         """Called when bridge is initialized."""
         self._input.set_sensitive(True)
@@ -301,6 +299,11 @@ class CIOSApplication(Gtk.Application):
                     result = data.get("result", "Concluído.")
                     status = data.get("status", "success")
 
+                    # Check if password is needed — show masked dialog
+                    if data.get("password_prompt"):
+                        GLib.idle_add(self._show_password_dialog, result)
+                        return
+
                     # Check if result contains gallery data
                     gallery = data.get("gallery")
                     if gallery:
@@ -324,6 +327,129 @@ class CIOSApplication(Gtk.Application):
         self._input.grab_focus()
         self._busy = False
         self._thread_panel.refresh()
+
+    def _show_password_dialog(self, prompt_text: str):
+        """Show a modal password dialog with masked input."""
+        dialog = Gtk.Window(transient_for=self._win, modal=True)
+        dialog.set_title("Autenticação")
+        dialog.set_default_size(380, -1)
+        dialog.set_decorated(False)
+
+        # Apply dark styling
+        css = Gtk.CssProvider()
+        css.load_from_string("""
+            .password-dialog {
+                background-color: #161b24;
+                border: 1px solid #1f2937;
+                border-radius: 12px;
+                padding: 24px;
+            }
+            .password-label {
+                color: #e5e7eb;
+                font-size: 14px;
+                margin-bottom: 12px;
+            }
+            .password-entry {
+                background: #0b0f14;
+                color: #e5e7eb;
+                border: 1px solid #1f2937;
+                border-radius: 8px;
+                padding: 12px 16px;
+                font-size: 15px;
+                min-height: 20px;
+            }
+            .password-entry:focus {
+                border-color: #a78bfa;
+            }
+            .password-btn {
+                background: #7c3aed;
+                color: white;
+                border-radius: 8px;
+                padding: 10px 24px;
+                font-size: 14px;
+                font-weight: bold;
+                border: none;
+                margin-top: 12px;
+            }
+            .password-cancel {
+                background: transparent;
+                color: #6b7280;
+                border: 1px solid #1f2937;
+                border-radius: 8px;
+                padding: 10px 24px;
+                font-size: 14px;
+                margin-top: 12px;
+            }
+        """)
+        Gtk.StyleContext.add_provider_for_display(
+            dialog.get_display(), css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        box.add_css_class("password-dialog")
+        dialog.set_child(box)
+
+        # Prompt label
+        label = Gtk.Label(label=prompt_text)
+        label.add_css_class("password-label")
+        label.set_wrap(True)
+        label.set_halign(Gtk.Align.START)
+        box.append(label)
+
+        # Password entry (masked)
+        entry = Gtk.Entry()
+        entry.set_visibility(False)  # ← masked with dots
+        entry.set_placeholder_text("Senha")
+        entry.add_css_class("password-entry")
+        box.append(entry)
+
+        # Buttons
+        btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        btn_box.set_halign(Gtk.Align.END)
+        box.append(btn_box)
+
+        cancel_btn = Gtk.Button(label="Cancelar")
+        cancel_btn.add_css_class("password-cancel")
+        btn_box.append(cancel_btn)
+
+        ok_btn = Gtk.Button(label="Confirmar")
+        ok_btn.add_css_class("password-btn")
+        btn_box.append(ok_btn)
+
+        def on_submit(*args):
+            password = entry.get_text()
+            dialog.close()
+            if password:
+                # Send password to bridge in background
+                self._result_label.set_label("⟳ Executando…")
+                self._result_label.set_visible(True)
+                self._result_label.add_css_class("processing")
+
+                def execute_with_password():
+                    try:
+                        data = self._bridge.execute_command(password)
+                        result = data.get("result", "Concluído.")
+                        status = data.get("status", "success")
+                    except Exception as e:
+                        result = f"Erro: {e}"
+                        status = "error"
+                    GLib.idle_add(self._show_result, result, status)
+
+                threading.Thread(target=execute_with_password, daemon=True).start()
+            else:
+                self._finish_execution()
+
+        def on_cancel(*args):
+            dialog.close()
+            self._finish_execution()
+
+        entry.connect("activate", on_submit)
+        ok_btn.connect("clicked", on_submit)
+        cancel_btn.connect("clicked", on_cancel)
+
+        dialog.present()
+        entry.grab_focus()
+        self._busy = False  # Allow interaction with dialog
 
     def _show_result(self, result: str, status: str):
         """Display execution result."""

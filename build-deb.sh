@@ -6,7 +6,7 @@
 # ═══════════════════════════════════════════════════
 set -euo pipefail
 
-VERSION="${1:-1.1.0-rc5}"
+VERSION="${1:-1.1.0-rc16}"
 PKG_NAME="cios"
 PKG_DIR="${PKG_NAME}_${VERSION}_amd64"
 INSTALL_DIR="/usr/share/cios"
@@ -53,6 +53,11 @@ mkdir -p "${PKG_DIR}/usr/bin"
 mkdir -p "${PKG_DIR}/usr/share/wayland-sessions"
 mkdir -p "${PKG_DIR}/usr/share/plymouth/themes/cios"
 mkdir -p "${PKG_DIR}/usr/share/backgrounds"
+mkdir -p "${PKG_DIR}/etc/ld.so.conf.d"
+
+# ── Register bundled libs with the system linker ──
+# This ensures cios-shell can find its libs without LD_LIBRARY_PATH or RPATH
+echo "/usr/lib/cios" > "${PKG_DIR}/etc/ld.so.conf.d/cios.conf"
 
 # ── DEBIAN/control ──
 cat > "${PKG_DIR}/DEBIAN/control" << EOF
@@ -121,15 +126,16 @@ cat > "${PKG_DIR}/DEBIAN/postinst" << 'POSTINST'
 export PATH="$PATH:/usr/local/sbin:/usr/sbin:/sbin"
 export DEBIAN_FRONTEND=noninteractive
 
-# ── Note: bundled libs use RPATH, no global ldconfig needed ──
+# ── Register bundled shared libraries with the system linker ──
+# The .deb includes /etc/ld.so.conf.d/cios.conf pointing to /usr/lib/cios
+# We must run ldconfig so the linker cache is updated before cios-shell runs.
+ldconfig 2>/dev/null || true
 
 echo ""
 echo "╔═══════════════════════════════════════════╗"
 echo "║       CIOS — Installer                   ║"
 echo "╚═══════════════════════════════════════════╝"
 echo ""
-
-# ── Note: bundled libs use RPATH on cios-shell binary, no global ldconfig needed ──
 
 # ── Create Python venv + install deps ──
 echo "[CIOS] Setting up Python environment..."
@@ -384,6 +390,12 @@ GREETD
     done
     systemctl enable greetd 2>/dev/null || true
 
+    # Disable getty on tty1 — greetd manages VT1 exclusively.
+    # Without this, getty restarts on tty1 after greeter exits and kills
+    # the user's compositor session.
+    systemctl disable getty@tty1.service 2>/dev/null || true
+    systemctl mask getty@tty1.service 2>/dev/null || true
+
     # Ensure system boots to graphical target
     systemctl set-default graphical.target 2>/dev/null || true
 
@@ -616,17 +628,49 @@ cat > "${PKG_DIR}/usr/local/bin/cios-greeter-session" << 'GREETER_SESSION'
 # greetd launches this; the greeter authenticates and tells greetd
 # to start the real user session (cios-session).
 
+# Fix HOME first — greeter user has HOME=/dev/null which breaks Mesa shader cache
+export HOME=/tmp/greeter-home
+mkdir -p "$HOME/.cache"
+export XDG_CACHE_HOME="$HOME/.cache"
+export MESA_SHADER_CACHE_DIR="$HOME/.cache/mesa"
+
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+# Ensure runtime dir exists (logind may not create it for system users)
+if [ ! -d "$XDG_RUNTIME_DIR" ]; then
+    mkdir -p "$XDG_RUNTIME_DIR"
+    chmod 0700 "$XDG_RUNTIME_DIR"
+fi
+
+# Fix HOME for greeter user (created with -d /dev/null, breaks Mesa shader cache)
+if [ "$HOME" = "/dev/null" ] || [ ! -d "$HOME" ]; then
+    export HOME="/tmp/greeter-home"
+    mkdir -p "$HOME/.cache"
+fi
+export XDG_CACHE_HOME="${HOME}/.cache"
 export XDG_SESSION_TYPE=wayland
 export GDK_BACKEND=wayland
 export WLR_NO_HARDWARE_CURSORS=1
+export WLR_RENDERER=${WLR_RENDERER:-gles2}
+export LIBSEAT_BACKEND=seatd
 export XKB_DEFAULT_LAYOUT="${XKB_DEFAULT_LAYOUT:-us}"
 export LD_LIBRARY_PATH="/usr/lib/cios:${LD_LIBRARY_PATH:-}"
 export PATH="/usr/bin:/usr/local/bin:/bin:/usr/sbin:/sbin:$PATH"
 export PYTHONPATH="/usr/share/cios:${PYTHONPATH:-}"
 
+# Log output for debugging
+LOGFILE="/tmp/cios-greeter.log"
+
+# Log output for debugging
+LOGFILE="/tmp/cios-greeter.log"
+
+# Find working Python with GTK4 support
+PYTHON="/usr/share/cios/.venv/bin/python3"
+if [ ! -x "$PYTHON" ] || ! "$PYTHON" -c "import gi" 2>/dev/null; then
+    PYTHON="python3"
+fi
+
 # Launch compositor with greeter as the runtime
-exec /usr/bin/cios-shell --runtime "/usr/share/cios/.venv/bin/python3 -m cios.ui.gtk.greeter"
+exec /usr/bin/cios-shell --runtime "$PYTHON -m cios.ui.gtk.greeter" >> "$LOGFILE" 2>&1
 GREETER_SESSION
 chmod 755 "${PKG_DIR}/usr/local/bin/cios-greeter-session"
 
@@ -646,6 +690,9 @@ export GTK_A11Y=none
 
 # Use software cursor (fixes inverted/offset cursor in VMs)
 export WLR_NO_HARDWARE_CURSORS=1
+
+# Seat access for DRM/GPU
+export LIBSEAT_BACKEND=seatd
 
 # Keyboard layout (ensures correct mapping in VMs and real hardware)
 export XKB_DEFAULT_LAYOUT="${XKB_DEFAULT_LAYOUT:-us}"
@@ -817,7 +864,7 @@ cat > "${PKG_DIR}${INSTALL_DIR}/config/greetd.toml" << 'GREETD'
 vt = 1
 
 [default_session]
-command = "/usr/sbin/agreety --cmd /usr/local/bin/cios-session"
+command = "/usr/local/bin/cios-greeter-session"
 user = "greeter"
 GREETD
 
