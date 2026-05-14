@@ -1,13 +1,14 @@
 #!/bin/bash
 # ═══════════════════════════════════════════════════
-#  Hook: Configure silent boot chain
-#  GRUB → Plymouth → LightDM with zero visible text.
+#  Hook: Configure seamless boot chain
+#  GRUB (invisible) → Plymouth (CIOS logo) → greetd
+#  Zero text, zero flash, continuous dark background.
 # ═══════════════════════════════════════════════════
 set -euo pipefail
 
-echo ">>> [0400] Configuring silent boot chain..."
+echo ">>> [0400] Configuring seamless boot chain..."
 
-# ── GRUB Configuration ─────────────────────────────────────────────
+# ── GRUB: Completely invisible ─────────────────────────────────────
 mkdir -p /etc/default
 cat > /etc/default/grub << 'EOF'
 GRUB_DEFAULT=0
@@ -16,34 +17,84 @@ GRUB_TIMEOUT_STYLE=hidden
 GRUB_DISTRIBUTOR="CIOS"
 GRUB_CMDLINE_LINUX_DEFAULT="quiet splash loglevel=0 vt.global_cursor_default=0 rd.udev.log_priority=3 systemd.show_status=false"
 GRUB_CMDLINE_LINUX=""
+GRUB_BACKGROUND=""
+GRUB_DISABLE_OS_PROBER=true
+GRUB_RECORDFAIL_TIMEOUT=2
 EOF
 
-# ── Plymouth Configuration ─────────────────────────────────────────
-# Set CIOS theme if available, otherwise use spinner
+# GRUB theme: solid dark background matching Plymouth/compositor (#0a0a0f)
+# If GRUB briefly shows (recordfail), it blends with the boot splash
+mkdir -p /boot/grub
+cat > /boot/grub/custom.cfg << 'EOF'
+# CIOS: dark background for seamless boot
+set color_normal=dark-gray/black
+set color_highlight=white/black
+set menu_color_normal=dark-gray/black
+set menu_color_highlight=white/black
+EOF
+
+# Generate a 1x1 dark PNG for GRUB background (prevents any bright flash)
+python3 -c "
+from PIL import Image
+img = Image.new('RGB', (1, 1), (10, 10, 15))
+img.save('/boot/grub/background.png')
+" 2>/dev/null || true
+
+if [ -f /boot/grub/background.png ]; then
+    # Set GRUB background
+    sed -i 's|^GRUB_BACKGROUND=.*|GRUB_BACKGROUND="/boot/grub/background.png"|' /etc/default/grub
+fi
+
+# ── Plymouth: CIOS theme (instant display via KMS) ─────────────────
 if [ -d "/usr/share/plymouth/themes/cios" ]; then
     plymouth-set-default-theme cios 2>/dev/null || true
 else
     plymouth-set-default-theme spinner 2>/dev/null || true
 fi
 
-# ── Initramfs Configuration ────────────────────────────────────────
-# Enable framebuffer for immediate Plymouth display
+# ── Initramfs: KMS modules for instant framebuffer ─────────────────
 mkdir -p /etc/initramfs-tools/conf.d
 echo "FRAMEBUFFER=y" > /etc/initramfs-tools/conf.d/splash
 
-# Add KMS modules for early GPU initialization
+# Add ALL common GPU drivers to initramfs (early KMS = instant Plymouth)
 cat >> /etc/initramfs-tools/modules << 'EOF'
-# KMS GPU drivers for early framebuffer
+# KMS GPU drivers for early framebuffer (seamless boot)
+drm
+drm_kms_helper
 i915
 amdgpu
 nouveau
 radeon
+virtio_gpu
+bochs
 EOF
 
-# Rebuild initramfs with new configuration
+# Rebuild initramfs
 update-initramfs -u 2>/dev/null || true
 
 # ── NetworkManager ─────────────────────────────────────────────────
 systemctl enable NetworkManager 2>/dev/null || true
 
-echo ">>> [0400] Silent boot chain configured."
+# ── seatd (seat management for Wayland compositor) ─────────────────
+systemctl enable seatd 2>/dev/null || true
+
+# ── SSH (for remote access/debugging) ─────────────────────────────
+systemctl enable ssh 2>/dev/null || true
+
+# ── Journald: volatile (no persistent logs eating disk) ────────────
+mkdir -p /etc/systemd/journald.conf.d
+cat > /etc/systemd/journald.conf.d/cios.conf << 'EOF'
+[Journal]
+Storage=volatile
+RuntimeMaxUse=32M
+EOF
+
+# ── Faster shutdown ────────────────────────────────────────────────
+mkdir -p /etc/systemd/system.conf.d
+cat > /etc/systemd/system.conf.d/cios.conf << 'EOF'
+[Manager]
+DefaultTimeoutStopSec=5s
+EOF
+
+echo ">>> [0400] Seamless boot chain configured."
+echo "    Boot: GRUB(0s,dark) → Plymouth(logo) → greetd(login) → CIOS"

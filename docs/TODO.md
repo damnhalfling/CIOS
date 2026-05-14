@@ -1,6 +1,6 @@
 # CIOS — TODO
 
-> Atualizado: Maio 2026 — v1.1.0-rc5
+> Atualizado: Maio 2026 — v1.1.0-rc16
 
 ---
 
@@ -109,16 +109,20 @@
 | 501 | greetd como display manager (Wayland-native) | ✅ |
 | 502 | Plymouth boot splash (tema CIOS) | ✅ |
 | 503 | GRUB invisível (0s timeout, silent boot) | ✅ |
-| 504 | Libs bundled via ldd + RPATH (sem conflito sistema) | ✅ |
+| 504 | Libs bundled via ldd + ldconfig (sem conflito sistema) | ✅ |
 | 505 | seatd para acesso DRM/input | ✅ |
 | 506 | Instalação .deb sem downloads pesados | ✅ |
 | 507 | cios-setup-ai (Ollama/Mistral/Whisper pós-login) | ✅ |
+| 508 | Greeter GTK4 visual (login screen Wayland-native) | ✅ |
+| 509 | Sessão estável pós-login (getty masked, seat handoff) | ✅ |
+| 510 | Password dialog mascarado para sudo | ✅ |
+| 511 | /etc/os-release customizado ("CIOS") | ✅ |
 
 ### Pendente
 | # | Task | Prioridade |
 |---|------|-----------|
-| 510 | Greeter gráfico (trocar agreety por Wayland visual) | Alta |
-| 511 | /etc/os-release customizado ("CIOS" não "Debian") | Média |
+| 510 | ~~Greeter gráfico (trocar agreety por Wayland visual)~~ | ✅ CONCLUÍDO |
+| 511 | /etc/os-release customizado ("CIOS" não "Debian") | ✅ CONCLUÍDO |
 | 512 | First-boot wizard ("Bem-vindo ao CIOS") | Média |
 | 513 | Update mechanism na UI | Média |
 | 514 | ISO de instalação própria (live-build) | Alta |
@@ -544,7 +548,7 @@ FUTURO    → Distribuição
 
 ---
 
-*Atualizado: Maio 2026 — v1.0.0*
+*Atualizado: Maio 2026 — v1.1.0-rc16*
 
 ---
 

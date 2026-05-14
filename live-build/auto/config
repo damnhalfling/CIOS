@@ -1,22 +1,33 @@
 #!/bin/bash
 # CIOS Live ISO — live-build auto-configuration
-# This script is called by `lb config` to set all build parameters.
+# Compatible with live-build on Ubuntu 24.04 (CI runner)
+
+# Override Ubuntu defaults that live-build inherits from /etc/live/build.conf
+export LB_LINUX_PACKAGES="linux-image"
+export LB_DISTRIBUTION="trixie"
+export LB_INITRAMFS="live-boot"
+export LB_INITSYSTEM="systemd"
+export LB_SYSTEM="live"
+export LB_BOOTLOADER="grub-efi"
+export LB_SYSLINUX_THEME="debian"
 
 lb config noauto \
-    --distribution bookworm \
+    --distribution trixie \
     --architecture amd64 \
     --archive-areas "main contrib non-free non-free-firmware" \
     --binary-images iso-hybrid \
-    --bootloaders "grub-efi,syslinux" \
     --memtest none \
-    --iso-application "CIOS" \
-    --iso-publisher "CIOS Project" \
-    --iso-volume "CIOS Live" \
-    --firmware-binary true \
-    --firmware-chroot true \
-    --updates true \
-    --security true \
     --apt-indices false \
     --apt-recommends false \
-    --debootstrap-options "--variant=minbase" \
+    --apt-secure false \
+    --linux-packages "linux-image" \
+    --initramfs "live-boot" \
+    --initsystem "systemd" \
+    --mirror-bootstrap "http://deb.debian.org/debian" \
+    --mirror-chroot "http://deb.debian.org/debian" \
+    --mirror-binary "http://deb.debian.org/debian" \
+    --mirror-chroot-security "http://deb.debian.org/debian-security" \
+    --mirror-binary-security "http://deb.debian.org/debian-security" \
+    --keyring-packages "debian-archive-keyring" \
+    --bootappend-live "boot=live quiet splash" \
     "${@}"

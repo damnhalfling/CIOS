@@ -1,0 +1,11 @@
+#!/bin/bash
+# ═══════════════════════════════════════════════════
+#  Hook: Install gnupg (needed for apt key verification)
+#  Must run before any other hook that uses apt.
+# ═══════════════════════════════════════════════════
+set -euo pipefail
+
+echo ">>> [0050] Installing gnupg for apt key verification..."
+apt-get update -qq
+apt-get install -y --no-install-recommends gnupg
+echo ">>> [0050] gnupg installed."

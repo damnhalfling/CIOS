@@ -7,18 +7,20 @@ set -euo pipefail
 
 echo ">>> [0200] Configuring live user 'cios'..."
 
-# Create user with no password
+# Create user with password 'cios' (for live session login)
 useradd \
     --create-home \
     --shell /bin/bash \
-    --disabled-password \
     --gecos "CIOS Live User" \
     cios 2>/dev/null || true
 
-# Add to required groups
-usermod -aG audio,video,netdev,plugdev,sudo cios
+# Set password to 'cios' (needed for greeter login)
+echo "cios:cios" | chpasswd
 
-# Configure passwordless sudo
+# Add to required groups (video/render/input for DRM, audio for sound)
+usermod -aG audio,video,render,input,netdev,plugdev,sudo cios
+
+# Configure passwordless sudo (live session convenience)
 cat > /etc/sudoers.d/cios-live << 'EOF'
 # CIOS Live Session — passwordless sudo
 cios ALL=(ALL) NOPASSWD: ALL
@@ -26,7 +28,20 @@ EOF
 chmod 0440 /etc/sudoers.d/cios-live
 
 # Create CIOS config directory
-mkdir -p /home/cios/.cios
+mkdir -p /home/cios/.cios/logs
 chown -R cios:cios /home/cios/.cios
 
-echo ">>> [0200] User 'cios' configured successfully."
+# Create XDG user directories
+for dir in Desktop Documents Downloads Music Pictures Videos; do
+    mkdir -p "/home/cios/$dir"
+done
+chown -R cios:cios /home/cios
+
+# Configure SSH (allow password auth for live session)
+mkdir -p /etc/ssh/sshd_config.d
+cat > /etc/ssh/sshd_config.d/cios-live.conf << 'EOF'
+PasswordAuthentication yes
+PermitEmptyPasswords no
+EOF
+
+echo ">>> [0200] User 'cios' configured (password: cios)."

@@ -1,21 +1,24 @@
 # CIOS Live ISO — Package List
 # Packages installed in the live filesystem (chroot)
+# Stack: Wayland (cios-shell + greetd + GTK4)
 
-# ── X11 / Display ──────────────────────────────────────────────────
-xorg
-lightdm
-lightdm-gtk-greeter
-openbox
+# ── Wayland / Display ─────────────────────────────────────────────
+greetd
+seatd
+xwayland
+
+# ── GTK4 + Python bindings ─────────────────────────────────────────
+gir1.2-gtk-4.0
+python3-gi
+python3-gi-cairo
+libgtk-4-1
 
 # ── CIOS Dependencies ──────────────────────────────────────────────
 python3
 python3-pip
 python3-venv
-python3-tk
-wmctrl
-xdotool
-x11-xserver-utils
 curl
+wl-clipboard
 
 # ── Audio ──────────────────────────────────────────────────────────
 pipewire
@@ -26,9 +29,10 @@ pipewire-pulse
 network-manager
 wpasupplicant
 
-# ── Boot ───────────────────────────────────────────────────────────
+# ── Boot (seamless: GRUB invisible → Plymouth → greeter) ──────────
 plymouth
 plymouth-themes
+grub-efi-amd64
 
 # ── Firmware ───────────────────────────────────────────────────────
 firmware-linux-free
@@ -37,10 +41,15 @@ firmware-iwlwifi
 firmware-realtek
 firmware-atheros
 
-# ── Installation Support ───────────────────────────────────────────
-debootstrap
-parted
-
 # ── Utilities ──────────────────────────────────────────────────────
 sudo
 bash-completion
+openssh-server
+dbus
+polkitd
+gnupg
+zstd
+linux-image-amd64
+live-boot
+live-config
+live-config-systemd

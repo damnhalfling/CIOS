@@ -4,7 +4,7 @@ on:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
-      - 'v[0-9]+.[0-9]+.[0-9]+-rc*'
+      - 'v[0-9]+.[0-9]+.[0-9]+-rc[0-9]*'
 
 permissions:
   contents: write
@@ -102,7 +102,7 @@ jobs:
             libegl1-mesa-dev libgles2-mesa-dev libcairo2-dev \
             patchelf
           # Install newer Meson (wlroots 0.18 requires c23 support → Meson 1.5+)
-          pip install meson>=1.5.0
+          sudo pip install meson>=1.5.0
           # These may not be in default repos — install if available
           sudo apt-get install -y libdisplay-info-dev libliftoff-dev 2>/dev/null || true
 
@@ -112,7 +112,7 @@ jobs:
           cd /tmp/wayland
           meson setup build --prefix=/usr --libdir=lib/x86_64-linux-gnu -Ddocumentation=false -Dtests=false -Ddtd_validation=false
           ninja -C build
-          sudo ninja -C build install
+          sudo meson install -C build
           sudo ldconfig
 
       - name: Build and install libdisplay-info
@@ -123,7 +123,7 @@ jobs:
             cd /tmp/libdisplay-info
             meson setup build --prefix=/usr --libdir=lib/x86_64-linux-gnu
             ninja -C build
-            sudo ninja -C build install
+            sudo meson install -C build
             sudo ldconfig
           else
             echo "libdisplay-info already available via apt"
@@ -137,7 +137,7 @@ jobs:
             cd /tmp/libliftoff
             meson setup build --prefix=/usr --libdir=lib/x86_64-linux-gnu
             ninja -C build
-            sudo ninja -C build install
+            sudo meson install -C build
             sudo ldconfig
           else
             echo "libliftoff already available via apt"
@@ -149,7 +149,7 @@ jobs:
           cd /tmp/wlroots
           meson setup build --prefix=/usr --libdir=lib/x86_64-linux-gnu -Dxwayland=enabled
           ninja -C build
-          sudo ninja -C build install
+          sudo meson install -C build
           # Protocol headers are generated in build dir — copy them to include dir
           sudo find build -name "*-protocol.h" -exec cp {} /usr/include/wlroots-0.18/ \;
           sudo ldconfig

@@ -4,6 +4,10 @@ on:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+-iso'
+      - 'v[0-9]+.[0-9]+.[0-9]+-rc*-iso'
+
+permissions:
+  contents: write
 
 jobs:
   build-iso:
@@ -17,11 +21,8 @@ jobs:
       - name: Free disk space
         run: |
           echo ">>> Freeing disk space..."
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache
-          sudo rm -rf /usr/share/swift
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache /usr/share/swift
           sudo apt-get remove -y '^dotnet-.*' '^llvm-.*' 'php.*' azure-cli \
             google-cloud-cli google-chrome-stable firefox powershell \
             mono-devel 2>/dev/null || true
@@ -33,17 +34,67 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            live-build \
-            debootstrap \
-            dpkg-dev \
-            debhelper \
-            python3-venv \
-            python3-pip
+            live-build debootstrap dpkg-dev debhelper \
+            debian-archive-keyring isolinux \
+            python3-venv python3-pip python3-pil \
+            ninja-build pkg-config git patchelf \
+            libwayland-dev wayland-protocols libxkbcommon-dev \
+            libinput-dev libpixman-1-dev libdrm-dev libseat-dev \
+            libxcb1-dev xwayland libgbm-dev libvulkan-dev \
+            libxcb-composite0-dev libxcb-icccm4-dev libxcb-image0-dev \
+            libxcb-render0-dev libxcb-render-util0-dev libxcb-xfixes0-dev \
+            libxcb-xinput-dev libxcb-dri3-dev libxcb-present-dev \
+            libxcb-res0-dev libxcb-shm0-dev hwdata libxcb-ewmh-dev \
+            libffi-dev libxml2-dev libexpat1-dev \
+            libegl1-mesa-dev libgles2-mesa-dev libcairo2-dev
+          pip install meson>=1.5.0
+          sudo pip install meson>=1.5.0
+          sudo apt-get install -y libdisplay-info-dev libliftoff-dev 2>/dev/null || true
+
+      - name: Build wayland 1.23
+        run: |
+          git clone --depth=1 --branch 1.23.0 https://gitlab.freedesktop.org/wayland/wayland.git /tmp/wayland
+          cd /tmp/wayland
+          meson setup build --prefix=/usr --libdir=lib/x86_64-linux-gnu -Ddocumentation=false -Dtests=false -Ddtd_validation=false
+          ninja -C build
+          sudo meson install -C build
+          sudo ldconfig
+
+      - name: Build libdisplay-info
+        run: |
+          if ! pkg-config --exists libdisplay-info; then
+            git clone --depth=1 --branch 0.2.0 https://gitlab.freedesktop.org/emersion/libdisplay-info.git /tmp/libdisplay-info
+            cd /tmp/libdisplay-info
+            meson setup build --prefix=/usr --libdir=lib/x86_64-linux-gnu
+            ninja -C build
+            sudo meson install -C build
+            sudo ldconfig
+          fi
+
+      - name: Build libliftoff
+        run: |
+          if ! pkg-config --exists libliftoff; then
+            git clone --depth=1 --branch v0.5.0 https://gitlab.freedesktop.org/emersion/libliftoff.git /tmp/libliftoff
+            cd /tmp/libliftoff
+            meson setup build --prefix=/usr --libdir=lib/x86_64-linux-gnu
+            ninja -C build
+            sudo meson install -C build
+            sudo ldconfig
+          fi
+
+      - name: Build wlroots 0.18.1
+        run: |
+          git clone --depth=1 --branch 0.18.1 https://gitlab.freedesktop.org/wlroots/wlroots.git /tmp/wlroots
+          cd /tmp/wlroots
+          meson setup build --prefix=/usr --libdir=lib/x86_64-linux-gnu -Dxwayland=enabled
+          ninja -C build
+          sudo meson install -C build
+          sudo find build -name "*-protocol.h" -exec cp {} /usr/include/wlroots-0.18/ \;
+          sudo ldconfig
 
       - name: Extract version from tag
         id: version
         run: |
-          # Tag format: v1.2.3-iso → version: 1.2.3
           TAG="${GITHUB_REF#refs/tags/}"
           VERSION="${TAG#v}"
           VERSION="${VERSION%-iso}"
@@ -52,7 +103,15 @@ jobs:
 
       - name: Build ISO
         run: |
+          # Force no-op isohybrid AFTER all packages installed (syslinux-utils overwrites it)
+          sudo rm -f /usr/bin/isohybrid /usr/local/bin/isohybrid
+          printf '#!/bin/sh\nexit 0\n' | sudo tee /usr/bin/isohybrid > /dev/null
+          sudo chmod +x /usr/bin/isohybrid
+          # Verify
+          echo "isohybrid check:"; cat /usr/bin/isohybrid
           sudo ./live-build/build-iso.sh "${{ steps.version.outputs.version }}"
+        env:
+          PKG_CONFIG_PATH: /usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig
 
       - name: Upload ISO to Release
         if: success()
@@ -64,12 +123,19 @@ jobs:
           body: |
             ## CIOS Live ISO v${{ steps.version.outputs.version }}
 
-            Bootable live ISO image. Write to USB with:
+            Bootable live ISO. Write to USB:
             ```bash
             sudo dd if=cios-${{ steps.version.outputs.version }}-amd64.iso of=/dev/sdX bs=4M status=progress
             ```
 
-            Supports UEFI and Legacy BIOS boot.
+            **Boot chain:** GRUB (invisible) → Plymouth (CIOS logo) → greetd (login) → CIOS Desktop
+
+            **Login:** user `cios`, password `cios`
+
+            **Test in QEMU:**
+            ```bash
+            qemu-system-x86_64 -cdrom cios-${{ steps.version.outputs.version }}-amd64.iso -m 4G -enable-kvm -device virtio-vga -display gtk
+            ```
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -77,7 +143,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: build-logs
+          name: iso-build-logs
           path: |
             live-build/.build/
             live-build/chroot.log

@@ -1,38 +1,40 @@
 #!/bin/bash
 # ═══════════════════════════════════════════════════
-#  Hook: Configure LightDM autologin
-#  Sets up automatic login to the CIOS session.
+#  Hook: Configure greetd (Wayland display manager)
+#  Sets up greetd with CIOS greeter on VT1.
 # ═══════════════════════════════════════════════════
 set -euo pipefail
 
-echo ">>> [0300] Configuring LightDM autologin..."
+echo ">>> [0300] Configuring greetd..."
 
-# Create LightDM configuration directory
-mkdir -p /etc/lightdm
+# Create greeter user (system user for running the greeter session)
+if ! id greeter &>/dev/null; then
+    useradd -r -s /usr/sbin/nologin -d /dev/null greeter 2>/dev/null || true
+    usermod -aG video greeter 2>/dev/null || true
+fi
 
-# Write LightDM main configuration
-cat > /etc/lightdm/lightdm.conf << 'EOF'
-[Seat:*]
-autologin-user=cios
-autologin-user-timeout=0
-user-session=cios
-greeter-session=lightdm-gtk-greeter
+# Configure greetd
+mkdir -p /etc/greetd
+cat > /etc/greetd/config.toml << 'EOF'
+[terminal]
+vt = 1
+
+[default_session]
+command = "/usr/local/bin/cios-greeter-session"
+user = "greeter"
 EOF
 
-# Configure greeter with CIOS branding
-mkdir -p /etc/lightdm
-cat > /etc/lightdm/lightdm-gtk-greeter.conf << 'EOF'
-[greeter]
-theme-name=Adwaita-dark
-icon-theme-name=Adwaita
-background=#0a0a0f
-user-background=false
-font-name=Sans 11
-xft-antialias=true
-xft-hintstyle=hintfull
-EOF
+# Enable greetd, disable getty on tty1 (greetd manages VT1)
+systemctl enable greetd 2>/dev/null || true
+systemctl disable getty@tty1.service 2>/dev/null || true
+systemctl mask getty@tty1.service 2>/dev/null || true
 
-# Ensure LightDM is enabled
-systemctl enable lightdm 2>/dev/null || true
+# Disable any other display managers
+for dm in lightdm gdm gdm3 sddm; do
+    systemctl disable "$dm" 2>/dev/null || true
+done
 
-echo ">>> [0300] LightDM autologin configured."
+# Ensure graphical target
+systemctl set-default graphical.target 2>/dev/null || true
+
+echo ">>> [0300] greetd configured (VT1, greeter user)."

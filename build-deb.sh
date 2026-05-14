@@ -6,7 +6,7 @@
 # ═══════════════════════════════════════════════════
 set -euo pipefail
 
-VERSION="${1:-1.1.0-rc16}"
+VERSION="${1:-2.0.0-rc1}"
 PKG_NAME="cios"
 PKG_DIR="${PKG_NAME}_${VERSION}_amd64"
 INSTALL_DIR="/usr/share/cios"
@@ -260,7 +260,11 @@ else
     echo ""
 
     INSTALL_MODE="1"
-    if [ -t 0 ]; then
+    # Skip interactive prompt in chroot/CI environments
+    if [ -f /.dockerenv ] || [ -f /run/live/medium ] || grep -q "chroot" /proc/1/cgroup 2>/dev/null || [ "$DEBIAN_FRONTEND" = "noninteractive" ]; then
+        INSTALL_MODE="2"
+        echo "[CIOS] Chroot/CI detected — using full replacement mode."
+    elif [ -t 0 ]; then
         read -rp "  Opção [1]: " INSTALL_MODE
         INSTALL_MODE="${INSTALL_MODE:-1}"
     elif [ -e /dev/tty ]; then

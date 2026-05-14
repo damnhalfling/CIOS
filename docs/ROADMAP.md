@@ -1,7 +1,7 @@
 # CIOS — Roadmap
 
 > Substituindo apps por intenção.
-> Atualizado: Maio 2026 — v1.1.0-rc5
+> Atualizado: Maio 2026 — v1.1.0-rc16
 
 ---
 
@@ -104,8 +104,8 @@ Se não for 100% confiável → fluxo guiado. Se for confiável → automático.
 | Módulo de Voz (P6) | STT/TTS como I/O agnóstico (mic → texto → pipeline → TTS) | Após P4 |
 | ~~Wayland compositor~~ | ~~Compositor próprio (wlroots-based)~~ | ✅ CONCLUÍDO |
 | ~~Distribuição base~~ | ~~greetd + Plymouth + .deb funcional~~ | ✅ CONCLUÍDO |
-| Greeter gráfico | Trocar agreety por greeter Wayland visual | Próximo |
-| ISO própria | Live-build com instalador CIOS | Após greeter |
+| ~~Greeter gráfico~~ | ~~GTK4 Wayland-native login screen~~ | ✅ CONCLUÍDO |
+| ISO própria | Live-build com instalador CIOS | Próximo |
 | First-boot wizard | "Bem-vindo ao CIOS" + config inicial | Após ISO |
 | Update mechanism | "CIOS 1.2 disponível" na UI | Após wizard |
 
@@ -123,10 +123,13 @@ Se não for 100% confiável → fluxo guiado. Se for confiável → automático.
 - Tkinter → continua via XWayland
 - XWayland habilitado para apps legados (browser, editor, terminal)
 - LightDM → **greetd** (display manager Wayland-native)
-- Libs bundled em `/usr/lib/cios/` via RPATH (sem conflito com sistema)
+- **Greeter GTK4** visual com login mascarado (substitui agreety)
+- Libs bundled em `/usr/lib/cios/` via ldconfig (sem conflito com sistema)
 - Plymouth boot splash funcional
 - Instalação limpa via .deb (sem downloads pesados)
 - Componentes de IA deferidos para pós-login (`sudo cios-setup-ai`)
+- Sessão estável (getty@tty1 masked, seat handoff correto)
+- Password dialog mascarado para operações sudo
 
 **Stack de sessão:**
 ```
@@ -140,7 +143,7 @@ GRUB (0s) → Plymouth → greetd (login) → cios-session → cios-shell (Wayla
 
 ---
 
-## Números (v1.1.0-rc5)
+## Números (v1.1.0-rc16)
 
 | Métrica | Valor |
 |---------|-------|
@@ -151,11 +154,12 @@ GRUB (0s) → Plymouth → greetd (login) → cios-session → cios-shell (Wayla
 | Testes | 615 |
 | Property tests (Hypothesis) | 22 |
 | Modos de execução | 6 |
-| Itens concluídos | 175+ |
+| Itens concluídos | 185+ |
 | Compositor | cios-shell (wlroots 0.18, C) |
-| Display Manager | greetd + agreety |
+| Display Manager | greetd + greeter GTK4 |
 | Boot splash | Plymouth (tema custom) |
-| Libs bundled | ~40 (via ldd, RPATH isolado) |
+| Libs bundled | ~40 (via ldd, ldconfig) |
+| UI | GTK4 Wayland-native |
 
 ---
 
@@ -183,4 +187,4 @@ Ver `docs/BRANCHING.md` para detalhes.
 
 ---
 
-*Atualizado: Maio 2026 — v1.1.0-rc5*
+*Atualizado: Maio 2026 — v1.1.0-rc16*
