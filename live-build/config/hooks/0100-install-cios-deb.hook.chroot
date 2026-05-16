@@ -1,0 +1,75 @@
+#!/bin/bash
+# ═══════════════════════════════════════════════════
+#  Hook: Install CIOS .deb package
+#  Runs inside chroot during live-build.
+#  The .deb is placed in /packages.chroot/ by build-iso.sh.
+# ═══════════════════════════════════════════════════
+set -euo pipefail
+
+echo ">>> [0100] Installing CIOS .deb package..."
+
+# Find the .deb (placed in /tmp by build-iso.sh via includes.chroot)
+DEB_FILE="/tmp/cios.deb"
+
+if [ ! -f "$DEB_FILE" ]; then
+    # Fallback: search
+    DEB_FILE=$(find /tmp -name 'cios_*.deb' 2>/dev/null | head -1)
+fi
+
+if [ ! -f "$DEB_FILE" ]; then
+    DEB_FILE=$(find / -maxdepth 3 -name 'cios*.deb' 2>/dev/null | head -1)
+fi
+
+if [ -z "$DEB_FILE" ]; then
+    echo "ERROR: CIOS .deb package not found!"
+    exit 1
+fi
+
+echo "    Found: $DEB_FILE"
+
+# Block interactive prompts during install
+export DEBIAN_FRONTEND=noninteractive
+
+# Install (may have unmet deps initially)
+dpkg -i "$DEB_FILE" 2>/dev/null || true
+
+# Resolve dependencies
+apt-get install -f -y --no-install-recommends 2>/dev/null || true
+
+# Verify critical files exist
+echo "    Verifying installation..."
+
+if [ ! -x "/usr/bin/cios-shell" ]; then
+    echo "ERROR: cios-shell binary not found"
+    exit 1
+fi
+
+if [ ! -x "/usr/local/bin/cios-greeter-session" ]; then
+    echo "ERROR: cios-greeter-session not found"
+    exit 1
+fi
+
+if [ ! -x "/usr/local/bin/cios-session" ]; then
+    echo "ERROR: cios-session not found"
+    exit 1
+fi
+
+# Verify ldconfig registered the libs
+ldconfig
+if ! ldconfig -p | grep -q wlroots; then
+    echo "WARNING: wlroots not in ldconfig cache"
+    # Force it
+    if [ -f /etc/ld.so.conf.d/cios.conf ]; then
+        ldconfig
+    fi
+fi
+
+# Verify cios-shell can find its libs
+if ! /usr/bin/cios-shell --version &>/dev/null; then
+    echo "ERROR: cios-shell cannot start (missing libs?)"
+    ldd /usr/bin/cios-shell 2>&1 | grep "not found" || true
+    exit 1
+fi
+
+echo "    cios-shell: $(/usr/bin/cios-shell --version)"
+echo ">>> [0100] CIOS .deb installed successfully."

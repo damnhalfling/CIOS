@@ -16,6 +16,7 @@ lb config noauto \
     --architecture amd64 \
     --archive-areas "main contrib non-free non-free-firmware" \
     --binary-images iso-hybrid \
+    --bootloaders "grub-efi" \
     --memtest none \
     --apt-indices false \
     --apt-recommends false \
@@ -29,5 +30,5 @@ lb config noauto \
     --mirror-chroot-security "http://deb.debian.org/debian-security" \
     --mirror-binary-security "http://deb.debian.org/debian-security" \
     --keyring-packages "debian-archive-keyring" \
-    --bootappend-live "boot=live quiet splash" \
+    --bootappend-live "boot=live components quiet splash live-config.username=cios live-config.user-fullname=CIOS live-config.user-default-groups=audio,video,render,input,netdev,plugdev,sudo" \
     "${@}"

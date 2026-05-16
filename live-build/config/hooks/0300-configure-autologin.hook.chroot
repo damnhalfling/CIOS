@@ -1,0 +1,40 @@
+#!/bin/bash
+# ═══════════════════════════════════════════════════
+#  Hook: Configure greetd (Wayland display manager)
+#  Sets up greetd with CIOS greeter on VT1.
+# ═══════════════════════════════════════════════════
+set -euo pipefail
+
+echo ">>> [0300] Configuring greetd..."
+
+# Create greeter user (system user for running the greeter session)
+if ! id greeter &>/dev/null; then
+    useradd -r -s /usr/sbin/nologin -d /dev/null greeter 2>/dev/null || true
+    usermod -aG video greeter 2>/dev/null || true
+fi
+
+# Configure greetd
+mkdir -p /etc/greetd
+cat > /etc/greetd/config.toml << 'EOF'
+[terminal]
+vt = 1
+
+[default_session]
+command = "/usr/local/bin/cios-greeter-session"
+user = "greeter"
+EOF
+
+# Enable greetd, disable getty on tty1 (greetd manages VT1)
+systemctl enable greetd 2>/dev/null || true
+systemctl disable getty@tty1.service 2>/dev/null || true
+systemctl mask getty@tty1.service 2>/dev/null || true
+
+# Disable any other display managers
+for dm in lightdm gdm gdm3 sddm; do
+    systemctl disable "$dm" 2>/dev/null || true
+done
+
+# Ensure graphical target
+systemctl set-default graphical.target 2>/dev/null || true
+
+echo ">>> [0300] greetd configured (VT1, greeter user)."

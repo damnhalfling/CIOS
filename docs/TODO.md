@@ -123,9 +123,9 @@
 |---|------|-----------|
 | 510 | ~~Greeter gráfico (trocar agreety por Wayland visual)~~ | ✅ CONCLUÍDO |
 | 511 | /etc/os-release customizado ("CIOS" não "Debian") | ✅ CONCLUÍDO |
-| 512 | First-boot wizard ("Bem-vindo ao CIOS") | Média |
-| 513 | Update mechanism na UI | Média |
-| 514 | ISO de instalação própria (live-build) | Alta |
+| 512 | First-boot wizard ("Bem-vindo ao CIOS") | ✅ CONCLUÍDO |
+| 513 | Update mechanism na UI | ✅ CONCLUÍDO |
+| 514 | ISO de instalação própria (live-build) | ✅ CONCLUÍDO |
 | 515 | Recovery mode no GRUB | Baixa |
 | 516 | Esconder terminal do usuário comum | Baixa |
 
@@ -537,13 +537,13 @@ Você: continua codando, consulta quando quiser
 ✅ FEITO   → P5: Intelligence API (Maestro v2.33.0)
 ✅ FEITO   → P6.5: Media Gallery Gestão Completa
 ✅ FEITO   → Screen Capture + XDG Dirs
+✅ FEITO   → Distribuição: First-boot wizard + Update UI + ISO live-build
 🟡 AGORA   → P4: Intelligence Client (2 tasks restantes)
 FASE 1    → Fechar loop (memória, runtime, confirmação semântica, terminal context)
 FASE 2    → Computação paralela (scheduler, arbitration, multi-channel, voz)
 FASE 3    → Intent-native core (compositor wlroots, focus, placement, overlays)
 FASE 4    → Memória cognitiva (graph, compression, semantic indexing)
 FASE 5    → Post-app computing (filesystem semântico, antecipação, zero-click)
-FUTURO    → Distribuição
 ```
 
 ---

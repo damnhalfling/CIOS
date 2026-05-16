@@ -105,9 +105,9 @@ Se não for 100% confiável → fluxo guiado. Se for confiável → automático.
 | ~~Wayland compositor~~ | ~~Compositor próprio (wlroots-based)~~ | ✅ CONCLUÍDO |
 | ~~Distribuição base~~ | ~~greetd + Plymouth + .deb funcional~~ | ✅ CONCLUÍDO |
 | ~~Greeter gráfico~~ | ~~GTK4 Wayland-native login screen~~ | ✅ CONCLUÍDO |
-| ISO própria | Live-build com instalador CIOS | Próximo |
-| First-boot wizard | "Bem-vindo ao CIOS" + config inicial | Após ISO |
-| Update mechanism | "CIOS 1.2 disponível" na UI | Após wizard |
+| ~~ISO própria~~ | ~~Live-build com instalador CIOS~~ | ✅ CONCLUÍDO |
+| ~~First-boot wizard~~ | ~~"Bem-vindo ao CIOS" + config inicial~~ | ✅ CONCLUÍDO |
+| ~~Update mechanism~~ | ~~"CIOS 1.2 disponível" na UI~~ | ✅ CONCLUÍDO |
 
 ---
 
