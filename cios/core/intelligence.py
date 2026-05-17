@@ -243,10 +243,14 @@ class IntelligenceClient:
         """Persist conversation session to disk."""
         try:
             SESSION_FILE.parent.mkdir(parents=True, exist_ok=True)
-            SESSION_FILE.write_text(json.dumps({
-                "conversation_id": self._conversation_id,
-                "updated_at": time.time(),
-            }))
+            SESSION_FILE.write_text(
+                json.dumps(
+                    {
+                        "conversation_id": self._conversation_id,
+                        "updated_at": time.time(),
+                    }
+                )
+            )
         except Exception:
             pass
 
@@ -357,13 +361,15 @@ class IntelligenceClient:
 
     def _call_chat(self, message: str, intent: str) -> IntelligenceResult:
         """Call /v1/chat with full context."""
-        payload = json.dumps({
-            "message": message,
-            "intent": intent,
-            "client": "os",
-            "conversation_id": self._conversation_id,
-            "system_context": _get_system_context(),
-        }).encode()
+        payload = json.dumps(
+            {
+                "message": message,
+                "intent": intent,
+                "client": "os",
+                "conversation_id": self._conversation_id,
+                "system_context": _get_system_context(),
+            }
+        ).encode()
 
         headers = {
             "Content-Type": "application/json",
@@ -405,10 +411,14 @@ class IntelligenceClient:
             return self._handle_http_error(e)
         except urllib.error.URLError as e:
             logger.warning("Intelligence API unreachable: %s", e)
-            return IntelligenceResult(success=False, error="offline", text="Sem conexão com o CIOS Intelligence.")
+            return IntelligenceResult(
+                success=False, error="offline", text="Sem conexão com o CIOS Intelligence."
+            )
         except Exception as e:
             logger.warning("Intelligence API unexpected error: %s", e)
-            return IntelligenceResult(success=False, error="unknown", text="Erro inesperado. Tente novamente.")
+            return IntelligenceResult(
+                success=False, error="unknown", text="Erro inesperado. Tente novamente."
+            )
 
     # ─── API Calls (Streaming) ────────────────────────────────────────
 
@@ -439,14 +449,16 @@ class IntelligenceClient:
 
         compressed = _compress_input(text)
 
-        payload = json.dumps({
-            "message": compressed,
-            "intent": intent,
-            "client": "os",
-            "conversation_id": self._conversation_id,
-            "system_context": _get_system_context(),
-            "lang": "pt",
-        }).encode()
+        payload = json.dumps(
+            {
+                "message": compressed,
+                "intent": intent,
+                "client": "os",
+                "conversation_id": self._conversation_id,
+                "system_context": _get_system_context(),
+                "lang": "pt",
+            }
+        ).encode()
 
         headers = {
             "Content-Type": "application/json",
@@ -528,12 +540,20 @@ class IntelligenceClient:
         """Handle HTTP errors from the API."""
         if e.code == 401:
             logger.warning("Intelligence token expired")
-            return IntelligenceResult(success=False, error="token_expired", text="Sessão expirada. Faça login novamente.")
+            return IntelligenceResult(
+                success=False, error="token_expired", text="Sessão expirada. Faça login novamente."
+            )
         elif e.code == 429:
-            return IntelligenceResult(success=False, error="rate_limited", text="Limite atingido. Tente novamente amanhã ou faça upgrade.")
+            return IntelligenceResult(
+                success=False,
+                error="rate_limited",
+                text="Limite atingido. Tente novamente amanhã ou faça upgrade.",
+            )
         else:
             logger.warning("Intelligence API error %d", e.code)
-            return IntelligenceResult(success=False, error="api_error", text="Erro no serviço. Tente novamente.")
+            return IntelligenceResult(
+                success=False, error="api_error", text="Erro no serviço. Tente novamente."
+            )
 
     # ─── Usage Check ──────────────────────────────────────────────────
 
@@ -578,7 +598,9 @@ def _get_system_context() -> dict:
     try:
         result = subprocess.run(
             ["xdotool", "getactivewindow", "getwindowname"],
-            capture_output=True, text=True, timeout=2,
+            capture_output=True,
+            text=True,
+            timeout=2,
         )
         if result.returncode == 0:
             context["active_window"] = result.stdout.strip()

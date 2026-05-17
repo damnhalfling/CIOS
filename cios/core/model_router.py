@@ -356,7 +356,9 @@ def _get_system_context() -> dict:
     try:
         result = subprocess.run(
             ["xdotool", "getactivewindow", "getwindowname"],
-            capture_output=True, text=True, timeout=2,
+            capture_output=True,
+            text=True,
+            timeout=2,
         )
         if result.returncode == 0:
             context["active_window"] = result.stdout.strip()
