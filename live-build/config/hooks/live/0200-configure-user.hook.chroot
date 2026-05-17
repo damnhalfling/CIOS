@@ -2,25 +2,35 @@
 # ═══════════════════════════════════════════════════
 #  Hook: Configure live user account
 #  Creates the 'cios' user with appropriate permissions.
+#  Note: runs inside chroot — no PAM, no systemd-logind.
 # ═══════════════════════════════════════════════════
 set -euo pipefail
 
 echo ">>> [0200] Configuring live user 'cios'..."
 
-# Create user with password 'cios' (for live session login)
-useradd \
-    --create-home \
-    --shell /bin/bash \
-    --gecos "CIOS Live User" \
-    cios 2>/dev/null || true
+# Ensure required groups exist
+for grp in audio video render input netdev plugdev sudo; do
+    getent group "$grp" >/dev/null 2>&1 || groupadd --system "$grp"
+done
 
-# Set password to 'cios' (needed for greeter login)
-# Use pre-hashed password to avoid PAM issues in chroot
+# Create user (--no-log-init avoids failures when lastlog/faillog unavailable in chroot)
+if ! id cios >/dev/null 2>&1; then
+    useradd \
+        --no-log-init \
+        --create-home \
+        --shell /bin/bash \
+        --comment "CIOS Live User" \
+        --groups audio,video,render,input,netdev,plugdev,sudo \
+        cios
+    echo ">>> [0200] User created."
+else
+    echo ">>> [0200] User already exists, updating groups."
+    usermod -aG audio,video,render,input,netdev,plugdev,sudo cios
+fi
+
+# Set password to 'cios' (pre-hashed — chpasswd/PAM fails in chroot)
 HASHED_PW=$(openssl passwd -6 "cios")
 usermod -p "$HASHED_PW" cios
-
-# Add to required groups (video/render/input for DRM, audio for sound)
-usermod -aG audio,video,render,input,netdev,plugdev,sudo cios
 
 # Configure passwordless sudo (live session convenience)
 cat > /etc/sudoers.d/cios-live << 'EOF'
