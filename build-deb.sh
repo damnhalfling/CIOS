@@ -318,9 +318,9 @@ DSKTP
         usermod -aG video greeter 2>/dev/null || true
     fi
 
-    # Only write config if it doesn't exist (don't overwrite user customization)
-    if [ ! -f /etc/greetd/config.toml ]; then
-        cat > /etc/greetd/config.toml << 'GREETD'
+    # Always write CIOS greetd config (greetd ships a default agreety config
+    # that doesn't launch our compositor — we must override it)
+    cat > /etc/greetd/config.toml << 'GREETD'
 [terminal]
 vt = 1
 
@@ -328,10 +328,7 @@ vt = 1
 command = "/usr/local/bin/cios-greeter-session"
 user = "greeter"
 GREETD
-        echo "[CIOS] ✓ greetd configured (new install)"
-    else
-        echo "[CIOS] ✓ greetd config preserved (upgrade)"
-    fi
+    echo "[CIOS] ✓ greetd configured"
 
     # ── Plymouth boot splash (instant, in initramfs) ──
     PLYMOUTH_THEME="/usr/share/plymouth/themes/cios"
@@ -407,11 +404,12 @@ GREETD
     if [ ! -f /etc/os-release.bak.cios ]; then
         cp /etc/os-release /etc/os-release.bak.cios
     fi
-    cat > /etc/os-release << 'OSREL'
-PRETTY_NAME="CIOS 1.1"
+    CIOS_VER=$(dpkg-query -W -f='${Version}' cios 2>/dev/null || echo "2.0")
+    cat > /etc/os-release << OSREL
+PRETTY_NAME="CIOS ${CIOS_VER}"
 NAME="CIOS"
-VERSION_ID="1.1"
-VERSION="1.1 (Wayland)"
+VERSION_ID="${CIOS_VER}"
+VERSION="${CIOS_VER} (Wayland)"
 ID=cios
 ID_LIKE=debian
 HOME_URL="https://github.com/damnhalfling/CIOS"
