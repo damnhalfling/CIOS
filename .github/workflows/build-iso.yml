@@ -126,29 +126,51 @@ jobs:
 
       - name: Upload ISO to Release
         if: success()
-        uses: softprops/action-gh-release@v2
-        with:
-          files: live-build/cios-${{ steps.version.outputs.version }}-amd64.iso
-          tag_name: ${{ github.ref_name }}
-          name: "CIOS ${{ steps.version.outputs.version }} Live ISO"
-          body: |
-            ## CIOS Live ISO v${{ steps.version.outputs.version }}
-
-            Bootable live ISO. Write to USB:
-            ```bash
-            sudo dd if=cios-${{ steps.version.outputs.version }}-amd64.iso of=/dev/sdX bs=4M status=progress
-            ```
-
-            **Boot chain:** GRUB (invisible) → Plymouth (CIOS logo) → greetd (login) → CIOS Desktop
-
-            **Login:** user `cios`, password `cios`
-
-            **Test in QEMU:**
-            ```bash
-            qemu-system-x86_64 -cdrom cios-${{ steps.version.outputs.version }}-amd64.iso -m 4G -enable-kvm -device virtio-vga -display gtk
-            ```
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ISO="live-build/cios-${{ steps.version.outputs.version }}-amd64.iso"
+          ISO_SIZE=$(stat -c%s "$ISO")
+          MAX_SIZE=2147483648  # 2GB GitHub limit
+
+          if [ "$ISO_SIZE" -lt "$MAX_SIZE" ]; then
+            # Direct upload
+            gh release upload "${{ github.ref_name }}" "$ISO" --clobber
+          else
+            # Split into <2GB parts
+            echo "ISO is $(du -h "$ISO" | cut -f1), splitting..."
+            split -b 1900M "$ISO" "${ISO}.part"
+            for part in ${ISO}.part*; do
+              gh release upload "${{ github.ref_name }}" "$part" --clobber
+            done
+            # Upload a checksum + reassembly instructions
+            sha256sum "$ISO" > "${ISO}.sha256"
+            cat > "${ISO}.README.txt" << 'EOF'
+          To reassemble the ISO from parts:
+            cat cios-*.iso.part* > cios-2.0.0-rc2-amd64.iso
+            sha256sum -c cios-*.sha256
+          EOF
+            gh release upload "${{ github.ref_name }}" "${ISO}.sha256" "${ISO}.README.txt" --clobber
+          fi
+
+          # Update release notes
+          gh release edit "${{ github.ref_name }}" \
+            --title "CIOS ${{ steps.version.outputs.version }} Live ISO" \
+            --notes "## CIOS Live ISO v${{ steps.version.outputs.version }}
+
+          Bootable live ISO. Write to USB:
+          \`\`\`bash
+          sudo dd if=cios-${{ steps.version.outputs.version }}-amd64.iso of=/dev/sdX bs=4M status=progress
+          \`\`\`
+
+          **Boot chain:** GRUB (invisible) → Plymouth (CIOS logo) → greetd (login) → CIOS Desktop
+
+          **Login:** user \`cios\`, password \`cios\`
+
+          **If split into parts, reassemble first:**
+          \`\`\`bash
+          cat cios-*.iso.part* > cios-${{ steps.version.outputs.version }}-amd64.iso
+          \`\`\`"
 
       - name: Upload build logs on failure
         if: failure()

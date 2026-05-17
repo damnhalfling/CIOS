@@ -1,6 +1,7 @@
 # CIOS Live ISO — Package List
 # Packages installed in the live filesystem (chroot)
 # Stack: Wayland (cios-shell + greetd + GTK4)
+# Target: <2GB ISO
 
 # ── Wayland / Display ─────────────────────────────────────────────
 greetd
@@ -15,7 +16,6 @@ libgtk-4-1
 
 # ── CIOS Dependencies ──────────────────────────────────────────────
 python3
-python3-pip
 python3-venv
 curl
 wl-clipboard
@@ -34,9 +34,8 @@ plymouth
 plymouth-themes
 grub-efi-amd64
 
-# ── Firmware ───────────────────────────────────────────────────────
+# ── Firmware (targeted — not the full firmware-linux-nonfree) ──────
 firmware-linux-free
-firmware-linux-nonfree
 firmware-iwlwifi
 firmware-realtek
 firmware-atheros

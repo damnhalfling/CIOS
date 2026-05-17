@@ -24,6 +24,7 @@ lb config noauto \
     --linux-packages "linux-image" \
     --initramfs "live-boot" \
     --initsystem "systemd" \
+    --chroot-squashfs-compression-type "xz" \
     --mirror-bootstrap "http://deb.debian.org/debian" \
     --mirror-chroot "http://deb.debian.org/debian" \
     --mirror-binary "http://deb.debian.org/debian" \
