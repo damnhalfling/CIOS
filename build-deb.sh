@@ -214,13 +214,13 @@ if ! /usr/share/cios/.venv/bin/python3 -c "import gi" 2>/dev/null; then
     python3 -m venv --system-site-packages /usr/share/cios/.venv
 fi
 
-/usr/share/cios/.venv/bin/pip install --quiet \
+/usr/share/cios/.venv/bin/pip install \
     prompt_toolkit==3.0.48 \
     rich==13.9.4 \
     psutil==6.1.1 \
     Pillow
 
-/usr/share/cios/.venv/bin/pip install --quiet -e /usr/share/cios
+/usr/share/cios/.venv/bin/pip install -e /usr/share/cios
 
 echo "[CIOS] ✓ Python environment ready"
 
@@ -284,9 +284,10 @@ echo "[CIOS] ✓ Piper TTS ready"
 # ══════════════════════════════════════════════════
 
 echo "[CIOS] [4/6] Whisper STT..."
+echo "[CIOS]   Downloading Whisper + PyTorch (~2GB, pode demorar)..."
 
 if ! command -v whisper &>/dev/null; then
-    /usr/share/cios/.venv/bin/pip install --quiet openai-whisper || {
+    /usr/share/cios/.venv/bin/pip install openai-whisper || {
         echo "[CIOS] ✗ FAILED to install Whisper."
         exit 1
     }
