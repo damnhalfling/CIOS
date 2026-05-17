@@ -35,8 +35,12 @@ jobs:
           # Remove Ubuntu's live-build (too old, doesn't support grub-efi)
           sudo apt-get remove -y live-build 2>/dev/null || true
 
+          # Import Debian archive keys
+          sudo apt-get install -y debian-archive-keyring
+          sudo cp /usr/share/keyrings/debian-archive-keyring.gpg /etc/apt/trusted.gpg.d/
+
           # Add Debian trixie repo (pinned low) to get live-build
-          echo "deb http://deb.debian.org/debian trixie main" | sudo tee /etc/apt/sources.list.d/debian-trixie.list
+          echo "deb [signed-by=/usr/share/keyrings/debian-archive-keyring.gpg] http://deb.debian.org/debian trixie main" | sudo tee /etc/apt/sources.list.d/debian-trixie.list
           # Pin it low so it doesn't interfere with Ubuntu packages
           cat <<'PIN' | sudo tee /etc/apt/preferences.d/debian-trixie.pref
           Package: *
