@@ -532,13 +532,22 @@ Conflicts=getty@tty1.service
 [Service]
 Type=idle
 ExecStart=/usr/bin/greetd
-Restart=always
-RestartSec=3
+Restart=on-failure
+RestartSec=5
+StartLimitIntervalSec=30
+StartLimitBurst=3
 
 [Install]
 Alias=display-manager.service
 WantedBy=graphical.target
 GREETD_UNIT
+
+# ── Override plymouth-quit-wait to not block forever ──
+mkdir -p "${PKG_DIR}/etc/systemd/system/plymouth-quit-wait.service.d"
+cat > "${PKG_DIR}/etc/systemd/system/plymouth-quit-wait.service.d/timeout.conf" << 'PLYTIMEOUT'
+[Service]
+TimeoutStartSec=15
+PLYTIMEOUT
 
 echo "→ Bundling runtime libraries..."
 BASE_LIBS="linux-vdso|ld-linux|libc\.so|libm\.so|libdl\.so|libpthread|librt\.so|libstdc\+\+|libgcc_s|libX11\.so|libxcb\.so|libglib-2\.0|libgio-2\.0|libgobject-2\.0|libgmodule-2\.0|libffi\.so|libpcre2|libsystemd|libudev|libcap\.so|libgpg-error|libgcrypt|liblz4|liblzma|libzstd|libexpat"
