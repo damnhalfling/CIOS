@@ -30,29 +30,19 @@ jobs:
           sudo apt-get clean
           df -h /
 
-      - name: Install Debian live-build (from Debian repo)
+      - name: Install Debian live-build
         run: |
-          # Remove Ubuntu's live-build (too old, doesn't support grub-efi)
+          # Remove Ubuntu's live-build if present (too old, doesn't support --bootloaders)
           sudo apt-get remove -y live-build 2>/dev/null || true
 
-          # Import Debian archive keys
-          sudo apt-get install -y debian-archive-keyring
-          sudo cp /usr/share/keyrings/debian-archive-keyring.gpg /etc/apt/trusted.gpg.d/
-
-          # Add Debian trixie repo (pinned low) to get live-build
-          echo "deb [signed-by=/usr/share/keyrings/debian-archive-keyring.gpg] http://deb.debian.org/debian trixie main" | sudo tee /etc/apt/sources.list.d/debian-trixie.list
-          # Pin it low so it doesn't interfere with Ubuntu packages
-          cat <<'PIN' | sudo tee /etc/apt/preferences.d/debian-trixie.pref
-          Package: *
-          Pin: release n=trixie
-          Pin-Priority: 50
-
-          Package: live-build
-          Pin: release n=trixie
-          Pin-Priority: 900
-          PIN
-          sudo apt-get update
-          sudo apt-get install -y -t trixie live-build
+          # live-build is Architecture: all (pure shell scripts), safe to install from Debian
+          # Find and download the latest live-build .deb from Debian trixie pool
+          DEB_URL=$(curl -sL 'http://deb.debian.org/debian/pool/main/l/live-build/' | \
+            grep -oP 'href="(live-build_[0-9]+_all\.deb)"' | \
+            sed 's/href="//;s/"//' | sort -V | tail -1)
+          echo ">>> Downloading: $DEB_URL"
+          wget -q "http://deb.debian.org/debian/pool/main/l/live-build/${DEB_URL}" -O /tmp/live-build.deb
+          sudo dpkg -i /tmp/live-build.deb || sudo apt-get install -f -y
           echo "live-build version: $(lb --version 2>/dev/null || echo unknown)"
 
       - name: Install build dependencies
