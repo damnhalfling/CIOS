@@ -35,13 +35,20 @@ jobs:
           # Remove Ubuntu's live-build (too old, doesn't support grub-efi)
           sudo apt-get remove -y live-build 2>/dev/null || true
 
-          # Install live-build from Debian trixie (supports --bootloaders grub-efi)
-          sudo apt-get install -y wget
-          cd /tmp
-          wget -q http://deb.debian.org/debian/pool/main/l/live-build/live-build_20250411_all.deb || \
-            wget -q http://deb.debian.org/debian/pool/main/l/live-build/live-build_20240811_all.deb || \
-            wget -q "$(wget -qO- 'http://deb.debian.org/debian/pool/main/l/live-build/' | grep -oP 'href="live-build_[^"]+_all\.deb"' | tail -1 | tr -d 'href="')"
-          sudo dpkg -i live-build_*_all.deb || sudo apt-get install -f -y
+          # Add Debian trixie repo (pinned low) to get live-build
+          echo "deb http://deb.debian.org/debian trixie main" | sudo tee /etc/apt/sources.list.d/debian-trixie.list
+          # Pin it low so it doesn't interfere with Ubuntu packages
+          cat <<'PIN' | sudo tee /etc/apt/preferences.d/debian-trixie.pref
+          Package: *
+          Pin: release n=trixie
+          Pin-Priority: 50
+
+          Package: live-build
+          Pin: release n=trixie
+          Pin-Priority: 900
+          PIN
+          sudo apt-get update
+          sudo apt-get install -y -t trixie live-build
           echo "live-build version: $(lb --version 2>/dev/null || echo unknown)"
 
       - name: Install build dependencies
