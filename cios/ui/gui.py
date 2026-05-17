@@ -1871,6 +1871,9 @@ class CIOSApp:
         gallery_data = data.get("gallery")
         if gallery_data:
             self.root.after(delay + 80, lambda: self._show_gallery(gallery_data))
+        elif self._is_artifact_content(result_text):
+            # Multi-section artifact — show in split panel
+            self.root.after(delay + 80, lambda: self._show_artifact(result_text))
         else:
             titles = {
                 "success": "Concluído",
@@ -1992,6 +1995,47 @@ class CIOSApp:
         if self._active_gallery is not None:
             self._active_gallery.destroy()
             self._active_gallery = None
+
+    def _is_artifact_content(self, text: str) -> bool:
+        """Detect if response is multi-section artifact content."""
+        if not text or len(text) < 300:
+            return False
+        # Check for section separators or platform headers
+        has_separators = "=== " in text
+        has_platform_headers = (
+            ("LinkedIn" in text and "Twitter" in text) or
+            ("linkedin" in text.lower() and "twitter" in text.lower())
+        )
+        return has_separators or has_platform_headers
+
+    def _show_artifact(self, content: str) -> None:
+        """Show artifact content in the right panel (split view)."""
+        from cios.ui.artifact_panel import ArtifactPanel
+
+        # Clear the right panel content
+        rp = self.root.grid_slaves(row=0, column=1)
+        if rp:
+            for widget in rp[0].winfo_children():
+                widget.destroy()
+
+            # Create artifact panel in the right panel frame
+            self._artifact_panel = ArtifactPanel(
+                parent=rp[0],
+                fonts=self._f,
+                on_close=self._close_artifact,
+            )
+            self._artifact_panel.show(content)
+
+    def _close_artifact(self) -> None:
+        """Close artifact panel and restore the right sidebar."""
+        if hasattr(self, "_artifact_panel") and self._artifact_panel:
+            self._artifact_panel.hide()
+            self._artifact_panel = None
+        # Rebuild the right panel
+        rp = self.root.grid_slaves(row=0, column=1)
+        if rp:
+            rp[0].destroy()
+        self._build_right_panel()
 
     def _show_confirm(self, msg: str, cmd: str) -> None:
         self._pending = cmd
