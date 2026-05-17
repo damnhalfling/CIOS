@@ -2002,9 +2002,8 @@ class CIOSApp:
             return False
         # Check for section separators or platform headers
         has_separators = "=== " in text
-        has_platform_headers = (
-            ("LinkedIn" in text and "Twitter" in text) or
-            ("linkedin" in text.lower() and "twitter" in text.lower())
+        has_platform_headers = ("LinkedIn" in text and "Twitter" in text) or (
+            "linkedin" in text.lower() and "twitter" in text.lower()
         )
         return has_separators or has_platform_headers
 

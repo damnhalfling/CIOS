@@ -10,11 +10,9 @@ Each section has:
 - Content area with monospace text
 """
 
-import tkinter as tk
-import tkinter.font as tkfont
 import re
-from typing import Callable, Optional
-
+import tkinter as tk
+from collections.abc import Callable
 
 # Colors (matching CIOS theme)
 BG = "#0a0a0f"
@@ -54,24 +52,33 @@ class ArtifactSection:
 
         # Chevron
         self._chevron = tk.Label(
-            header, text="▶" if not is_open else "▼",
-            font=fonts.get("small", None), fg=FG_DIM, bg=BG_CARD,
+            header,
+            text="▶" if not is_open else "▼",
+            font=fonts.get("small"),
+            fg=FG_DIM,
+            bg=BG_CARD,
         )
         self._chevron.pack(side="left", padx=(0, 6))
         self._chevron.bind("<Button-1>", lambda _: self.toggle())
 
         # Label
         lbl = tk.Label(
-            header, text=label.upper(),
-            font=fonts.get("metric", None), fg=FG_SEC, bg=BG_CARD,
+            header,
+            text=label.upper(),
+            font=fonts.get("metric"),
+            fg=FG_SEC,
+            bg=BG_CARD,
         )
         lbl.pack(side="left")
         lbl.bind("<Button-1>", lambda _: self.toggle())
 
         # Copy button
         self._copy_btn = tk.Label(
-            header, text="📋 Copiar",
-            font=fonts.get("small", None), fg=ACCENT, bg=BG_CARD,
+            header,
+            text="📋 Copiar",
+            font=fonts.get("small"),
+            fg=ACCENT,
+            bg=BG_CARD,
             cursor="hand2",
         )
         self._copy_btn.pack(side="right")
@@ -86,7 +93,7 @@ class ArtifactSection:
             self._content_frame,
             bg=BG,
             fg=FG,
-            font=fonts.get("small", None),
+            font=fonts.get("small"),
             wrap="word",
             height=min(15, content.count("\n") + 3),
             borderwidth=0,
@@ -127,11 +134,11 @@ class ArtifactSection:
 class ArtifactPanel:
     """Full artifact panel that replaces the right sidebar."""
 
-    def __init__(self, parent: tk.Frame, fonts: dict, on_close: Optional[Callable] = None):
+    def __init__(self, parent: tk.Frame, fonts: dict, on_close: Callable | None = None):
         self._parent = parent
         self._fonts = fonts
         self._on_close = on_close
-        self._frame: Optional[tk.Frame] = None
+        self._frame: tk.Frame | None = None
         self._sections: list[ArtifactSection] = []
 
     def show(self, content: str) -> None:
@@ -146,14 +153,20 @@ class ArtifactPanel:
         header.pack(fill="x")
 
         tk.Label(
-            header, text="📄 Artefato",
-            font=self._fonts.get("sec", None), fg=FG, bg=BG_PANEL,
+            header,
+            text="📄 Artefato",
+            font=self._fonts.get("sec"),
+            fg=FG,
+            bg=BG_PANEL,
         ).pack(side="left")
 
         # Close button
         close_btn = tk.Label(
-            header, text="✕",
-            font=self._fonts.get("metric", None), fg=FG_DIM, bg=BG_PANEL,
+            header,
+            text="✕",
+            font=self._fonts.get("metric"),
+            fg=FG_DIM,
+            bg=BG_PANEL,
             cursor="hand2",
         )
         close_btn.pack(side="right")
@@ -198,7 +211,7 @@ class ArtifactPanel:
         sections = []
 
         # Try === separators first
-        sep_pattern = r'^={3,}\s*\[?\s*(.+?)\s*\]?\s*={3,}$'
+        sep_pattern = r"^={3,}\s*\[?\s*(.+?)\s*\]?\s*={3,}$"
         matches = list(re.finditer(sep_pattern, content, re.MULTILINE))
 
         if matches:
@@ -213,7 +226,7 @@ class ArtifactPanel:
                 return sections
 
         # Try ## headers
-        header_pattern = r'^##\s+(.+)$'
+        header_pattern = r"^##\s+(.+)$"
         matches = list(re.finditer(header_pattern, content, re.MULTILINE))
 
         if len(matches) > 1:
@@ -228,7 +241,7 @@ class ArtifactPanel:
                 return sections
 
         # Try bold headers like **LinkedIn EN**
-        bold_pattern = r'^\*\*(.+?)\*\*\s*$'
+        bold_pattern = r"^\*\*(.+?)\*\*\s*$"
         matches = list(re.finditer(bold_pattern, content, re.MULTILINE))
 
         if len(matches) > 1:
