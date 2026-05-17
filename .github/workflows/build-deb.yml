@@ -100,11 +100,22 @@ jobs:
             libxcb-res0-dev libxcb-shm0-dev hwdata libxcb-ewmh-dev \
             libffi-dev libxml2-dev libexpat1-dev \
             libegl1-mesa-dev libgles2-mesa-dev libcairo2-dev \
-            patchelf
+            patchelf libpam0g-dev
           # Install newer Meson (wlroots 0.18 requires c23 support → Meson 1.5+)
           sudo pip install meson>=1.5.0
           # These may not be in default repos — install if available
           sudo apt-get install -y libdisplay-info-dev libliftoff-dev 2>/dev/null || true
+
+      - name: Build and install greetd
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          source "$HOME/.cargo/env"
+          git clone --depth=1 --branch 0.10.3 https://git.sr.ht/~kennylevinsen/greetd /tmp/greetd
+          cd /tmp/greetd
+          cargo build --release
+          sudo cp target/release/greetd /usr/bin/greetd
+          sudo cp target/release/agreety /usr/bin/agreety
+          sudo chmod 755 /usr/bin/greetd /usr/bin/agreety
 
       - name: Build and install wayland 1.23 (system has 1.22)
         run: |

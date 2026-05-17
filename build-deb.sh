@@ -136,8 +136,10 @@ Version: ${VERSION}
 Section: x11
 Priority: optional
 Architecture: amd64
-Depends: python3 (>= 3.10), python3-pip, python3-venv, python3-gi, gir1.2-gtk-4.0, greetd, seatd, libxkbcommon0, libinput10, libseat1, libpixman-1-0, libdrm2, libgles2, libegl1, libgbm1, libcap2, plymouth, plymouth-themes, curl, pipewire-pulse | pulseaudio-utils, network-manager
+Depends: python3 (>= 3.10), python3-pip, python3-venv, python3-gi, gir1.2-gtk-4.0, libxkbcommon0, libinput10, libseat1, seatd, libpixman-1-0, libdrm2, libgles2, libegl1, libgbm1, libcap2, plymouth, curl, network-manager, pipewire, pipewire-pulse
 Recommends: xwayland, wl-clipboard
+Conflicts: lightdm, gdm3, sddm
+Provides: x-display-manager
 Maintainer: damnhalfling <damnhalfling@github.com>
 Description: CIOS — AI-first operating system (Wayland)
  An AI-first desktop that replaces apps with intent-driven
@@ -299,11 +301,16 @@ echo "[CIOS] ✓ Whisper STT ready"
 
 echo "[CIOS] [5/6] Display manager (greetd)..."
 
-# Kill and disable any other DM
+# Kill and disable any other DM — they conflict with CIOS
 for dm in lightdm gdm gdm3 sddm; do
     systemctl stop "$dm" 2>/dev/null || true
     systemctl disable "$dm" 2>/dev/null || true
+    # Remove them to prevent apt from pulling X11 back
+    apt-get remove -y "$dm" 2>/dev/null || true
 done
+
+# Remove X11 packages that may have been pulled as dependencies
+apt-get autoremove -y 2>/dev/null || true
 
 # Create greeter user
 if ! id greeter &>/dev/null; then
@@ -489,6 +496,48 @@ cp -r cios/skills/*.py "${PKG_DIR}${INSTALL_DIR}/cios/skills/"
 echo "→ Installing cios-shell compositor..."
 cp shell/build/cios-shell "${PKG_DIR}/usr/bin/cios-shell"
 chmod 755 "${PKG_DIR}/usr/bin/cios-shell"
+
+# ── Bundle greetd binary (not in Debian repos) ──
+echo "→ Bundling greetd..."
+if command -v greetd &>/dev/null; then
+    cp "$(which greetd)" "${PKG_DIR}/usr/bin/greetd"
+    chmod 755 "${PKG_DIR}/usr/bin/greetd"
+elif [ -f /usr/bin/greetd ]; then
+    cp /usr/bin/greetd "${PKG_DIR}/usr/bin/greetd"
+    chmod 755 "${PKG_DIR}/usr/bin/greetd"
+else
+    echo "  → greetd not found locally, will build from source..."
+    if command -v cargo &>/dev/null; then
+        cargo install greetd --root /tmp/greetd-build 2>/dev/null && \
+            cp /tmp/greetd-build/bin/greetd "${PKG_DIR}/usr/bin/greetd" && \
+            chmod 755 "${PKG_DIR}/usr/bin/greetd" || \
+            fatal "Cannot build greetd. Install cargo or provide greetd binary."
+    else
+        fatal "greetd not found and cargo not available to build it." \
+            "Install greetd: cargo install greetd, or apt install greetd from a third-party repo."
+    fi
+fi
+
+# ── Bundle greetd systemd unit ──
+mkdir -p "${PKG_DIR}/usr/lib/systemd/system"
+cat > "${PKG_DIR}/usr/lib/systemd/system/greetd.service" << 'GREETD_UNIT'
+[Unit]
+Description=greetd login manager
+Documentation=man:greetd(1)
+After=systemd-user-sessions.service plymouth-quit-wait.service
+After=getty@tty1.service
+Conflicts=getty@tty1.service
+
+[Service]
+Type=idle
+ExecStart=/usr/bin/greetd
+Restart=always
+RestartSec=3
+
+[Install]
+Alias=display-manager.service
+WantedBy=graphical.target
+GREETD_UNIT
 
 echo "→ Bundling runtime libraries..."
 BASE_LIBS="linux-vdso|ld-linux|libc\.so|libm\.so|libdl\.so|libpthread|librt\.so|libstdc\+\+|libgcc_s|libX11\.so|libxcb\.so|libglib-2\.0|libgio-2\.0|libgobject-2\.0|libgmodule-2\.0|libffi\.so|libpcre2|libsystemd|libudev|libcap\.so|libgpg-error|libgcrypt|liblz4|liblzma|libzstd|libexpat"
