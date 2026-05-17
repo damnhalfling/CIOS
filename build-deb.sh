@@ -542,6 +542,16 @@ Alias=display-manager.service
 WantedBy=graphical.target
 GREETD_UNIT
 
+# ── PAM config for greetd (required for authentication) ──
+mkdir -p "${PKG_DIR}/etc/pam.d"
+cat > "${PKG_DIR}/etc/pam.d/greetd" << 'GREETD_PAM'
+#%PAM-1.0
+auth       include   login
+account    include   login
+password   include   login
+session    include   login
+GREETD_PAM
+
 # ── Override plymouth-quit-wait to not block forever ──
 mkdir -p "${PKG_DIR}/etc/systemd/system/plymouth-quit-wait.service.d"
 cat > "${PKG_DIR}/etc/systemd/system/plymouth-quit-wait.service.d/timeout.conf" << 'PLYTIMEOUT'
