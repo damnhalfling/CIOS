@@ -15,7 +15,9 @@ useradd \
     cios 2>/dev/null || true
 
 # Set password to 'cios' (needed for greeter login)
-echo "cios:cios" | chpasswd
+# Use pre-hashed password to avoid PAM issues in chroot
+HASHED_PW=$(openssl passwd -6 "cios")
+usermod -p "$HASHED_PW" cios
 
 # Add to required groups (video/render/input for DRM, audio for sound)
 usermod -aG audio,video,render,input,netdev,plugdev,sudo cios
