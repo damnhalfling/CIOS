@@ -16,7 +16,7 @@ lb config noauto \
     --architecture amd64 \
     --archive-areas "main contrib non-free non-free-firmware" \
     --binary-images iso-hybrid \
-    --bootloader "grub-efi" \
+    --bootloaders "grub-efi" \
     --memtest none \
     --apt-indices false \
     --apt-recommends false \
