@@ -528,10 +528,8 @@ def _provider_is_configured(provider: str) -> bool:
         return bool(config.get("openai_api_key"))
     if provider == "anthropic":
         return bool(config.get("anthropic_api_key"))
-    if provider == "cios_api":
-        # CIOS API is always available as final fallback (free tier exists)
-        return True
-    return False
+    # CIOS API is always available as final fallback (free tier exists)
+    return provider == "cios_api"
 
 
 # Cache Ollama reachability for 30s to avoid repeated socket checks

@@ -28,7 +28,6 @@ import urllib.request
 from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 from cios.core.config import CIOS_HOME
 
@@ -497,7 +496,7 @@ class IntelligenceClient:
         except urllib.error.HTTPError as e:
             result = self._handle_http_error(e)
             yield StreamChunk(type="error", metadata={"message": result.error})
-        except urllib.error.URLError as e:
+        except urllib.error.URLError:
             yield StreamChunk(type="error", metadata={"message": "offline"})
         except Exception as e:
             logger.warning("Stream error: %s", e)
