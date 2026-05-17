@@ -122,17 +122,24 @@ main() {
     info "[2/5] Preparing live-build environment..."
     clean_previous
 
-    # Instead of using config/packages.chroot (which creates an unsigned local repo),
-    # copy the .deb into includes.chroot and install via hook
+    # Place .deb in packages.chroot (live-build installs these automatically)
+    mkdir -p "$SCRIPT_DIR/config/packages.chroot"
+    cp "$deb_file" "$SCRIPT_DIR/config/packages.chroot/"
+
+    # Also place in includes.chroot/tmp as fallback for hook-based install
     mkdir -p "$SCRIPT_DIR/config/includes.chroot/tmp"
     cp "$deb_file" "$SCRIPT_DIR/config/includes.chroot/tmp/cios.deb"
 
     # Ensure hooks are in BOTH locations for compatibility:
     # - config/hooks/live/*.chroot  (live-build >= 4.x, Debian)
+    # - config/hooks/normal/*.chroot (live-build newer Debian)
     # - config/hooks/*.chroot       (live-build 3.x, Ubuntu)
     if [ -d "$SCRIPT_DIR/config/hooks/live" ]; then
+        mkdir -p "$SCRIPT_DIR/config/hooks/normal"
         cp -f "$SCRIPT_DIR/config/hooks/live/"*.chroot "$SCRIPT_DIR/config/hooks/" 2>/dev/null || true
+        cp -f "$SCRIPT_DIR/config/hooks/live/"*.chroot "$SCRIPT_DIR/config/hooks/normal/" 2>/dev/null || true
         chmod +x "$SCRIPT_DIR/config/hooks/"*.chroot 2>/dev/null || true
+        chmod +x "$SCRIPT_DIR/config/hooks/normal/"*.chroot 2>/dev/null || true
     fi
 
     # Step 3: Configure live-build
