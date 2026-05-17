@@ -2,14 +2,20 @@
 # ═══════════════════════════════════════════════════
 #  CIOS — Build .deb package
 #  Usage: bash build-deb.sh [VERSION]
-#  Example: bash build-deb.sh 0.3.0
+#  Example: bash build-deb.sh 1.1.0-rc1
 # ═══════════════════════════════════════════════════
 set -euo pipefail
 
-VERSION="${1:-0.3.0}"
+VERSION="${1:-2.0.0-rc1}"
 PKG_NAME="cios"
 PKG_DIR="${PKG_NAME}_${VERSION}_amd64"
 INSTALL_DIR="/usr/share/cios"
+
+# ── Ensure fakeroot is available (avoids permission issues in .deb) ──
+if ! command -v fakeroot &>/dev/null; then
+    echo "⚠ fakeroot not found. Installing..."
+    sudo apt-get install -y fakeroot
+fi
 
 echo "╔═══════════════════════════════════════════╗"
 echo "║  CIOS — Building .deb v${VERSION}             ║"
@@ -17,6 +23,26 @@ echo "╚═══════════════════════�
 
 # ── Clean previous build ──
 rm -rf "${PKG_DIR}" "${PKG_DIR}.deb"
+
+# ── Build Wayland compositor ──
+echo "→ Building CIOS Shell (Wayland compositor)..."
+export PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
+if [ -d shell ]; then
+    pushd shell > /dev/null
+    rm -rf build
+    if meson setup build --prefix=/usr 2>/dev/null && ninja -C build 2>/dev/null; then
+        popd > /dev/null
+        echo "→ ✓ cios-shell compiled"
+        SHELL_BUILT=true
+    else
+        popd > /dev/null
+        echo "→ ⚠ cios-shell skipped (missing wlroots-0.18 or build deps)"
+        SHELL_BUILT=false
+    fi
+else
+    echo "→ ⚠ shell/ directory not found. Building without compositor."
+    SHELL_BUILT=false
+fi
 
 # ── Create directory structure ──
 mkdir -p "${PKG_DIR}/DEBIAN"
@@ -28,10 +54,15 @@ mkdir -p "${PKG_DIR}${INSTALL_DIR}/cios/skills"
 mkdir -p "${PKG_DIR}${INSTALL_DIR}/assets"
 mkdir -p "${PKG_DIR}${INSTALL_DIR}/config"
 mkdir -p "${PKG_DIR}/usr/local/bin"
-mkdir -p "${PKG_DIR}/usr/share/xsessions"
+mkdir -p "${PKG_DIR}/usr/bin"
+mkdir -p "${PKG_DIR}/usr/share/wayland-sessions"
 mkdir -p "${PKG_DIR}/usr/share/plymouth/themes/cios"
 mkdir -p "${PKG_DIR}/usr/share/backgrounds"
-mkdir -p "${PKG_DIR}/etc/xdg/openbox-cios"
+mkdir -p "${PKG_DIR}/etc/ld.so.conf.d"
+
+# ── Register bundled libs with the system linker ──
+# This ensures cios-shell can find its libs without LD_LIBRARY_PATH or RPATH
+echo "/usr/lib/cios" > "${PKG_DIR}/etc/ld.so.conf.d/cios.conf"
 
 # ── DEBIAN/control ──
 cat > "${PKG_DIR}/DEBIAN/control" << EOF
@@ -40,15 +71,17 @@ Version: ${VERSION}
 Section: x11
 Priority: optional
 Architecture: amd64
-Depends: python3 (>= 3.10), python3-pip, python3-venv, python3-tk, xorg, lightdm, lightdm-gtk-greeter, openbox, wmctrl, xdotool, x11-xserver-utils, curl
-Recommends: pipewire-pulse | pulseaudio-utils, network-manager, i3lock, plymouth
-Suggests: slick-greeter, plymouth-themes
+Depends: python3 (>= 3.10), python3-pip, python3-venv, python3-gi, gir1.2-gtk-4.0, greetd, libxkbcommon0, libinput10, libseat1, seatd, libpixman-1-0, libdrm2, libgles2, libegl1, libgbm1, dmsetup, libcap2, plymouth, plymouth-themes, curl
+Recommends: xwayland, pipewire-pulse | pulseaudio-utils, network-manager, wl-clipboard
 Maintainer: damnhalfling <damnhalfling@github.com>
-Description: CIOS — AI-first desktop interface
+Description: CIOS — AI-first desktop interface (Wayland)
  A AI-first layer that replaces apps with intent-driven
  execution on top of Linux. Speak intent, get results.
  .
- Can be installed as an additional X session alongside
+ Uses a custom Wayland compositor (cios-shell) based on
+ wlroots 0.18+ with XWayland support for legacy apps.
+ .
+ Can be installed as an additional session alongside
  GNOME/KDE, or as the default desktop with custom login.
 Homepage: https://github.com/damnhalfling/cios
 EOF
@@ -98,6 +131,11 @@ cat > "${PKG_DIR}/DEBIAN/postinst" << 'POSTINST'
 export PATH="$PATH:/usr/local/sbin:/usr/sbin:/sbin"
 export DEBIAN_FRONTEND=noninteractive
 
+# ── Register bundled shared libraries with the system linker ──
+# The .deb includes /etc/ld.so.conf.d/cios.conf pointing to /usr/lib/cios
+# We must run ldconfig so the linker cache is updated before cios-shell runs.
+ldconfig 2>/dev/null || true
+
 echo ""
 echo "╔═══════════════════════════════════════════╗"
 echo "║       CIOS — Installer                   ║"
@@ -127,9 +165,9 @@ if [ ! -d /usr/share/cios/.venv ]; then
 fi
 
 if [ -d /usr/share/cios/.venv ]; then
-    # Verify venv has tkinter access, recreate if not
-    if ! /usr/share/cios/.venv/bin/python3 -c "import tkinter" 2>/dev/null; then
-        echo "[CIOS] Venv missing tkinter, recreating with --system-site-packages..."
+    # Verify venv has gi (GTK4) access, recreate if not
+    if ! /usr/share/cios/.venv/bin/python3 -c "import gi" 2>/dev/null; then
+        echo "[CIOS] Venv missing PyGObject (gi), recreating with --system-site-packages..."
         rm -rf /usr/share/cios/.venv
         python3 -m venv --system-site-packages /usr/share/cios/.venv 2>/dev/null || true
     fi
@@ -146,81 +184,54 @@ fi
 chmod +x /usr/local/bin/cios-session 2>/dev/null || true
 echo "[CIOS] ✓ Python environment ready"
 
-# ── Install Ollama (local LLM) ──
+# ── Install Ollama + Mistral (with progress feedback) ──
+echo ""
+echo "┌─────────────────────────────────────────────┐"
+echo "│  Instalando IA local (Ollama + Mistral)      │"
+echo "│  Isso pode levar 10-30 minutos.              │"
+echo "│  Não interrompa a instalação.                 │"
+echo "└─────────────────────────────────────────────┘"
+echo ""
+
+# Install Ollama
 if ! command -v ollama &>/dev/null; then
-    echo "[CIOS] Installing Ollama (local AI)..."
-    curl -fsSL https://ollama.com/install.sh | sh 2>/dev/null || {
-        echo "[CIOS] ⚠ Could not install Ollama. Local AI will be unavailable."
-        echo "[CIOS]   Install manually later: curl -fsSL https://ollama.com/install.sh | sh"
-    }
-fi
-
-# Pull default model if Ollama is available
-if command -v ollama &>/dev/null; then
-    echo "[CIOS] Pulling default model (mistral)..."
-    # Start ollama serve temporarily for the pull
-    ollama serve &>/dev/null &
-    OLLAMA_SERVE_PID=$!
-    sleep 2
-    ollama pull mistral 2>/dev/null || {
-        echo "[CIOS] ⚠ Could not pull mistral model now. Will retry on first boot."
-    }
-    kill $OLLAMA_SERVE_PID 2>/dev/null || true
-fi
-
-echo "[CIOS] ✓ AI environment ready"
-
-# ── Install voice tools (optional — STT/TTS) ──
-echo "[CIOS] Setting up voice (optional)..."
-
-# Install piper TTS (local, offline)
-if ! command -v piper &>/dev/null; then
-    echo "[CIOS] Installing piper (TTS)..."
-    PIPER_VERSION="2023.11.14-2"
-    PIPER_URL="https://github.com/rhasspy/piper/releases/download/${PIPER_VERSION}/piper_linux_x86_64.tar.gz"
-    if curl -fsSL "$PIPER_URL" -o /tmp/piper.tar.gz 2>/dev/null; then
-        tar -xzf /tmp/piper.tar.gz -C /usr/local/bin/ --strip-components=1 piper/piper 2>/dev/null || true
-        rm -f /tmp/piper.tar.gz
-        # Download PT-BR voice model
-        mkdir -p /usr/share/piper/voices
-        VOICE_URL="https://huggingface.co/rhasspy/piper-voices/resolve/main/pt/pt_BR/faber/medium/pt_BR-faber-medium.onnx"
-        curl -fsSL "$VOICE_URL" -o /usr/share/piper/voices/pt_BR-faber-medium.onnx 2>/dev/null || true
-        curl -fsSL "${VOICE_URL}.json" -o /usr/share/piper/voices/pt_BR-faber-medium.onnx.json 2>/dev/null || true
-        echo "[CIOS] ✓ Piper TTS installed"
+    echo "[CIOS] [1/2] Baixando Ollama..."
+    if curl -fsSL https://ollama.com/install.sh | sh; then
+        echo "[CIOS] ✓ Ollama instalado"
     else
-        echo "[CIOS] ⚠ Could not download piper. TTS will be unavailable."
+        echo "[CIOS] ⚠ Falha ao instalar Ollama. Execute depois: curl -fsSL https://ollama.com/install.sh | sh"
     fi
+else
+    echo "[CIOS] ✓ Ollama já instalado"
 fi
 
-# Install whisper.cpp (local STT)
-if ! command -v whisper-cpp &>/dev/null && ! command -v whisper &>/dev/null; then
-    echo "[CIOS] Installing whisper (STT)..."
-    # Try pip install (openai-whisper is simpler to install)
-    if [ -d /usr/share/cios/.venv ]; then
-        /usr/share/cios/.venv/bin/pip install --quiet openai-whisper 2>/dev/null && {
-            # Create symlink so VoiceManager finds it
-            ln -sf /usr/share/cios/.venv/bin/whisper /usr/local/bin/whisper 2>/dev/null || true
-            echo "[CIOS] ✓ Whisper STT installed"
-        } || {
-            echo "[CIOS] ⚠ Could not install whisper. STT will be unavailable."
-        }
+# Pull Mistral model (with progress — ollama pull shows download %)
+if command -v ollama &>/dev/null; then
+    echo "[CIOS] [2/2] Baixando modelo Mistral (~4GB)..."
+    echo "[CIOS]       O progresso aparece abaixo:"
+    echo ""
+
+    # Start ollama serve temporarily
+    ollama serve &>/dev/null &
+    OLLAMA_PID=$!
+    sleep 3
+
+    # Pull with visible progress (ollama pull shows % in real-time)
+    if ollama pull mistral; then
+        echo ""
+        echo "[CIOS] ✓ Modelo Mistral instalado"
+    else
+        echo ""
+        echo "[CIOS] ⚠ Falha ao baixar Mistral. Execute depois: ollama pull mistral"
     fi
+
+    kill $OLLAMA_PID 2>/dev/null || true
+else
+    echo "[CIOS] ⚠ Ollama não disponível, modelo não baixado"
 fi
 
-echo "[CIOS] ✓ Voice setup complete"
-
-# ── Apply LightDM branding if LightDM is installed (both modes) ──
-if [ -d /etc/lightdm ] && command -v lightdm &>/dev/null; then
-    CIOS_CONF="/usr/share/cios/config"
-    if [ -f "$CIOS_CONF/slick-greeter.conf" ] && [ -f /usr/share/pixmaps/cios-logo.png ]; then
-        if [ ! -f /etc/lightdm/slick-greeter.conf.bak.cios ]; then
-            cp /etc/lightdm/slick-greeter.conf /etc/lightdm/slick-greeter.conf.bak.cios 2>/dev/null || true
-        fi
-        cp "$CIOS_CONF/slick-greeter.conf" /etc/lightdm/slick-greeter.conf
-        echo "[CIOS] ✓ LightDM branding applied (logo + background)"
-    fi
-fi
-
+echo ""
+echo "[CIOS] ✓ IA local configurada"
 echo ""
 
 # ── Installation mode ──
@@ -254,7 +265,11 @@ else
     echo ""
 
     INSTALL_MODE="1"
-    if [ -t 0 ]; then
+    # Skip interactive prompt in chroot/CI environments
+    if [ -f /.dockerenv ] || [ -f /run/live/medium ] || grep -q "chroot" /proc/1/cgroup 2>/dev/null || [ "$DEBIAN_FRONTEND" = "noninteractive" ]; then
+        INSTALL_MODE="2"
+        echo "[CIOS] Chroot/CI detected — using full replacement mode."
+    elif [ -t 0 ]; then
         read -rp "  Opção [1]: " INSTALL_MODE
         INSTALL_MODE="${INSTALL_MODE:-1}"
     elif [ -e /dev/tty ]; then
@@ -280,60 +295,45 @@ esac
 POLICY
     chmod 755 /usr/sbin/policy-rc.d
 
-    # LightDM and Xorg are already installed as package dependencies
-    # Just need to configure them
-    echo "[CIOS] ✓ Xorg + LightDM already installed (package deps)"
+    # LightDM — configure for Wayland session
+    echo "[CIOS] ✓ Wayland compositor installed"
+
+    # Ensure session desktop files exist (belt + suspenders)
+    mkdir -p /usr/share/xsessions /usr/share/wayland-sessions
+    cat > /usr/share/xsessions/cios-shell.desktop << 'DSKTP'
+[Desktop Entry]
+Name=CIOS
+Comment=CIOS — AI-first desktop (Wayland)
+Exec=/usr/local/bin/cios-session
+Type=Application
+DesktopNames=CIOS
+DSKTP
+    cp /usr/share/xsessions/cios-shell.desktop /usr/share/wayland-sessions/cios-shell.desktop
+    echo "[CIOS] ✓ Session desktop files installed"
 
     # Remove DM restart block
     rm -f /usr/sbin/policy-rc.d
 
-    # Backup + set LightDM as default
-    mkdir -p /etc/X11
-    if [ -f /etc/X11/default-display-manager ] && [ ! -f /etc/X11/default-display-manager.bak.cios ]; then
-        cp /etc/X11/default-display-manager /etc/X11/default-display-manager.bak.cios
-    fi
-    echo "/usr/sbin/lightdm" > /etc/X11/default-display-manager
+    # ── Configure greetd (Wayland-native display manager) ──
+    mkdir -p /etc/greetd
 
-    # Apply LightDM configs (logo + background + theme)
-    mkdir -p /etc/lightdm
-    CIOS_CONF="/usr/share/cios/config"
-
-    # Detect which greeter is available
-    if command -v slick-greeter &>/dev/null; then
-        GREETER="slick-greeter"
-    elif [ -f /usr/share/xgreeters/lightdm-gtk-greeter.desktop ]; then
-        GREETER="lightdm-gtk-greeter"
-    else
-        GREETER="lightdm-gtk-greeter"
+    # Create greeter user if it doesn't exist (required by greetd)
+    if ! id greeter &>/dev/null; then
+        useradd -r -s /usr/sbin/nologin -d /dev/null greeter 2>/dev/null || true
+        usermod -aG video greeter 2>/dev/null || true
     fi
 
-    # Write lightdm.conf with correct greeter
-    cat > /etc/lightdm/lightdm.conf << LDMCONF
-[Seat:*]
-greeter-session=$GREETER
-user-session=cios
-greeter-hide-users=false
-allow-guest=false
-LDMCONF
+    # Always write CIOS greetd config (greetd ships a default agreety config
+    # that doesn't launch our compositor — we must override it)
+    cat > /etc/greetd/config.toml << 'GREETD'
+[terminal]
+vt = 1
 
-    # Apply greeter theme if slick-greeter
-    if [ "$GREETER" = "slick-greeter" ] && [ -f "$CIOS_CONF/slick-greeter.conf" ]; then
-        cp "$CIOS_CONF/slick-greeter.conf" /etc/lightdm/slick-greeter.conf
-    fi
-
-    # Apply GTK greeter theme if lightdm-gtk-greeter
-    if [ "$GREETER" = "lightdm-gtk-greeter" ]; then
-        cat > /etc/lightdm/lightdm-gtk-greeter.conf << 'GTKCONF'
-[greeter]
-background=/usr/share/backgrounds/cios.png
-theme-name=Adwaita-dark
-icon-theme-name=Adwaita
-font-name=Sans 11
-indicators=~host;~spacer;~session;~power
-position=50%,center 50%,center
-GTKCONF
-    fi
-    echo "[CIOS] ✓ LightDM configured (greeter: $GREETER)"
+[default_session]
+command = "/usr/local/bin/cios-greeter-session"
+user = "greeter"
+GREETD
+    echo "[CIOS] ✓ greetd configured"
 
     # ── Plymouth boot splash (instant, in initramfs) ──
     PLYMOUTH_THEME="/usr/share/plymouth/themes/cios"
@@ -365,27 +365,21 @@ GTKCONF
             cp /etc/default/grub /etc/default/grub.bak.cios
         fi
 
-        # Replace GRUB_CMDLINE_LINUX_DEFAULT with fully silent boot
         sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash loglevel=0 vt.global_cursor_default=0 rd.udev.log_priority=3 systemd.show_status=false"/' /etc/default/grub
-
-        # Zero timeout — GRUB is invisible (Shift/Esc still works to access menu)
         sed -i 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=0/' /etc/default/grub
 
-        # Hidden style — no countdown, no menu
         if grep -q "^GRUB_TIMEOUT_STYLE" /etc/default/grub; then
             sed -i 's/^GRUB_TIMEOUT_STYLE=.*/GRUB_TIMEOUT_STYLE=hidden/' /etc/default/grub
         else
             echo 'GRUB_TIMEOUT_STYLE=hidden' >> /etc/default/grub
         fi
 
-        # Don't probe for other OS (faster boot, cleaner menu)
         if grep -q "^GRUB_DISABLE_OS_PROBER" /etc/default/grub; then
             sed -i 's/^GRUB_DISABLE_OS_PROBER=.*/GRUB_DISABLE_OS_PROBER=true/' /etc/default/grub
         else
             echo 'GRUB_DISABLE_OS_PROBER=true' >> /etc/default/grub
         fi
 
-        # Even after failed boot, keep timeout minimal (2s safety net)
         if grep -q "^GRUB_RECORDFAIL_TIMEOUT" /etc/default/grub; then
             sed -i 's/^GRUB_RECORDFAIL_TIMEOUT=.*/GRUB_RECORDFAIL_TIMEOUT=2/' /etc/default/grub
         else
@@ -393,27 +387,54 @@ GTKCONF
         fi
 
         update-grub 2>/dev/null || true
-        echo "[CIOS] ✓ GRUB invisible (0s timeout, silent kernel, no OS probe)"
+        echo "[CIOS] ✓ GRUB invisible (0s timeout, silent kernel)"
     fi
 
-    # Disable other DMs
-    for dm in gdm gdm3 sddm; do
-        if systemctl is-enabled "$dm" 2>/dev/null | grep -q "enabled"; then
-            systemctl disable "$dm" 2>/dev/null || true
-        fi
+    # Disable other DMs (lightdm, gdm, sddm)
+    for dm in lightdm gdm gdm3 sddm; do
+        systemctl disable "$dm" 2>/dev/null || true
     done
-    systemctl enable lightdm 2>/dev/null || true
+    systemctl enable greetd 2>/dev/null || true
 
-    # Ensure system boots to graphical target (not multi-user/text)
+    # Disable getty on tty1 — greetd manages VT1 exclusively.
+    # Without this, getty restarts on tty1 after greeter exits and kills
+    # the user's compositor session.
+    systemctl disable getty@tty1.service 2>/dev/null || true
+    systemctl mask getty@tty1.service 2>/dev/null || true
+
+    # Ensure system boots to graphical target
     systemctl set-default graphical.target 2>/dev/null || true
+
+    # Customize /etc/os-release to show CIOS identity
+    if [ ! -f /etc/os-release.bak.cios ]; then
+        cp /etc/os-release /etc/os-release.bak.cios
+    fi
+    CIOS_VER=$(dpkg-query -W -f='${Version}' cios 2>/dev/null || echo "2.0")
+    cat > /etc/os-release << OSREL
+PRETTY_NAME="CIOS ${CIOS_VER}"
+NAME="CIOS"
+VERSION_ID="${CIOS_VER}"
+VERSION="${CIOS_VER} (Wayland)"
+ID=cios
+ID_LIKE=debian
+HOME_URL="https://github.com/damnhalfling/CIOS"
+BUG_REPORT_URL="https://github.com/damnhalfling/CIOS/issues"
+OSREL
+    echo "[CIOS] ✓ /etc/os-release customized"
+
+    # Ensure all non-root users are in video/render/input groups (DRM access)
+    for user in $(awk -F: '$3 >= 1000 && $3 < 65000 {print $1}' /etc/passwd); do
+        usermod -aG video,render,input "$user" 2>/dev/null || true
+    done
+    echo "[CIOS] ✓ Users added to video/render/input groups"
 
     echo ""
     echo "═══════════════════════════════════════════"
     echo "  ✓ Substituição completa configurada!"
     echo ""
     echo "  Boot: logo CIOS (Plymouth)"
-    echo "  Login: LightDM com tema CIOS"
-    echo "  Desktop: CIOS"
+    echo "  Login: greetd (texto) → CIOS (Wayland)"
+    echo "  Desktop: CIOS (Wayland compositor)"
     echo ""
     echo "  Reboot: sudo reboot"
     echo "  Reverter: sudo apt remove cios && sudo reboot"
@@ -464,6 +485,7 @@ else
     echo "  ✓ CIOS instalado (sessão adicional)"
     echo ""
     echo "  Reboot e selecione 'CIOS' na tela de login."
+    echo "  (Sessão Wayland com compositor próprio)"
     echo "  sudo reboot"
     echo "═══════════════════════════════════════════"
     echo ""
@@ -547,31 +569,151 @@ cp -r cios/core/*.py "${PKG_DIR}${INSTALL_DIR}/cios/core/"
 mkdir -p "${PKG_DIR}${INSTALL_DIR}/cios/core/handlers"
 cp -r cios/core/handlers/*.py "${PKG_DIR}${INSTALL_DIR}/cios/core/handlers/"
 cp -r cios/ui/*.py "${PKG_DIR}${INSTALL_DIR}/cios/ui/"
+mkdir -p "${PKG_DIR}${INSTALL_DIR}/cios/ui/gtk"
+cp -r cios/ui/gtk/*.py "${PKG_DIR}${INSTALL_DIR}/cios/ui/gtk/"
 cp -r cios/infra/*.py "${PKG_DIR}${INSTALL_DIR}/cios/infra/"
 cp -r cios/skills/*.py "${PKG_DIR}${INSTALL_DIR}/cios/skills/"
+
+# ── Install compositor binary ──
+if [ "$SHELL_BUILT" = true ] && [ -f shell/build/cios-shell ]; then
+    echo "→ Installing cios-shell compositor..."
+    cp shell/build/cios-shell "${PKG_DIR}/usr/bin/cios-shell"
+    chmod 755 "${PKG_DIR}/usr/bin/cios-shell"
+
+    # ── Bundle ALL shared library dependencies not in base system ──
+    # Use ldd to find every lib cios-shell needs, bundle non-standard ones
+    echo "→ Bundling cios-shell runtime dependencies..."
+    mkdir -p "${PKG_DIR}/usr/lib/cios"
+
+    # List of libs that are ALWAYS in a base Debian/Ubuntu install (skip these)
+    BASE_LIBS="linux-vdso|ld-linux|libc\.so|libm\.so|libdl\.so|libpthread|librt\.so|libstdc\+\+|libgcc_s|libX11\.so|libxcb\.so|libglib-2\.0|libgio-2\.0|libgobject-2\.0|libgmodule-2\.0|libffi\.so|libpcre2|libsystemd|libudev|libcap\.so|libgpg-error|libgcrypt|liblz4|liblzma|libzstd|libexpat"
+
+    ldd "${PKG_DIR}/usr/bin/cios-shell" | grep "=> /" | awk '{print $3}' | while read -r lib; do
+        libname=$(basename "$lib")
+        if echo "$libname" | grep -qE "$BASE_LIBS"; then
+            continue
+        fi
+        if [ -f "$lib" ]; then
+            cp -L "$lib" "${PKG_DIR}/usr/lib/cios/$libname"
+        fi
+    done
+
+    echo "→ Bundled libs:"
+    ls "${PKG_DIR}/usr/lib/cios/" 2>/dev/null || echo "  (none)"
+
+    # ── Set RPATH on cios-shell so it finds bundled libs WITHOUT global ldconfig ──
+    if command -v patchelf &>/dev/null; then
+        patchelf --set-rpath '/usr/lib/cios' "${PKG_DIR}/usr/bin/cios-shell"
+        echo "→ ✓ RPATH set on cios-shell"
+    else
+        echo "→ ⚠ patchelf not found, will rely on LD_LIBRARY_PATH in cios-session"
+    fi
+else
+    echo "→ ⚠ Skipping compositor (not built). Package will use Openbox fallback."
+    mkdir -p "${PKG_DIR}/usr/lib/cios"
+fi
 
 # ── Session files ──
 echo "→ Copying session files..."
 
-# Session script
+# Desktop entry in BOTH locations (xsessions for LightDM, wayland-sessions for GDM/SDDM)
+mkdir -p "${PKG_DIR}/usr/share/xsessions"
+cat > "${PKG_DIR}/usr/share/wayland-sessions/cios-shell.desktop" << 'WSESSION'
+[Desktop Entry]
+Name=CIOS
+Comment=CIOS — AI-first desktop (Wayland)
+Exec=/usr/local/bin/cios-session
+Type=Application
+DesktopNames=CIOS
+WSESSION
+cp "${PKG_DIR}/usr/share/wayland-sessions/cios-shell.desktop" "${PKG_DIR}/usr/share/xsessions/cios-shell.desktop"
+
+# Greeter session — launched by greetd to show login screen
+cat > "${PKG_DIR}/usr/local/bin/cios-greeter-session" << 'GREETER_SESSION'
+#!/bin/bash
+# CIOS Greeter Session — starts compositor with greeter as runtime
+# greetd launches this; the greeter authenticates and tells greetd
+# to start the real user session (cios-session).
+
+# Fix HOME first — greeter user has HOME=/dev/null which breaks Mesa shader cache
+export HOME=/tmp/greeter-home
+mkdir -p "$HOME/.cache"
+export XDG_CACHE_HOME="$HOME/.cache"
+export MESA_SHADER_CACHE_DIR="$HOME/.cache/mesa"
+
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+# Ensure runtime dir exists (logind may not create it for system users)
+if [ ! -d "$XDG_RUNTIME_DIR" ]; then
+    mkdir -p "$XDG_RUNTIME_DIR"
+    chmod 0700 "$XDG_RUNTIME_DIR"
+fi
+
+# Fix HOME for greeter user (created with -d /dev/null, breaks Mesa shader cache)
+if [ "$HOME" = "/dev/null" ] || [ ! -d "$HOME" ]; then
+    export HOME="/tmp/greeter-home"
+    mkdir -p "$HOME/.cache"
+fi
+export XDG_CACHE_HOME="${HOME}/.cache"
+export XDG_SESSION_TYPE=wayland
+export GDK_BACKEND=wayland
+export WLR_NO_HARDWARE_CURSORS=1
+export WLR_RENDERER=${WLR_RENDERER:-gles2}
+export LIBSEAT_BACKEND=seatd
+export XKB_DEFAULT_LAYOUT="${XKB_DEFAULT_LAYOUT:-us}"
+export LD_LIBRARY_PATH="/usr/lib/cios:${LD_LIBRARY_PATH:-}"
+export PATH="/usr/bin:/usr/local/bin:/bin:/usr/sbin:/sbin:$PATH"
+export PYTHONPATH="/usr/share/cios:${PYTHONPATH:-}"
+
+# Log output for debugging
+LOGFILE="/tmp/cios-greeter.log"
+
+# Log output for debugging
+LOGFILE="/tmp/cios-greeter.log"
+
+# Find working Python with GTK4 support
+PYTHON="/usr/share/cios/.venv/bin/python3"
+if [ ! -x "$PYTHON" ] || ! "$PYTHON" -c "import gi" 2>/dev/null; then
+    PYTHON="python3"
+fi
+
+# Launch compositor with greeter as the runtime
+exec /usr/bin/cios-shell --runtime "$PYTHON -m cios.ui.gtk.greeter" >> "$LOGFILE" 2>&1
+GREETER_SESSION
+chmod 755 "${PKG_DIR}/usr/local/bin/cios-greeter-session"
+
+# Session script — launched by greetd after login
 cat > "${PKG_DIR}/usr/local/bin/cios-session" << 'SESSION'
 #!/bin/bash
-# CIOS X Session — optimized boot
-# Zero flicker. Splash with real progress. Crash recovery.
+# CIOS Session — Wayland compositor launcher
+# Launched by greetd on VT1 with proper seat/session access.
 
 export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
-export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+export XDG_SESSION_TYPE=wayland
+export GDK_BACKEND=wayland
+export PATH="/usr/bin:/usr/local/bin:/bin:/usr/sbin:/sbin:$PATH"
 export NO_AT_BRIDGE=1
 export GTK_A11Y=none
+
+# Use software cursor (fixes inverted/offset cursor in VMs)
+export WLR_NO_HARDWARE_CURSORS=1
+
+# Seat access for DRM/GPU
+export LIBSEAT_BACKEND=seatd
+
+# Keyboard layout (ensures correct mapping in VMs and real hardware)
+export XKB_DEFAULT_LAYOUT="${XKB_DEFAULT_LAYOUT:-us}"
+
+# Ensure bundled libs in /usr/lib/cios are findable
+export LD_LIBRARY_PATH="/usr/lib/cios:${LD_LIBRARY_PATH:-}"
 
 LOGFILE="$HOME/.cios/session.log"
 mkdir -p "$HOME/.cios"
 
 echo "=== CIOS session starting $(date) ===" >> "$LOGFILE"
-
-# Set background IMMEDIATELY (prevents any flash)
-xsetroot -solid '#0a0a0f' 2>/dev/null || true
-xsetroot -cursor_name left_ptr 2>/dev/null || true
+echo "  USER=$(whoami) UID=$(id -u) GROUPS=$(groups)" >> "$LOGFILE"
+echo "  XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR" >> "$LOGFILE"
+echo "  TTY=$(tty 2>/dev/null || echo unknown)" >> "$LOGFILE"
 
 # Find Python — try venv first, then system
 VENV="/usr/share/cios/.venv/bin/python3"
@@ -580,75 +722,36 @@ if [ ! -x "$VENV" ]; then
     echo "WARNING: venv not found, using system python: $VENV" >> "$LOGFILE"
 fi
 
-# Verify tkinter is accessible — if venv can't import it, fall back to system python
+# Verify venv has GTK4 (gi) access — essential for Wayland UI
 if [ -x "/usr/share/cios/.venv/bin/python3" ]; then
-    if ! /usr/share/cios/.venv/bin/python3 -c "import tkinter" 2>/dev/null; then
-        echo "WARNING: tkinter not available in venv, falling back to system python" >> "$LOGFILE"
+    if ! /usr/share/cios/.venv/bin/python3 -c "import gi" 2>/dev/null; then
+        echo "WARNING: gi not available in venv, falling back to system python" >> "$LOGFILE"
         VENV=$(which python3 2>/dev/null)
     fi
 fi
 
 if [ -z "$VENV" ]; then
     echo "FATAL: No python3 found!" >> "$LOGFILE"
-    xterm -e "echo 'CIOS: python3 not found. Check installation.'; bash" &
-    wait
     exit 1
 fi
 
-# Ensure cios module is findable
 export PYTHONPATH="/usr/share/cios:${PYTHONPATH:-}"
 
-# Verify cios module is importable
 if ! $VENV -c "import cios" 2>/dev/null; then
     echo "FATAL: Cannot import cios module" >> "$LOGFILE"
-    echo "Python: $VENV" >> "$LOGFILE"
-    echo "PYTHONPATH: $PYTHONPATH" >> "$LOGFILE"
     $VENV -c "import cios" >> "$LOGFILE" 2>&1
-    xterm -e "echo 'CIOS: module not found. Run: sudo apt install -f'; tail -10 $LOGFILE; echo; bash" &
-    wait
     exit 1
 fi
 
-# Show splash BEFORE Openbox (user sees brand instantly)
-$VENV -m cios.ui.splash &
-SPLASH_PID=$!
-
-# Start Openbox in parallel
-OPENBOX_CONF="/etc/xdg/openbox-cios"
-if command -v openbox &>/dev/null; then
-    openbox --config-file "${OPENBOX_CONF}/rc.xml" &
-    echo "Openbox started (PID $!)" >> "$LOGFILE"
-else
-    echo "WARNING: openbox not found, trying without WM" >> "$LOGFILE"
-fi
-
-# Start CIOS (crash recovery loop)
+# ── Launch Wayland compositor ──
 CRASH_COUNT=0
 while true; do
-    echo "Starting CIOS at $(date)" >> "$LOGFILE"
-    $VENV -m cios.main >> "$LOGFILE" 2>&1
+    echo "Starting cios-shell at $(date)" >> "$LOGFILE"
+
+    /usr/bin/cios-shell --runtime "$VENV -m cios.main" >> "$LOGFILE" 2>&1
     EXIT_CODE=$?
-    echo "CIOS exited with code $EXIT_CODE at $(date)" >> "$LOGFILE"
 
-    kill $SPLASH_PID 2>/dev/null || true
-
-    # Exit code 77 = tkinter not available, fall back to CLI in xterm
-    if [ $EXIT_CODE -eq 77 ]; then
-        echo "Tkinter not available, launching CLI in xterm" >> "$LOGFILE"
-        # Try to fix tkinter first
-        sudo apt-get install -y python3-tk 2>/dev/null || true
-        # If fix worked, retry GUI
-        if $VENV -c "import tkinter" 2>/dev/null; then
-            echo "python3-tk installed successfully, retrying GUI" >> "$LOGFILE"
-            continue
-        fi
-        # Otherwise launch CLI in terminal
-        xterm -fa "Monospace" -fs 11 -bg "#0a0a0f" -fg "#fafafa" \
-            -T "CIOS" -e "$VENV -m cios --cli" 2>/dev/null || \
-            x-terminal-emulator -e "$VENV -m cios --cli" 2>/dev/null || \
-            $VENV -m cios --cli
-        break
-    fi
+    echo "cios-shell exited with code $EXIT_CODE at $(date)" >> "$LOGFILE"
 
     if [ $EXIT_CODE -eq 0 ]; then
         break
@@ -656,14 +759,10 @@ while true; do
 
     CRASH_COUNT=$((CRASH_COUNT + 1))
     if [ $CRASH_COUNT -ge 3 ]; then
-        echo "Too many crashes, opening terminal" >> "$LOGFILE"
-        xterm -e "echo 'CIOS crashed 3x. Check ~/.cios/session.log'; tail -30 $LOGFILE; echo; bash" &
-        wait
+        echo "Too many crashes ($CRASH_COUNT), giving up" >> "$LOGFILE"
         break
     fi
 
-    $VENV -m cios.ui.splash &
-    SPLASH_PID=$!
     sleep 1
 done
 
@@ -671,62 +770,112 @@ echo "=== Session ended $(date) ===" >> "$LOGFILE"
 SESSION
 chmod 755 "${PKG_DIR}/usr/local/bin/cios-session"
 
-# X session desktop entry
-cat > "${PKG_DIR}/usr/share/xsessions/cios.desktop" << 'XSESSION'
-[Desktop Entry]
-Name=CIOS
-Comment=AI-first desktop interface
-Exec=/usr/local/bin/cios-session
-Type=Application
-DesktopNames=CIOS
-XSESSION
-
-# Openbox config
-cp session/rc.xml "${PKG_DIR}/etc/xdg/openbox-cios/rc.xml"
-
-# Openbox autostart (fallback)
-cat > "${PKG_DIR}/etc/xdg/openbox-cios/autostart" << 'AUTOSTART'
+# ── cios-setup-ai: installs heavy AI components after first login ──
+cat > "${PKG_DIR}/usr/local/bin/cios-setup-ai" << 'SETUPAI'
 #!/bin/bash
-# Fallback autostart — used if session script doesn't handle it
-xsetroot -solid '#0a0a0f' 2>/dev/null || true
-export NO_AT_BRIDGE=1
-export GTK_A11Y=none
-export PYTHONPATH="/usr/share/cios:${PYTHONPATH:-}"
-VENV="/usr/share/cios/.venv/bin/python3"
-if [ ! -x "$VENV" ]; then
-    VENV="python3"
-elif ! $VENV -c "import tkinter" 2>/dev/null; then
-    VENV="python3"
+# CIOS — Install AI components (Ollama + model + Whisper + Piper)
+# Run with: sudo cios-setup-ai
+# Automatically triggered on first login if not yet done.
+set -e
+
+MARKER="/usr/share/cios/.ai-setup-done"
+
+if [ -f "$MARKER" ]; then
+    echo "[CIOS] AI components already installed."
+    exit 0
 fi
-$VENV -m cios.ui.splash &
-$VENV -m cios.main &
-AUTOSTART
-chmod 755 "${PKG_DIR}/etc/xdg/openbox-cios/autostart"
 
-# ── LightDM config (bundled, applied only in full replacement mode) ──
-echo "→ Bundling LightDM configs..."
+if [ "$(id -u)" -ne 0 ]; then
+    echo "[CIOS] Requires sudo: sudo cios-setup-ai"
+    exit 1
+fi
 
-cat > "${PKG_DIR}${INSTALL_DIR}/config/lightdm.conf" << 'LIGHTDM'
-[Seat:*]
-greeter-session=slick-greeter
-user-session=cios
-greeter-hide-users=false
-allow-guest=false
-LIGHTDM
+echo ""
+echo "╔═══════════════════════════════════════════╗"
+echo "║  CIOS — Installing AI Components         ║"
+echo "╚═══════════════════════════════════════════╝"
+echo ""
 
-cat > "${PKG_DIR}${INSTALL_DIR}/config/slick-greeter.conf" << 'GREETER'
-[Greeter]
-background=/usr/share/backgrounds/cios.png
-logo=/usr/share/pixmaps/cios-logo.png
-theme-name=Adwaita-dark
-icon-theme-name=Adwaita
-draw-grid=false
-show-hostname=false
-show-power=true
-clock-format=%H:%M
-GREETER
+# ── Ollama ──
+if ! command -v ollama &>/dev/null; then
+    echo "[1/4] Installing Ollama..."
+    curl -fsSL https://ollama.com/install.sh | sh || {
+        echo "  ⚠ Failed. Install manually: curl -fsSL https://ollama.com/install.sh | sh"
+    }
+else
+    echo "[1/4] Ollama already installed ✓"
+fi
 
-# ── Logo for LightDM ──
+# ── Mistral model ──
+if command -v ollama &>/dev/null; then
+    echo "[2/4] Downloading Mistral model (~4GB)..."
+    ollama serve &>/dev/null &
+    SERVE_PID=$!
+    sleep 3
+    ollama pull mistral || echo "  ⚠ Failed. Run manually: ollama pull mistral"
+    kill $SERVE_PID 2>/dev/null || true
+else
+    echo "[2/4] Skipped (Ollama not available)"
+fi
+
+# ── Piper TTS ──
+if ! command -v piper &>/dev/null; then
+    echo "[3/4] Installing Piper TTS..."
+    PIPER_VERSION="2023.11.14-2"
+    PIPER_URL="https://github.com/rhasspy/piper/releases/download/${PIPER_VERSION}/piper_linux_x86_64.tar.gz"
+    if curl -fsSL "$PIPER_URL" -o /tmp/piper.tar.gz; then
+        tar -xzf /tmp/piper.tar.gz -C /usr/local/bin/ --strip-components=1 piper/piper 2>/dev/null || true
+        rm -f /tmp/piper.tar.gz
+        mkdir -p /usr/share/piper/voices
+        VOICE_URL="https://huggingface.co/rhasspy/piper-voices/resolve/main/pt/pt_BR/faber/medium/pt_BR-faber-medium.onnx"
+        curl -fsSL "$VOICE_URL" -o /usr/share/piper/voices/pt_BR-faber-medium.onnx 2>/dev/null || true
+        curl -fsSL "${VOICE_URL}.json" -o /usr/share/piper/voices/pt_BR-faber-medium.onnx.json 2>/dev/null || true
+        echo "  ✓ Piper TTS installed"
+    else
+        echo "  ⚠ Failed to download Piper"
+    fi
+else
+    echo "[3/4] Piper already installed ✓"
+fi
+
+# ── Whisper STT ──
+if ! command -v whisper &>/dev/null; then
+    echo "[4/4] Installing Whisper STT..."
+    if [ -d /usr/share/cios/.venv ]; then
+        /usr/share/cios/.venv/bin/pip install --quiet openai-whisper && {
+            ln -sf /usr/share/cios/.venv/bin/whisper /usr/local/bin/whisper 2>/dev/null || true
+            echo "  ✓ Whisper installed"
+        } || echo "  ⚠ Failed. Run: /usr/share/cios/.venv/bin/pip install openai-whisper"
+    fi
+else
+    echo "[4/4] Whisper already installed ✓"
+fi
+
+# Mark as done
+touch "$MARKER"
+
+echo ""
+echo "═══════════════════════════════════════════"
+echo "  ✓ AI components installed!"
+echo "  Restart CIOS session to activate."
+echo "═══════════════════════════════════════════"
+echo ""
+SETUPAI
+chmod 755 "${PKG_DIR}/usr/local/bin/cios-setup-ai"
+
+# ── greetd config (bundled) ──
+echo "→ Bundling greetd config..."
+
+cat > "${PKG_DIR}${INSTALL_DIR}/config/greetd.toml" << 'GREETD'
+[terminal]
+vt = 1
+
+[default_session]
+command = "/usr/local/bin/cios-greeter-session"
+user = "greeter"
+GREETD
+
+# ── Logo for greeter ──
 mkdir -p "${PKG_DIR}/usr/share/pixmaps"
 if [ -f assets/cios_logo.png ]; then
     cp assets/cios_logo.png "${PKG_DIR}/usr/share/pixmaps/cios-logo.png"
@@ -750,7 +899,6 @@ fi
 # ── Background ──
 if [ -f assets/background.png ]; then
     cp assets/background.png "${PKG_DIR}/usr/share/backgrounds/cios.png"
-    sed -i 's/cios\.jpg/cios.png/' "${PKG_DIR}${INSTALL_DIR}/config/slick-greeter.conf"
 elif [ -f assets/background.jpg ]; then
     cp assets/background.jpg "${PKG_DIR}/usr/share/backgrounds/cios.jpg"
 else
@@ -758,15 +906,26 @@ else
     python3 assets/generate_background.py 2>/dev/null || true
     if [ -f assets/background.png ]; then
         cp assets/background.png "${PKG_DIR}/usr/share/backgrounds/cios.png"
-        sed -i 's/cios\.jpg/cios.png/' "${PKG_DIR}${INSTALL_DIR}/config/slick-greeter.conf"
     else
         echo "  ⚠ Could not generate background (non-critical)"
     fi
 fi
 
+# ── Fix permissions (ensure no root-owned files inside package) ──
+echo "→ Fixing file permissions..."
+find "${PKG_DIR}" -type d -exec chmod 755 {} \;
+find "${PKG_DIR}" -type f -exec chmod 644 {} \;
+chmod 755 "${PKG_DIR}/DEBIAN/preinst" "${PKG_DIR}/DEBIAN/postinst" "${PKG_DIR}/DEBIAN/prerm" 2>/dev/null || true
+find "${PKG_DIR}/usr/bin" -type f -exec chmod 755 {} \; 2>/dev/null || true
+find "${PKG_DIR}/usr/local/bin" -type f -exec chmod 755 {} \; 2>/dev/null || true
+
 # ── Build .deb ──
 echo "→ Building .deb..."
-dpkg-deb --build "${PKG_DIR}"
+if command -v fakeroot &>/dev/null; then
+    fakeroot dpkg-deb --build "${PKG_DIR}"
+else
+    dpkg-deb --build "${PKG_DIR}"
+fi
 
 # ── Cleanup ──
 rm -rf "${PKG_DIR}"
@@ -776,6 +935,8 @@ echo "════════════════════════�
 echo "  ✓ Built: ${PKG_DIR}.deb"
 echo "═══════════════════════════════════════════"
 echo ""
-echo "  Install:  sudo apt install ./${PKG_DIR}.deb"
-echo "            sudo reboot"
+echo "  Install:"
+echo "    cp ${PKG_DIR}.deb /tmp/"
+echo "    sudo apt install /tmp/${PKG_DIR}.deb"
+echo "    sudo reboot"
 echo ""

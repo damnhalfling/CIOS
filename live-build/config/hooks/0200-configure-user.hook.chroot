@@ -1,0 +1,59 @@
+#!/bin/bash
+# ═══════════════════════════════════════════════════
+#  Hook: Configure live user account
+#  Creates the 'cios' user with appropriate permissions.
+#  Note: runs inside chroot — no PAM, no systemd-logind.
+# ═══════════════════════════════════════════════════
+set -euo pipefail
+
+echo ">>> [0200] Configuring live user 'cios'..."
+
+# Ensure required groups exist
+for grp in audio video render input netdev plugdev sudo; do
+    getent group "$grp" >/dev/null 2>&1 || groupadd --system "$grp"
+done
+
+# Create user (--no-log-init avoids failures when lastlog/faillog unavailable in chroot)
+if ! id cios >/dev/null 2>&1; then
+    useradd \
+        --no-log-init \
+        --create-home \
+        --shell /bin/bash \
+        --comment "CIOS Live User" \
+        --groups audio,video,render,input,netdev,plugdev,sudo \
+        cios
+    echo ">>> [0200] User created."
+else
+    echo ">>> [0200] User already exists, updating groups."
+    usermod -aG audio,video,render,input,netdev,plugdev,sudo cios
+fi
+
+# Set password to 'cios' (pre-hashed — chpasswd/PAM fails in chroot)
+HASHED_PW=$(openssl passwd -6 "cios")
+usermod -p "$HASHED_PW" cios
+
+# Configure passwordless sudo (live session convenience)
+cat > /etc/sudoers.d/cios-live << 'EOF'
+# CIOS Live Session — passwordless sudo
+cios ALL=(ALL) NOPASSWD: ALL
+EOF
+chmod 0440 /etc/sudoers.d/cios-live
+
+# Create CIOS config directory
+mkdir -p /home/cios/.cios/logs
+chown -R cios:cios /home/cios/.cios
+
+# Create XDG user directories
+for dir in Desktop Documents Downloads Music Pictures Videos; do
+    mkdir -p "/home/cios/$dir"
+done
+chown -R cios:cios /home/cios
+
+# Configure SSH (allow password auth for live session)
+mkdir -p /etc/ssh/sshd_config.d
+cat > /etc/ssh/sshd_config.d/cios-live.conf << 'EOF'
+PasswordAuthentication yes
+PermitEmptyPasswords no
+EOF
+
+echo ">>> [0200] User 'cios' configured (password: cios)."

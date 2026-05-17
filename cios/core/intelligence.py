@@ -1,15 +1,21 @@
-"""Intelligence Client — connects CIOS to the cloud API.
+"""Intelligence Client — connects CIOS to the cloud API (Maestro).
 
 Handles:
 - Authentication state (JWT stored locally)
 - Token optimization (compress input via Ollama before sending)
-- API calls to api.cios-ia.com
-- Usage tracking (local cache of remaining requests)
+- SSE streaming from /v1/chat/stream
+- Conversation continuity (persists conversation_id per session)
+- Cognitive state tracking (mood, attention, memory usage)
+- Intent forwarding (passes OS-classified intent to API)
 - Graceful degradation when offline
 
 Usage:
     from cios.core.intelligence import intelligence
     result = intelligence.query("resuma as notícias do dia", intent="news")
+
+    # Streaming:
+    for chunk in intelligence.stream("explica recursão", intent="explain"):
+        print(chunk.token, end="")
 """
 
 import json
@@ -19,8 +25,8 @@ import threading
 import time
 import urllib.error
 import urllib.request
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import Callable, Generator
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from cios.core.config import CIOS_HOME
@@ -31,11 +37,13 @@ logger = logging.getLogger(__name__)
 #  CONSTANTS
 # ═══════════════════════════════════════════════════════════════════════════
 
-API_BASE = "https://api.cios-ia.com"
+API_BASE = "https://api.cios-ai.com"
 AUTH_FILE = CIOS_HOME / "intelligence.json"
+SESSION_FILE = CIOS_HOME / "intelligence_session.json"
 FACE_PATH = Path.home() / ".face"
 
-_TIMEOUT = 15  # seconds
+_TIMEOUT = 30  # seconds (increased for streaming/DeepSeek)
+_STREAM_TIMEOUT = 60  # seconds for streaming connections
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -66,14 +74,39 @@ class UsageInfo:
 
 
 @dataclass
+class CognitiveState:
+    """Cognitive state returned by the API."""
+
+    emotional_tone: float = 0.5
+    attention_focus: str = ""
+    memory_used: bool = False
+    memory_sources: list = field(default_factory=list)
+    honesty_check: bool = False
+
+
+@dataclass
 class IntelligenceResult:
     """Result from an Intelligence API call."""
 
     success: bool = False
     text: str = ""
     error: str = ""
-    tokens_used: int = 0
+    intent: str = ""
+    model: str = ""
+    tokens_input: int = 0
+    tokens_output: int = 0
+    conversation_id: int | None = None
+    cognitive_state: CognitiveState | None = None
     cached: bool = False
+
+
+@dataclass
+class StreamChunk:
+    """A single chunk from SSE streaming."""
+
+    type: str = ""  # "start" | "token" | "done" | "error"
+    token: str = ""
+    metadata: dict = field(default_factory=dict)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -142,13 +175,16 @@ def _compress_input(text: str) -> str:
 
 
 class IntelligenceClient:
-    """Client for the CIOS Intelligence API."""
+    """Client for the CIOS Intelligence API (Maestro)."""
 
     def __init__(self) -> None:
         self._user: UserProfile | None = None
         self._usage = UsageInfo()
         self._lock = threading.Lock()
+        self._conversation_id: int | None = None
+        self._last_cognitive_state: CognitiveState | None = None
         self._load_auth()
+        self._load_session()
 
     # ─── Auth State ───────────────────────────────────────────────────
 
@@ -163,6 +199,14 @@ class IntelligenceClient:
     @property
     def usage(self) -> UsageInfo:
         return self._usage
+
+    @property
+    def conversation_id(self) -> int | None:
+        return self._conversation_id
+
+    @property
+    def cognitive_state(self) -> CognitiveState | None:
+        return self._last_cognitive_state
 
     def _load_auth(self) -> None:
         """Load saved authentication from disk."""
@@ -184,6 +228,38 @@ class IntelligenceClient:
         except Exception as e:
             logger.warning("Failed to load intelligence auth: %s", e)
 
+    def _load_session(self) -> None:
+        """Load conversation session from disk (continuity across restarts)."""
+        if not SESSION_FILE.exists():
+            return
+        try:
+            data = json.loads(SESSION_FILE.read_text())
+            self._conversation_id = data.get("conversation_id")
+            logger.debug("Session loaded: conversation_id=%s", self._conversation_id)
+        except Exception:
+            pass
+
+    def _save_session(self) -> None:
+        """Persist conversation session to disk."""
+        try:
+            SESSION_FILE.parent.mkdir(parents=True, exist_ok=True)
+            SESSION_FILE.write_text(
+                json.dumps(
+                    {
+                        "conversation_id": self._conversation_id,
+                        "updated_at": time.time(),
+                    }
+                )
+            )
+        except Exception:
+            pass
+
+    def new_conversation(self) -> None:
+        """Start a new conversation (clears conversation_id)."""
+        self._conversation_id = None
+        self._save_session()
+        logger.info("New conversation started")
+
     def save_auth(self, token: str, user_data: dict) -> None:
         """Save authentication after successful login."""
         self._user = UserProfile(
@@ -197,7 +273,6 @@ class IntelligenceClient:
         self._usage.plan = self._user.plan
         self._usage.limit_today = _plan_limit(self._user.plan)
 
-        # Save to disk
         AUTH_FILE.parent.mkdir(parents=True, exist_ok=True)
         AUTH_FILE.write_text(
             json.dumps(
@@ -212,51 +287,49 @@ class IntelligenceClient:
                 indent=2,
             )
         )
-        # Restrict permissions (contains JWT)
         os.chmod(AUTH_FILE, 0o600)
 
-        # Download profile picture for LightDM
         if self._user.picture:
             self._download_face(self._user.picture)
 
         logger.info("Intelligence auth saved: %s", self._user.email)
 
     def logout(self) -> None:
-        """Clear authentication."""
+        """Clear authentication and session."""
         self._user = None
         self._usage = UsageInfo()
+        self._conversation_id = None
         if AUTH_FILE.exists():
             AUTH_FILE.unlink()
+        if SESSION_FILE.exists():
+            SESSION_FILE.unlink()
         logger.info("Intelligence logged out")
 
     def _download_face(self, url: str) -> None:
         """Download Google profile picture and save as ~/.face for LightDM."""
         try:
-            # Google picture URLs often have =s96-c suffix, get larger version
             if "googleusercontent.com" in url:
                 url = url.split("=")[0] + "=s256-c"
-
             req = urllib.request.Request(url)
             with urllib.request.urlopen(req, timeout=10) as resp:
                 img_data = resp.read()
-
             FACE_PATH.write_bytes(img_data)
             os.chmod(FACE_PATH, 0o644)
-            logger.info("Profile picture saved to %s", FACE_PATH)
         except Exception as e:
             logger.debug("Failed to download profile picture: %s", e)
 
-    # ─── API Calls ────────────────────────────────────────────────────
+    # ─── API Calls (Synchronous) ──────────────────────────────────────
 
     def query(self, text: str, intent: str = "chat") -> IntelligenceResult:
-        """Send a query to the Intelligence API.
+        """Send a query to the Intelligence API (synchronous, non-streaming).
 
         Flow:
         1. Check auth
         2. Check rate limit (local)
         3. Compress input (Token Optimizer)
-        4. Call API
-        5. Update usage
+        4. Call /v1/chat with intent, client, conversation_id
+        5. Parse cognitive_state + memory_sources
+        6. Update usage and session
         """
         if not self.is_logged_in:
             return IntelligenceResult(
@@ -265,7 +338,6 @@ class IntelligenceClient:
                 text="Faça login para usar o CIOS Intelligence.",
             )
 
-        # Local rate limit check
         if self._usage.used_today >= self._usage.limit_today:
             return IntelligenceResult(
                 success=False,
@@ -274,24 +346,28 @@ class IntelligenceClient:
                 f"Renova amanhã ou faça upgrade.",
             )
 
-        # Compress input
         compressed = _compress_input(text)
+        result = self._call_chat(compressed, intent)
 
-        # Call API
-        result = self._call_api(compressed, intent)
-
-        # Update local usage on success
         if result.success:
             self._usage.used_today += 1
+            if result.conversation_id:
+                self._conversation_id = result.conversation_id
+                self._save_session()
+            if result.cognitive_state:
+                self._last_cognitive_state = result.cognitive_state
 
         return result
 
-    def _call_api(self, message: str, intent: str) -> IntelligenceResult:
-        """Make the actual API call."""
+    def _call_chat(self, message: str, intent: str) -> IntelligenceResult:
+        """Call /v1/chat with full context."""
         payload = json.dumps(
             {
                 "message": message,
                 "intent": intent,
+                "client": "os",
+                "conversation_id": self._conversation_id,
+                "system_context": _get_system_context(),
             }
         ).encode()
 
@@ -301,7 +377,7 @@ class IntelligenceClient:
         }
 
         req = urllib.request.Request(
-            f"{API_BASE}/chat",
+            f"{API_BASE}/v1/chat",
             data=payload,
             headers=headers,
             method="POST",
@@ -310,50 +386,176 @@ class IntelligenceClient:
         try:
             with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
                 data = json.loads(resp.read())
-                # The Maestro API returns the response text directly or in a structured format
-                text = data.get("response", data.get("message", ""))
-                if isinstance(text, dict):
-                    text = text.get("content", str(text))
+
+                # Parse cognitive state
+                cog = data.get("cognitive_state", {})
+                cognitive_state = CognitiveState(
+                    emotional_tone=cog.get("emotional_tone", 0.5),
+                    attention_focus=cog.get("attention_focus", ""),
+                    memory_used=cog.get("memory_used", False),
+                    memory_sources=cog.get("memory_sources", []),
+                    honesty_check=cog.get("honesty_check", False),
+                )
+
                 return IntelligenceResult(
                     success=True,
-                    text=str(text).strip(),
-                    tokens_used=data.get("tokens", 0),
+                    text=data.get("response", "").strip(),
+                    intent=data.get("intent", intent),
+                    model=data.get("model", ""),
+                    tokens_input=data.get("tokens_input", 0),
+                    tokens_output=data.get("tokens_output", 0),
+                    conversation_id=data.get("conversation_id"),
+                    cognitive_state=cognitive_state,
                 )
         except urllib.error.HTTPError as e:
-            if e.code == 401:
-                logger.warning("Intelligence token expired")
-                return IntelligenceResult(
-                    success=False,
-                    error="token_expired",
-                    text="Sessão expirada. Faça login novamente.",
-                )
-            elif e.code == 429:
-                return IntelligenceResult(
-                    success=False,
-                    error="rate_limited",
-                    text="Limite atingido. Tente novamente amanhã ou faça upgrade.",
-                )
-            else:
-                logger.warning("Intelligence API error %d", e.code)
-                return IntelligenceResult(
-                    success=False,
-                    error="api_error",
-                    text="Erro no serviço. Tente novamente.",
-                )
+            return self._handle_http_error(e)
         except urllib.error.URLError as e:
             logger.warning("Intelligence API unreachable: %s", e)
             return IntelligenceResult(
-                success=False,
-                error="offline",
-                text="Sem conexão com o CIOS Intelligence.",
+                success=False, error="offline", text="Sem conexão com o CIOS Intelligence."
             )
         except Exception as e:
             logger.warning("Intelligence API unexpected error: %s", e)
             return IntelligenceResult(
-                success=False,
-                error="unknown",
-                text="Erro inesperado. Tente novamente.",
+                success=False, error="unknown", text="Erro inesperado. Tente novamente."
             )
+
+    # ─── API Calls (Streaming) ────────────────────────────────────────
+
+    def stream(self, text: str, intent: str = "chat") -> Generator[StreamChunk, None, None]:
+        """Stream a response from /v1/chat/stream via SSE.
+
+        Yields StreamChunk objects:
+        - type="start": conversation started, metadata has conversation_id + model
+        - type="token": a text token to display
+        - type="done": stream complete, metadata has cognitive_state + token counts
+        - type="error": error occurred
+
+        Usage:
+            for chunk in intelligence.stream("pergunta densa", intent="opinion"):
+                if chunk.type == "token":
+                    print(chunk.token, end="", flush=True)
+                elif chunk.type == "done":
+                    # Access metadata
+                    pass
+        """
+        if not self.is_logged_in:
+            yield StreamChunk(type="error", metadata={"message": "not_logged_in"})
+            return
+
+        if self._usage.used_today >= self._usage.limit_today:
+            yield StreamChunk(type="error", metadata={"message": "rate_limited"})
+            return
+
+        compressed = _compress_input(text)
+
+        payload = json.dumps(
+            {
+                "message": compressed,
+                "intent": intent,
+                "client": "os",
+                "conversation_id": self._conversation_id,
+                "system_context": _get_system_context(),
+                "lang": "pt",
+            }
+        ).encode()
+
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self._user.token}",
+            "Accept": "text/event-stream",
+        }
+
+        req = urllib.request.Request(
+            f"{API_BASE}/v1/chat/stream",
+            data=payload,
+            headers=headers,
+            method="POST",
+        )
+
+        try:
+            with urllib.request.urlopen(req, timeout=_STREAM_TIMEOUT) as resp:
+                buffer = ""
+                for line_bytes in resp:
+                    line = line_bytes.decode("utf-8", errors="replace")
+                    buffer += line
+
+                    # SSE format: "data: {...}\n\n"
+                    while "\n\n" in buffer:
+                        event_str, buffer = buffer.split("\n\n", 1)
+                        chunk = self._parse_sse_event(event_str)
+                        if chunk:
+                            yield chunk
+
+                            # Handle metadata updates
+                            if chunk.type == "start":
+                                conv_id = chunk.metadata.get("conversation_id")
+                                if conv_id:
+                                    self._conversation_id = conv_id
+                                    self._save_session()
+                            elif chunk.type == "done":
+                                self._usage.used_today += 1
+                                cog = chunk.metadata.get("cognitive_state", {})
+                                if cog:
+                                    self._last_cognitive_state = CognitiveState(
+                                        emotional_tone=cog.get("emotional_tone", 0.5),
+                                        attention_focus=cog.get("attention_focus", ""),
+                                        memory_used=cog.get("memory_used", False),
+                                        memory_sources=cog.get("memory_sources", []),
+                                        honesty_check=cog.get("honesty_check", False),
+                                    )
+
+        except urllib.error.HTTPError as e:
+            result = self._handle_http_error(e)
+            yield StreamChunk(type="error", metadata={"message": result.error})
+        except urllib.error.URLError:
+            yield StreamChunk(type="error", metadata={"message": "offline"})
+        except Exception as e:
+            logger.warning("Stream error: %s", e)
+            yield StreamChunk(type="error", metadata={"message": str(e)})
+
+    def _parse_sse_event(self, event_str: str) -> StreamChunk | None:
+        """Parse a single SSE event string into a StreamChunk."""
+        for line in event_str.strip().split("\n"):
+            if line.startswith("data: "):
+                try:
+                    data = json.loads(line[6:])
+                    event_type = data.get("type", "")
+
+                    if event_type == "token":
+                        return StreamChunk(type="token", token=data.get("token", ""))
+                    elif event_type == "start":
+                        return StreamChunk(type="start", metadata=data)
+                    elif event_type == "done":
+                        return StreamChunk(type="done", metadata=data.get("metadata", {}))
+                    elif event_type == "error":
+                        return StreamChunk(type="error", metadata=data)
+                except json.JSONDecodeError:
+                    pass
+        return None
+
+    # ─── Error Handling ───────────────────────────────────────────────
+
+    def _handle_http_error(self, e: urllib.error.HTTPError) -> IntelligenceResult:
+        """Handle HTTP errors from the API."""
+        if e.code == 401:
+            logger.warning("Intelligence token expired")
+            return IntelligenceResult(
+                success=False, error="token_expired", text="Sessão expirada. Faça login novamente."
+            )
+        elif e.code == 429:
+            return IntelligenceResult(
+                success=False,
+                error="rate_limited",
+                text="Limite atingido. Tente novamente amanhã ou faça upgrade.",
+            )
+        else:
+            logger.warning("Intelligence API error %d", e.code)
+            return IntelligenceResult(
+                success=False, error="api_error", text="Erro no serviço. Tente novamente."
+            )
+
+    # ─── Usage Check ──────────────────────────────────────────────────
 
     def check_usage(self) -> None:
         """Refresh usage info from API (background, non-blocking)."""
@@ -363,7 +565,7 @@ class IntelligenceClient:
         def _fetch():
             try:
                 req = urllib.request.Request(
-                    f"{API_BASE}/auth/me",
+                    f"{API_BASE}/v1/auth/me",
                     headers={"Authorization": f"Bearer {self._user.token}"},
                 )
                 with urllib.request.urlopen(req, timeout=5) as resp:
@@ -380,6 +582,35 @@ class IntelligenceClient:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+#  SYSTEM CONTEXT (sent with every API call from OS)
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def _get_system_context() -> dict:
+    """Gather current OS context for API escalation."""
+    import subprocess
+
+    context = {
+        "current_directory": os.getcwd(),
+        "client": "os",
+    }
+
+    try:
+        result = subprocess.run(
+            ["xdotool", "getactivewindow", "getwindowname"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        if result.returncode == 0:
+            context["active_window"] = result.stdout.strip()
+    except Exception:
+        pass
+
+    return context
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 #  AUTH FLOW (Google OAuth via local HTTP callback)
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -387,7 +618,7 @@ class IntelligenceClient:
 def start_auth_flow(on_complete: Callable[[bool, str], None] | None = None) -> None:
     """Start the Google OAuth flow.
 
-    1. Opens browser to api.cios-ia.com/auth/google
+    1. Opens browser to api.cios-ai.com/v1/auth/google
     2. Starts a local HTTP server on port 7778 to capture the callback
     3. Saves JWT and user data
     4. Calls on_complete(success, message)
@@ -395,7 +626,7 @@ def start_auth_flow(on_complete: Callable[[bool, str], None] | None = None) -> N
     import webbrowser
     from http.server import BaseHTTPRequestHandler, HTTPServer
 
-    auth_url = f"{API_BASE}/auth/google?state=cios&redirect_uri=http://localhost:7778/callback"
+    auth_url = f"{API_BASE}/v1/auth/google?state=cios&redirect_uri=http://localhost:7778/callback"
 
     result_holder = {"done": False, "success": False, "message": ""}
 
@@ -417,7 +648,6 @@ def start_auth_flow(on_complete: Callable[[bool, str], None] | None = None) -> N
                         result_holder["success"] = True
                         result_holder["message"] = f"Bem-vindo, {user_data.get('name', '')}!"
 
-                        # Success page
                         self.send_response(200)
                         self.send_header("Content-Type", "text/html; charset=utf-8")
                         self.end_headers()
@@ -443,13 +673,13 @@ def start_auth_flow(on_complete: Callable[[bool, str], None] | None = None) -> N
             result_holder["done"] = True
 
         def log_message(self, format, *args):
-            pass  # Suppress HTTP server logs
+            pass
 
     def _run_server():
         try:
             server = HTTPServer(("localhost", 7778), CallbackHandler)
-            server.timeout = 120  # 2 min timeout
-            server.handle_request()  # Handle single request then stop
+            server.timeout = 120
+            server.handle_request()
             server.server_close()
         except Exception as e:
             result_holder["message"] = f"Erro no servidor local: {e}"
@@ -458,11 +688,8 @@ def start_auth_flow(on_complete: Callable[[bool, str], None] | None = None) -> N
         if on_complete:
             on_complete(result_holder["success"], result_holder["message"])
 
-    # Start callback server in background
     threading.Thread(target=_run_server, daemon=True).start()
-
-    # Open browser
-    time.sleep(0.2)  # Give server time to start
+    time.sleep(0.2)
     webbrowser.open(auth_url)
 
 

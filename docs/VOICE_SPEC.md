@@ -1,4 +1,4 @@
-# Harmoni — Voice Spec
+# CIOS — Voice Spec
 
 > Como o sistema fala com o usuário. Toda resposta, erro, e feedback segue estas regras.
 
@@ -100,4 +100,4 @@ O usuário só percebe: "funcionou ou não funcionou?"
 
 ---
 
-*Atualizado: Maio 2026 — v0.12.0*
+*Atualizado: Maio 2026 — v1.0.0-rc.1.1*

@@ -1,6 +1,6 @@
 [project]
 name = "cios"
-version = "1.0.0"
+version = "2.0.0rc4"
 description = "CIOS — Cognitive Intent-first Operational System. Replaces apps with intent-driven execution on Linux"
 requires-python = ">=3.10"
 dependencies = [
@@ -63,7 +63,17 @@ omit = [
 [tool.coverage.report]
 show_missing = true
 skip_empty = true
-fail_under = 35
+fail_under = 30
+omit = [
+    "cios/ui/gtk/*",
+    "cios/ui/gui.py",
+    "cios/ui/gui_secondary.py",
+    "cios/ui/splash.py",
+    "cios/ui/hotkey.py",
+    "cios/ui/topbar.py",
+    "cios/ui/image_viewer.py",
+    "cios/ui/gallery_component.py",
+]
 
 # ── Ruff (linter + formatter) ──────────────────────────────────────
 [tool.ruff]

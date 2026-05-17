@@ -46,7 +46,11 @@ HOTKEY = os.environ.get("CIOS_HOTKEY", "ctrl+space")
 _DEFAULTS: dict[str, Any] = {
     # Provider: "ollama" (local, always first), external only when needed
     "llm_provider": "ollama",
-    # Ollama (local LLM — primary)
+    # Preferred external provider: "openai" | "anthropic" | "cios_api" | ""
+    # When user has multiple keys, this determines which is used first.
+    # Empty = auto (first configured in order: openai → anthropic → cios_api)
+    "preferred_external_provider": "",
+    # Ollama (local LLM — primary, required)
     "ollama_url": "http://localhost:11434",
     "ollama_model": "mistral",
     # OpenAI (client's own key — external)
@@ -55,9 +59,9 @@ _DEFAULTS: dict[str, Any] = {
     # Anthropic (client's own key — external)
     "anthropic_api_key": "",
     "anthropic_model": "claude-3-haiku-20240307",
-    # CIOS API (paid service — external)
+    # CIOS Intelligence API (Maestro/Bedrock — always available as final fallback)
     "cios_api_key": "",
-    "cios_api_url": "https://api.ciosia.com",
+    "cios_api_url": "https://api.cios-ai.com",
 }
 
 # In-memory settings cache
@@ -113,6 +117,7 @@ def _load_settings() -> dict[str, Any]:
         "CIOS_API_KEY": "cios_api_key",
         "CIOS_API_URL": "cios_api_url",
         "CIOS_LLM_PROVIDER": "llm_provider",
+        "CIOS_PREFERRED_PROVIDER": "preferred_external_provider",
     }
     for env_key, setting_key in env_map.items():
         val = os.environ.get(env_key)

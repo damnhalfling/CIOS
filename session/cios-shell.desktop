@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=CIOS Shell
+Comment=CIOS Wayland Compositor
+Exec=cios-shell
+Type=Application
+DesktopNames=CIOS

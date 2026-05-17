@@ -7,10 +7,11 @@ Features:
 - Clipboard search
 - Auto-detect and suggest actions based on content type
 
-Uses xclip/xsel for X11 clipboard access.
+Uses wl-copy/wl-paste for Wayland, falls back to xclip/xsel for X11.
 """
 
 import logging
+import os
 import re
 import subprocess
 import time
@@ -24,6 +25,11 @@ logger = logging.getLogger(__name__)
 _HISTORY_PATH = CIOS_HOME / "clipboard_history.json"
 _MAX_HISTORY = 50
 _MAX_ITEM_SIZE = 10000  # chars
+
+
+def _is_wayland() -> bool:
+    """Detect if running under Wayland."""
+    return os.environ.get("WAYLAND_DISPLAY") is not None
 
 
 @dataclass
@@ -92,6 +98,23 @@ class CognitiveClipboard:
 
     def get_current(self) -> str | None:
         """Get current clipboard content."""
+        if _is_wayland():
+            try:
+                result = subprocess.run(
+                    ["wl-paste", "--no-newline"],
+                    capture_output=True,
+                    text=True,
+                    timeout=3,
+                )
+                if result.returncode == 0:
+                    return result.stdout
+            except FileNotFoundError:
+                logger.warning("wl-paste not found — install wl-clipboard")
+            except Exception:
+                pass
+            return None
+
+        # X11 fallback
         try:
             result = subprocess.run(
                 ["xclip", "-selection", "clipboard", "-o"],
@@ -120,11 +143,25 @@ class CognitiveClipboard:
 
     def set_clipboard(self, content: str) -> bool:
         """Set clipboard content."""
+        if _is_wayland():
+            try:
+                proc = subprocess.Popen(
+                    ["wl-copy"],
+                    stdin=subprocess.PIPE,
+                )
+                proc.communicate(input=content.encode("utf-8"), timeout=3)
+                return proc.returncode == 0
+            except FileNotFoundError:
+                logger.warning("wl-copy not found — install wl-clipboard")
+            except Exception:
+                pass
+            return False
+
+        # X11 fallback
         try:
             proc = subprocess.Popen(
                 ["xclip", "-selection", "clipboard"],
                 stdin=subprocess.PIPE,
-                timeout=3,
             )
             proc.communicate(input=content.encode("utf-8"), timeout=3)
             return proc.returncode == 0
@@ -133,7 +170,6 @@ class CognitiveClipboard:
                 proc = subprocess.Popen(
                     ["xsel", "--clipboard", "--input"],
                     stdin=subprocess.PIPE,
-                    timeout=3,
                 )
                 proc.communicate(input=content.encode("utf-8"), timeout=3)
                 return proc.returncode == 0

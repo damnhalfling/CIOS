@@ -1,0 +1,10 @@
+cios-shell (0.1.0-1) unstable; urgency=low
+
+  * Initial release.
+  * Minimal Wayland compositor with wlroots 0.18+ backend.
+  * XWayland support for legacy X11 applications.
+  * JSON IPC protocol for runtime communication.
+  * Layer-shell support for topbar exclusive zone.
+  * Session desktop file for LightDM/GDM.
+
+ -- CIOS Team <cios@localhost>  Mon, 01 Jan 2025 00:00:00 +0000

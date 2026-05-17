@@ -1,16 +1,21 @@
 """Model router — routes LLM calls to the configured provider.
 
-Resolution chain:
-1. Intent Parser (regex hardcoded, 180+ patterns) — handles 80%+
-2. Ollama (local LLM) — classifies intent + resolves local commands
+Resolution chain (intent-first, IA-first):
+1. Hardcoded (regex patterns, 180+ aliases) — trivial commands, zero latency
+2. Ollama (local LLM, REQUIRED) — classifies intent + resolves local commands
 3. External API (only when local can't resolve) — generates execution plans
-   - OpenAI (client's own key)
-   - Anthropic (client's own key)
-   - CIOS API (paid service, Bedrock behind the scenes)
+   - Uses the user's preferred provider (configured once, used always)
+   - Fallback order: preferred → other configured → CIOS API (Maestro/Bedrock)
 
 The external API is ONLY called when:
 - The intent requires knowledge the local model doesn't have
-- Example: installing software that needs external sources, complex configs
+- Example: installing software, factual questions, complex multi-step configs
+
+Design decisions:
+- Ollama is REQUIRED — the system doesn't operate without it
+- User picks ONE preferred external provider (or auto-selects first available)
+- Ollama summarizes context before sending to API (token optimization)
+- CIOS API (Maestro) is always the final fallback (no key needed for basic tier)
 
 Retry with exponential backoff on transient failures.
 Circuit breaker prevents hammering dead providers.
@@ -270,43 +275,66 @@ def _call_anthropic(prompt: str, system: str = "") -> str | None:
 
 
 def _call_cios_api(prompt: str, system: str = "") -> str | None:
-    """Call CIOS API (paid service — powered by Bedrock behind the scenes).
+    """Call CIOS Intelligence API (Maestro — powered by Bedrock/DeepSeek).
 
-    This is the official CIOS cloud API. Users subscribe at ciosia.com
-    and get an API key. No AWS credentials needed on their end.
+    This is the official CIOS cloud API. Always available as final fallback.
+    Users with a subscription get higher limits. Free tier has basic access.
+
+    Uses the Intelligence client for auth, conversation continuity, and intent forwarding.
     """
+    from cios.core.intelligence import intelligence
+
+    if not intelligence.is_logged_in:
+        # Fallback: direct call without auth (free tier)
+        return _call_cios_api_direct(prompt, system)
+
+    result = intelligence.query(prompt, intent="chat")
+    if result.success:
+        return result.text
+    elif result.error == "offline":
+        raise ConnectionError("CIOS API connection failed: offline")
+    elif result.error == "token_expired":
+        # Try direct call without auth
+        return _call_cios_api_direct(prompt, system)
+    else:
+        return None
+
+
+def _call_cios_api_direct(prompt: str, system: str = "") -> str | None:
+    """Direct API call without auth (free tier, limited)."""
     import urllib.error
     import urllib.request
-
-    api_key = config.get("cios_api_key")
-    if not api_key:
-        return None
 
     api_url = config.get("cios_api_url")
     timeout = _PROVIDER_TIMEOUTS["cios_api"]
 
     payload = json.dumps(
         {
-            "prompt": prompt,
-            "system": system,
-            "max_tokens": 512,
-            "temperature": 0.1,
+            "message": prompt,
+            "intent": "chat",
+            "client": "os",
+            "system_context": _get_system_context(),
         }
     ).encode()
 
+    headers = {
+        "Content-Type": "application/json",
+    }
+
+    api_key = config.get("cios_api_key")
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
     req = urllib.request.Request(
-        f"{api_url}/v1/completions",
+        f"{api_url}/v1/chat",
         data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
-        },
+        headers=headers,
         method="POST",
     )
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             data = json.loads(resp.read())
-            return data.get("content", "").strip() or None
+            return data.get("response", "").strip() or None
     except urllib.error.HTTPError as e:
         raise ConnectionError(f"CIOS API HTTP {e.code}: {e.reason}") from e
     except urllib.error.URLError as e:
@@ -315,34 +343,94 @@ def _call_cios_api(prompt: str, system: str = "") -> str | None:
         raise TimeoutError(f"CIOS API timed out after {timeout}s") from None
 
 
+def _get_system_context() -> dict:
+    """Gather current OS context for API escalation."""
+    import os
+    import subprocess
+
+    context = {
+        "current_directory": os.getcwd(),
+    }
+
+    # Active window / project (best effort)
+    try:
+        result = subprocess.run(
+            ["xdotool", "getactivewindow", "getwindowname"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        if result.returncode == 0:
+            context["active_window"] = result.stdout.strip()
+    except Exception:
+        pass
+
+    return context
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 #  EXTERNAL API AVAILABILITY CHECK
 # ═══════════════════════════════════════════════════════════════════════════
 
 
 def has_external_provider() -> bool:
-    """Check if any external API provider is configured."""
-    return bool(
-        config.get("openai_api_key")
-        or config.get("anthropic_api_key")
-        or config.get("cios_api_key")
-    )
+    """Check if any external API provider is available.
+
+    Always returns True because CIOS API (Maestro) is always available
+    as the final fallback (free tier, no key required for basic usage).
+    """
+    return True
+
+
+def get_configured_providers() -> list[str]:
+    """Return list of configured external providers (with keys)."""
+    providers = []
+    if config.get("openai_api_key"):
+        providers.append("openai")
+    if config.get("anthropic_api_key"):
+        providers.append("anthropic")
+    # CIOS API always available
+    providers.append("cios_api")
+    return providers
+
+
+def get_preferred_provider() -> str:
+    """Get the user's preferred external provider.
+
+    Returns the configured preference, or auto-detects from available keys.
+    """
+    preferred = config.get("preferred_external_provider")
+    if preferred:
+        return preferred
+
+    # Auto: first configured key wins
+    if config.get("openai_api_key"):
+        return "openai"
+    if config.get("anthropic_api_key"):
+        return "anthropic"
+    return "cios_api"
+
+
+def set_preferred_provider(provider: str) -> None:
+    """Set the user's preferred external provider and persist."""
+    valid = ("openai", "anthropic", "cios_api")
+    if provider not in valid:
+        logger.warning("Invalid provider '%s', must be one of %s", provider, valid)
+        return
+    config.set("preferred_external_provider", provider)
+    config.save()
+    logger.info("Preferred external provider set to '%s'", provider)
 
 
 def get_no_provider_message() -> str:
-    """Return a user-friendly message when no external API is configured.
+    """Return a user-friendly message when external API call fails.
 
-    This is shown when the system needs external knowledge (e.g., how to
-    install something that requires adding sources, complex configurations).
+    This is shown when all external providers fail (network issue, etc.).
     """
     return (
-        "Preciso de acesso a uma API externa para resolver isso, "
-        "mas nenhuma está configurada.\n\n"
-        "Opções:\n"
-        "  1. CIOS API (assinatura em ciosia.com) — mais simples\n"
-        "  2. Sua própria chave OpenAI ou Anthropic\n\n"
-        "Configure com: cios --setup\n"
-        "Ou defina a variável: CIOS_API_KEY, OPENAI_API_KEY ou ANTHROPIC_API_KEY"
+        "Não consegui acessar nenhuma API externa para resolver isso.\n\n"
+        "Verifique sua conexão com a internet.\n"
+        "Se o problema persistir, configure um provider alternativo com: cios --setup"
     )
 
 
@@ -398,13 +486,29 @@ def _call_local(prompt: str, system: str = "") -> str | None:
 def _call_external(prompt: str, system: str = "") -> str | None:
     """Call external API provider (only when local can't resolve).
 
-    Priority: client's own key first, CIOS API as fallback.
-    Returns None if no provider is configured (caller should show message).
-    """
-    # Priority order for external providers
-    _EXTERNAL_ORDER = ["openai", "anthropic", "cios_api"]
+    Uses the user's preferred provider first, then falls back to others.
+    CIOS API (Maestro/Bedrock) is always the final fallback.
 
-    for provider in _EXTERNAL_ORDER:
+    Priority:
+    1. User's preferred_external_provider (if configured)
+    2. Other configured providers in order
+    3. CIOS API (always available as final fallback)
+
+    Returns None if no provider is available (offline, all circuits open).
+    """
+    preferred = config.get("preferred_external_provider")
+
+    # Build priority order based on user preference
+    all_external = ["openai", "anthropic", "cios_api"]
+
+    if preferred and preferred in all_external:
+        # Preferred first, then the rest
+        order = [preferred] + [p for p in all_external if p != preferred]
+    else:
+        # Auto: first configured wins
+        order = all_external
+
+    for provider in order:
         if _circuit_is_open(provider):
             continue
         if not _provider_is_configured(provider):
@@ -426,9 +530,8 @@ def _provider_is_configured(provider: str) -> bool:
         return bool(config.get("openai_api_key"))
     if provider == "anthropic":
         return bool(config.get("anthropic_api_key"))
-    if provider == "cios_api":
-        return bool(config.get("cios_api_key"))
-    return False
+    # CIOS API is always available as final fallback (free tier exists)
+    return provider == "cios_api"
 
 
 # Cache Ollama reachability for 30s to avoid repeated socket checks
@@ -479,16 +582,25 @@ def request_execution_plan(user_input: str, context: str = "") -> dict | None:
     Called when the local LLM can't resolve something that needs
     external knowledge (e.g., installing software with custom sources).
 
+    Uses Ollama to summarize context before sending to API (token optimization).
+
     Returns:
         {"explanation": str, "steps": [str], "confirm": bool}
         or None if no external provider is available.
     """
-    if not has_external_provider():
-        return None
+    # Use Ollama to compress context before sending to API (saves tokens)
+    compressed_context = context
+    if context and len(context) > 200:
+        summary = _call_local(
+            f"Summarize this system context in 2 sentences max:\n{context}",
+            system="You are a context summarizer. Be extremely concise. Output only the summary.",
+        )
+        if summary:
+            compressed_context = summary
 
     prompt = f'User request: "{user_input}"\n'
-    if context:
-        prompt += f"System context: {context}\n"
+    if compressed_context:
+        prompt += f"System context: {compressed_context}\n"
     prompt += "Generate an execution plan."
 
     raw = _call_external(prompt, system=_SYSTEM_PLAN)

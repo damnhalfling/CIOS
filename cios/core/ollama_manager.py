@@ -105,6 +105,31 @@ def _start_ollama_serve() -> bool:
     return False
 
 
+def _pull_model(model_name: str) -> bool:
+    """Pull a model from Ollama registry. Blocks until complete.
+
+    Called on first boot when model is not yet available.
+    """
+    try:
+        logger.info("Pulling model '%s'...", model_name)
+        result = subprocess.run(
+            ["ollama", "pull", model_name],
+            capture_output=True,
+            text=True,
+            timeout=600,  # 10 min max
+        )
+        if result.returncode == 0:
+            return True
+        logger.error("ollama pull failed: %s", result.stderr)
+        return False
+    except subprocess.TimeoutExpired:
+        logger.error("ollama pull timed out after 10 minutes")
+        return False
+    except Exception as e:
+        logger.error("Failed to pull model: %s", e)
+        return False
+
+
 def ensure_ollama_running() -> bool:
     """Ensure Ollama is running if configured as the LLM provider.
 
@@ -167,10 +192,9 @@ def ensure_ollama_running() -> bool:
         logger.info("Ollama model '%s' available", model)
     else:
         _ollama_status["model_available"] = False
-        _ollama_status["error"] = f"Modelo '{model}' não encontrado"
+        _ollama_status["error"] = f"Modelo '{model}' ausente — execute: sudo cios-setup-ai"
         logger.warning(
-            "Ollama running but model '%s' not found. " "Pull with: ollama pull %s",
-            model,
+            "Model '%s' not found. Run: sudo cios-setup-ai",
             model,
         )
         return False

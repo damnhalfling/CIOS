@@ -4,7 +4,7 @@ on:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
-      - 'v[0-9]+.[0-9]+.[0-9]+-rc*'
+      - 'v[0-9]+.[0-9]+.[0-9]+-rc[0-9]*'
 
 permissions:
   contents: write
@@ -71,17 +71,112 @@ jobs:
 
       - name: Extract version from tag
         id: version
-        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        run: |
+          # Strip 'v' prefix: v1.2.0-rc1 → 1.2.0-rc1
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          # Detect if this is an RC release
+          if [[ "$VERSION" == *"-rc"* ]]; then
+            echo "IS_RC=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "IS_RC=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build pkg-config git \
+            libwayland-dev wayland-protocols libxkbcommon-dev \
+            libinput-dev libpixman-1-dev libdrm-dev libseat-dev \
+            libxcb1-dev xwayland libgbm-dev libvulkan-dev \
+            libxcb-composite0-dev libxcb-icccm4-dev libxcb-image0-dev \
+            libxcb-render0-dev libxcb-render-util0-dev libxcb-xfixes0-dev \
+            libxcb-xinput-dev libxcb-dri3-dev libxcb-present-dev \
+            libxcb-res0-dev libxcb-shm0-dev hwdata libxcb-ewmh-dev \
+            libffi-dev libxml2-dev libexpat1-dev \
+            libegl1-mesa-dev libgles2-mesa-dev libcairo2-dev \
+            patchelf
+          # Install newer Meson (wlroots 0.18 requires c23 support → Meson 1.5+)
+          sudo pip install meson>=1.5.0
+          # These may not be in default repos — install if available
+          sudo apt-get install -y libdisplay-info-dev libliftoff-dev 2>/dev/null || true
+
+      - name: Build and install wayland 1.23 (system has 1.22)
+        run: |
+          git clone --depth=1 --branch 1.23.0 https://gitlab.freedesktop.org/wayland/wayland.git /tmp/wayland
+          cd /tmp/wayland
+          meson setup build --prefix=/usr --libdir=lib/x86_64-linux-gnu -Ddocumentation=false -Dtests=false -Ddtd_validation=false
+          ninja -C build
+          sudo meson install -C build
+          sudo ldconfig
+
+      - name: Build and install libdisplay-info
+        run: |
+          if ! pkg-config --exists libdisplay-info; then
+            echo "Building libdisplay-info from source..."
+            git clone --depth=1 --branch 0.2.0 https://gitlab.freedesktop.org/emersion/libdisplay-info.git /tmp/libdisplay-info
+            cd /tmp/libdisplay-info
+            meson setup build --prefix=/usr --libdir=lib/x86_64-linux-gnu
+            ninja -C build
+            sudo meson install -C build
+            sudo ldconfig
+          else
+            echo "libdisplay-info already available via apt"
+          fi
+
+      - name: Build and install libliftoff
+        run: |
+          if ! pkg-config --exists libliftoff; then
+            echo "Building libliftoff from source..."
+            git clone --depth=1 --branch v0.5.0 https://gitlab.freedesktop.org/emersion/libliftoff.git /tmp/libliftoff
+            cd /tmp/libliftoff
+            meson setup build --prefix=/usr --libdir=lib/x86_64-linux-gnu
+            ninja -C build
+            sudo meson install -C build
+            sudo ldconfig
+          else
+            echo "libliftoff already available via apt"
+          fi
+
+      - name: Build and install wlroots 0.18.1
+        run: |
+          git clone --depth=1 --branch 0.18.1 https://gitlab.freedesktop.org/wlroots/wlroots.git /tmp/wlroots
+          cd /tmp/wlroots
+          meson setup build --prefix=/usr --libdir=lib/x86_64-linux-gnu -Dxwayland=enabled
+          ninja -C build
+          sudo meson install -C build
+          # Protocol headers are generated in build dir — copy them to include dir
+          sudo find build -name "*-protocol.h" -exec cp {} /usr/include/wlroots-0.18/ \;
+          sudo ldconfig
+          # Verify wlroots is findable
+          pkg-config --modversion wlroots-0.18 || { echo "wlroots-0.18.pc not found, searching..."; find /usr -name "wlroots*.pc" 2>/dev/null; exit 1; }
+
       - name: Build .deb package
         run: bash build-deb.sh "${{ steps.version.outputs.VERSION }}"
+        env:
+          PKG_CONFIG_PATH: /usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig
 
-      - name: Delete all previous releases
+      - name: Delete previous RC releases (RC only)
+        if: steps.version.outputs.IS_RC == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Cleaning old RC releases..."
+          RELEASES=$(gh release list --limit 100 --json tagName -q '.[].tagName')
+          for TAG in $RELEASES; do
+            if [[ "$TAG" == *"-rc"* ]]; then
+              echo "Deleting RC release $TAG..."
+              gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
+            fi
+          done
+
+      - name: Delete all previous releases (stable only)
+        if: steps.version.outputs.IS_RC == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -93,7 +188,8 @@ jobs:
           done
           echo "All previous releases deleted."
 
-      - name: Delete old tags from remote
+      - name: Delete old tags from remote (stable only)
+        if: steps.version.outputs.IS_RC == 'false'
         run: |
           CURRENT_TAG="${GITHUB_REF_NAME}"
           for TAG in $(git tag -l); do
@@ -109,4 +205,4 @@ jobs:
           files: cios_${{ steps.version.outputs.VERSION }}_amd64.deb
           generate_release_notes: true
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.version.outputs.IS_RC == 'true' }}

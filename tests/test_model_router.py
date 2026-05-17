@@ -167,10 +167,11 @@ class TestExternalCall:
 class TestHasExternalProvider:
     """Check if any external API is configured."""
 
-    def test_no_provider(self):
+    def test_always_true_because_cios_api_is_always_available(self):
+        """CIOS API is always available as final fallback (free tier, no key needed)."""
         with patch("cios.core.model_router.config") as mock_config:
             mock_config.get.return_value = ""
-            assert has_external_provider() is False
+            assert has_external_provider() is True
 
     def test_openai_configured(self):
         with patch("cios.core.model_router.config") as mock_config:
@@ -186,12 +187,10 @@ class TestHasExternalProvider:
 class TestNoProviderMessage:
     """User-friendly message when no external API is configured."""
 
-    def test_message_contains_options(self):
+    def test_message_contains_guidance(self):
         msg = get_no_provider_message()
-        assert "CIOS API" in msg
-        assert "OpenAI" in msg
-        assert "Anthropic" in msg
         assert "cios --setup" in msg
+        assert "conexão" in msg.lower() or "internet" in msg.lower()
 
 
 class TestCircuitBreaker:
@@ -267,10 +266,11 @@ class TestProviderConfigured:
             mock_config.get.return_value = "sk-test-key"
             assert _provider_is_configured("openai") is True
 
-    def test_cios_api_needs_key(self):
+    def test_cios_api_always_configured(self):
+        """CIOS API is always available — no key required for free tier."""
         with patch("cios.core.model_router.config") as mock_config:
             mock_config.get.return_value = ""
-            assert _provider_is_configured("cios_api") is False
+            assert _provider_is_configured("cios_api") is True
 
     def test_cios_api_configured_with_key(self):
         with patch("cios.core.model_router.config") as mock_config:

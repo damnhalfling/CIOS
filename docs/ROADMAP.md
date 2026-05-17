@@ -1,7 +1,7 @@
-# Harmoni OS — Roadmap
+# CIOS — Roadmap
 
 > Substituindo apps por intenção.
-> Atualizado: Maio 2026 — v0.15.0
+> Atualizado: Maio 2026 — v1.1.0-rc16
 
 ---
 
@@ -60,7 +60,7 @@ Se não for 100% confiável → fluxo guiado. Se for confiável → automático.
 - ✅ Hotkey overlay com mesma identidade visual
 - ✅ Splash com transição contínua para GUI
 - ✅ Multi-monitor: janela principal no primário, tela secundária interativa
-- ✅ Plymouth boot splash (logo Harmoni, sem texto de boot)
+- ✅ Plymouth boot splash (logo CIOS, sem texto de boot)
 - ✅ Installer com opção de substituição completa (LightDM + Plymouth)
 - ✅ Modal de confirmação com focus correto (Enter confirma, não reenvia)
 
@@ -102,48 +102,64 @@ Se não for 100% confiável → fluxo guiado. Se for confiável → automático.
 |------|----------|--------|
 | Intelligence Client (P4) | Client no OS que consome api.harmoni-ia.com | AGORA |
 | Módulo de Voz (P6) | STT/TTS como I/O agnóstico (mic → texto → pipeline → TTS) | Após P4 |
-| Wayland compositor | Compositor próprio (wlroots-based) | Antes de distribuição |
-| Distribuição | 1-liner, AppImage, distro própria | Quando tiver impacto |
+| ~~Wayland compositor~~ | ~~Compositor próprio (wlroots-based)~~ | ✅ CONCLUÍDO |
+| ~~Distribuição base~~ | ~~greetd + Plymouth + .deb funcional~~ | ✅ CONCLUÍDO |
+| ~~Greeter gráfico~~ | ~~GTK4 Wayland-native login screen~~ | ✅ CONCLUÍDO |
+| ~~ISO própria~~ | ~~Live-build com instalador CIOS~~ | ✅ CONCLUÍDO |
+| ~~First-boot wizard~~ | ~~"Bem-vindo ao CIOS" + config inicial~~ | ✅ CONCLUÍDO |
+| ~~Update mechanism~~ | ~~"CIOS 1.2 disponível" na UI~~ | ✅ CONCLUÍDO |
 
 ---
 
-## Nota: Migração X11 → Wayland
+## Nota: Migração X11 → Wayland ✅ CONCLUÍDA
 
-**Decisão:** manter X11 agora, migrar quando for hora de distribuir.
+**Status:** Compositor Wayland próprio (cios-shell) implementado e funcional.
 
-**Por que migrar (eventualmente):**
-- Harmoni roda apps reais (editor, browser) — isolamento de segurança faz sentido
-- Compositor próprio = controle total sobre window placement, hotkeys, segurança
-- Distros estão convergindo pra Wayland como padrão
-
-**O que muda:**
-- Openbox → compositor wlroots-based próprio (Harmoni É o compositor)
-- `wmctrl` → protocolos Wayland nativos (controle direto, sem hack)
-- `xclip` → `wl-copy`/`wl-paste`
+**O que foi feito:**
+- Openbox → **cios-shell** (compositor wlroots 0.18, C puro)
+- `wmctrl` → IPC via Unix socket (JSON protocol)
+- `xclip` → `wl-copy`/`wl-paste` (com fallback X11)
 - Hotkey global → layer-shell protocol
-- Tkinter → continua via XWayland (ou migra pra widget toolkit nativo)
+- Tkinter → continua via XWayland
+- XWayland habilitado para apps legados (browser, editor, terminal)
+- LightDM → **greetd** (display manager Wayland-native)
+- **Greeter GTK4** visual com login mascarado (substitui agreety)
+- Libs bundled em `/usr/lib/cios/` via ldconfig (sem conflito com sistema)
+- Plymouth boot splash funcional
+- Instalação limpa via .deb (sem downloads pesados)
+- Componentes de IA deferidos para pós-login (`sudo cios-setup-ai`)
+- Sessão estável (getty@tty1 masked, seat handoff correto)
+- Password dialog mascarado para operações sudo
 
-**O que NÃO muda (zero impacto):**
+**Stack de sessão:**
+```
+GRUB (0s) → Plymouth → greetd (login) → cios-session → cios-shell (Wayland)
+```
+
+**O que NÃO mudou (zero impacto):**
 - Skills core (nmcli, pactl, apt, bluetoothctl, psutil)
 - MCP, planner, intent parser, humanizer, memory
 - Toda a camada cognitiva
 
-**Estimativa:** ~2-4 semanas de trabalho focado. Acoplamento X11 é localizado (UI + 3 skills).
-
 ---
 
-## Números (v0.15.0)
+## Números (v1.1.0-rc16)
 
 | Métrica | Valor |
 |---------|-------|
-| Skills | 22 (+media_player) |
-| Intent patterns | 170+ (PT/EN) |
+| Skills | 26 |
+| Intent patterns | 171 (PT/EN) |
 | Traduções humanizer | 230+ (PT/EN) |
 | Tipos de erro | 19 |
-| Testes | 608+ |
+| Testes | 615 |
 | Property tests (Hypothesis) | 22 |
 | Modos de execução | 6 |
-| Itens concluídos | 175+ |
+| Itens concluídos | 185+ |
+| Compositor | cios-shell (wlroots 0.18, C) |
+| Display Manager | greetd + greeter GTK4 |
+| Boot splash | Plymouth (tema custom) |
+| Libs bundled | ~40 (via ldd, ldconfig) |
+| UI | GTK4 Wayland-native |
 
 ---
 
@@ -159,4 +175,16 @@ LLM só para intents desconhecidos. Pattern matching resolve 80%+.
 
 ---
 
-*Atualizado: Maio 2026 — v0.15.0*
+---
+
+## Branching & Release
+
+- **main** — versão estável, release semanal (domingo)
+- **dev** — desenvolvimento diário, RC
+- **feat/*** — features isoladas (ex: `feat/wayland-compositor`)
+
+Ver `docs/BRANCHING.md` para detalhes.
+
+---
+
+*Atualizado: Maio 2026 — v1.1.0-rc16*

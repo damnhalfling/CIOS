@@ -1,7 +1,7 @@
-# Harmoni OS — Plano Técnico (Itens Críticos)
+# CIOS — Plano Técnico (Itens Críticos)
 
 > De projeto para produto percebido.
-> Atualizado: Maio 2026 — v0.14.0
+> Atualizado: Maio 2026 — v1.1.0-rc3
 
 ---
 
@@ -29,7 +29,7 @@
 |---|------|--------|
 | 160 | Boot suave (fade 300ms alpha animation) | ✅ |
 | 161 | Feedback consistente (audit 21 handlers) | ✅ |
-| 162 | Audit de outputs (zero leak técnico, 468 testes) | ✅ |
+| 162 | Audit de outputs (zero leak técnico, 398 testes) | ✅ |
 
 ### P3 — Demo
 
@@ -39,4 +39,4 @@
 
 ---
 
-*Atualizado: Maio 2026 — v0.13.0*
+*Atualizado: Maio 2026 — v1.0.0-rc.1.1*

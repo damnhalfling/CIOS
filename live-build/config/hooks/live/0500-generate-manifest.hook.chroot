@@ -1,0 +1,27 @@
+#!/bin/bash
+# ═══════════════════════════════════════════════════
+#  Hook: Generate package manifest
+#  Records installed packages for reproducibility.
+# ═══════════════════════════════════════════════════
+set -euo pipefail
+
+echo ">>> [0500] Generating package manifest..."
+
+MANIFEST_DIR="/usr/share/cios"
+MANIFEST_FILE="$MANIFEST_DIR/iso-manifest.txt"
+
+mkdir -p "$MANIFEST_DIR"
+
+# Write header with build metadata
+{
+    echo "# CIOS Live ISO — Package Manifest"
+    echo "# Build timestamp: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    echo "# Git commit: ${CIOS_GIT_COMMIT:-unknown}"
+    echo "#"
+    echo "# Package Version"
+    echo "# ─────── ───────"
+    dpkg-query -W -f='${Package} ${Version}\n' | sort
+} > "$MANIFEST_FILE"
+
+PACKAGE_COUNT=$(dpkg-query -W -f='${Package}\n' | wc -l)
+echo ">>> [0500] Manifest generated: $PACKAGE_COUNT packages recorded."

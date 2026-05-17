@@ -221,17 +221,35 @@ class OnboardingWizard:
         provider_var = tk.StringVar(value="ollama")
 
         options = [
-            ("Ollama (local, grátis, privado)", "ollama"),
-            ("OpenAI (sua chave, precisa de API key)", "openai"),
-            ("Anthropic (sua chave, precisa de API key)", "anthropic"),
-            ("CIOS API (assinatura em ciosia.com)", "cios_api"),
+            ("Ollama (local, grátis, privado) — obrigatório", "ollama"),
+            ("OpenAI (sua chave)", "openai"),
+            ("Anthropic (sua chave)", "anthropic"),
+            ("CIOS Intelligence (api.ciosia.com) — sempre disponível", "cios_api"),
         ]
 
-        for text, value in options:
+        tk.Label(
+            self._container,
+            text="O Ollama local é obrigatório. Escolha um provider externo\npara quando precisar de conhecimento além do local:",
+            font=("Inter", 10),
+            fg="#6b6b7b",
+            bg="#0a0a0f",
+            justify=tk.LEFT,
+        ).pack(anchor=tk.W, pady=(0, 10))
+
+        # External provider selection (preferred)
+        ext_var = tk.StringVar(value="cios_api")
+
+        ext_options = [
+            ("CIOS Intelligence (grátis, Bedrock)", "cios_api"),
+            ("OpenAI (sua chave)", "openai"),
+            ("Anthropic (sua chave)", "anthropic"),
+        ]
+
+        for text, value in ext_options:
             rb = tk.Radiobutton(
                 self._container,
                 text=text,
-                variable=provider_var,
+                variable=ext_var,
                 value=value,
                 font=("Inter", 11),
                 fg="#b0b0c0",
@@ -266,14 +284,17 @@ class OnboardingWizard:
         key_entry.pack(fill=tk.X, pady=(4, 0), ipady=6)
 
         def save_and_next():
-            provider = provider_var.get()
-            self._settings["llm_provider"] = provider
+            provider = ext_var.get()
+            self._settings["llm_provider"] = "ollama"  # Always ollama as primary
+            self._settings["preferred_external_provider"] = provider
             key = key_entry.get().strip()
             if key:
                 if provider == "openai":
                     self._settings["openai_api_key"] = key
                 elif provider == "anthropic":
                     self._settings["anthropic_api_key"] = key
+                elif provider == "cios_api":
+                    self._settings["cios_api_key"] = key
             self._next_step()
 
         tk.Button(
@@ -445,23 +466,25 @@ class OnboardingWizard:
         print("  Bem-vindo ao CIOS, seu sistema operacional cognitivo.\n")
 
         # Provider
-        print("  Escolha o modelo de IA:")
-        print("    1. Ollama (local, grátis)")
+        print("  O CIOS usa Ollama local (obrigatório) + um provider externo para")
+        print("  tarefas complexas.\n")
+        print("  Escolha o provider externo preferido:")
+        print("    1. CIOS Intelligence (grátis, sempre disponível)")
         print("    2. OpenAI (sua chave)")
         print("    3. Anthropic (sua chave)")
-        print("    4. CIOS API (assinatura em ciosia.com)")
 
         choice = input("\n  Opção [1]: ").strip() or "1"
-        providers = {"1": "ollama", "2": "openai", "3": "anthropic", "4": "cios_api"}
-        provider = providers.get(choice, "ollama")
-        config.set("llm_provider", provider)
+        providers = {"1": "cios_api", "2": "openai", "3": "anthropic"}
+        provider = providers.get(choice, "cios_api")
+        config.set("llm_provider", "ollama")  # Always ollama as primary
+        config.set("preferred_external_provider", provider)
 
         if provider in ("openai", "anthropic"):
             key = input(f"  API Key para {provider}: ").strip()
             if key:
                 config.set(f"{provider}_api_key", key)
         elif provider == "cios_api":
-            key = input("  CIOS API Key (de ciosia.com): ").strip()
+            key = input("  CIOS API Key (opcional, para limites maiores): ").strip()
             if key:
                 config.set("cios_api_key", key)
 
