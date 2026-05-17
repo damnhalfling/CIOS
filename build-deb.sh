@@ -30,13 +30,18 @@ export PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig
 if [ -d shell ]; then
     pushd shell > /dev/null
     rm -rf build
-    meson setup build --prefix=/usr
-    ninja -C build
-    popd > /dev/null
-    echo "→ ✓ cios-shell compiled"
+    if meson setup build --prefix=/usr 2>/dev/null && ninja -C build 2>/dev/null; then
+        popd > /dev/null
+        echo "→ ✓ cios-shell compiled"
+        SHELL_BUILT=true
+    else
+        popd > /dev/null
+        echo "→ ⚠ cios-shell skipped (missing wlroots-0.18 or build deps)"
+        SHELL_BUILT=false
+    fi
 else
-    echo "ERROR: shell/ directory not found. Cannot build compositor."
-    exit 1
+    echo "→ ⚠ shell/ directory not found. Building without compositor."
+    SHELL_BUILT=false
 fi
 
 # ── Create directory structure ──
@@ -570,42 +575,42 @@ cp -r cios/infra/*.py "${PKG_DIR}${INSTALL_DIR}/cios/infra/"
 cp -r cios/skills/*.py "${PKG_DIR}${INSTALL_DIR}/cios/skills/"
 
 # ── Install compositor binary ──
-echo "→ Installing cios-shell compositor..."
-cp shell/build/cios-shell "${PKG_DIR}/usr/bin/cios-shell"
-chmod 755 "${PKG_DIR}/usr/bin/cios-shell"
+if [ "$SHELL_BUILT" = true ] && [ -f shell/build/cios-shell ]; then
+    echo "→ Installing cios-shell compositor..."
+    cp shell/build/cios-shell "${PKG_DIR}/usr/bin/cios-shell"
+    chmod 755 "${PKG_DIR}/usr/bin/cios-shell"
 
-# ── Bundle ALL shared library dependencies not in base system ──
-# Use ldd to find every lib cios-shell needs, bundle non-standard ones
-echo "→ Bundling cios-shell runtime dependencies..."
-mkdir -p "${PKG_DIR}/usr/lib/cios"
+    # ── Bundle ALL shared library dependencies not in base system ──
+    # Use ldd to find every lib cios-shell needs, bundle non-standard ones
+    echo "→ Bundling cios-shell runtime dependencies..."
+    mkdir -p "${PKG_DIR}/usr/lib/cios"
 
-# List of libs that are ALWAYS in a base Debian/Ubuntu install (skip these)
-# Also skip X11/xcb base libs that the display manager needs untouched
-BASE_LIBS="linux-vdso|ld-linux|libc\.so|libm\.so|libdl\.so|libpthread|librt\.so|libstdc\+\+|libgcc_s|libX11\.so|libxcb\.so|libglib-2\.0|libgio-2\.0|libgobject-2\.0|libgmodule-2\.0|libffi\.so|libpcre2|libsystemd|libudev|libcap\.so|libgpg-error|libgcrypt|liblz4|liblzma|libzstd|libexpat"
+    # List of libs that are ALWAYS in a base Debian/Ubuntu install (skip these)
+    BASE_LIBS="linux-vdso|ld-linux|libc\.so|libm\.so|libdl\.so|libpthread|librt\.so|libstdc\+\+|libgcc_s|libX11\.so|libxcb\.so|libglib-2\.0|libgio-2\.0|libgobject-2\.0|libgmodule-2\.0|libffi\.so|libpcre2|libsystemd|libudev|libcap\.so|libgpg-error|libgcrypt|liblz4|liblzma|libzstd|libexpat"
 
-# Get all linked libs and bundle the non-base ones
-ldd "${PKG_DIR}/usr/bin/cios-shell" | grep "=> /" | awk '{print $3}' | while read -r lib; do
-    libname=$(basename "$lib")
-    # Skip base system libs
-    if echo "$libname" | grep -qE "$BASE_LIBS"; then
-        continue
+    ldd "${PKG_DIR}/usr/bin/cios-shell" | grep "=> /" | awk '{print $3}' | while read -r lib; do
+        libname=$(basename "$lib")
+        if echo "$libname" | grep -qE "$BASE_LIBS"; then
+            continue
+        fi
+        if [ -f "$lib" ]; then
+            cp -L "$lib" "${PKG_DIR}/usr/lib/cios/$libname"
+        fi
+    done
+
+    echo "→ Bundled libs:"
+    ls "${PKG_DIR}/usr/lib/cios/" 2>/dev/null || echo "  (none)"
+
+    # ── Set RPATH on cios-shell so it finds bundled libs WITHOUT global ldconfig ──
+    if command -v patchelf &>/dev/null; then
+        patchelf --set-rpath '/usr/lib/cios' "${PKG_DIR}/usr/bin/cios-shell"
+        echo "→ ✓ RPATH set on cios-shell"
+    else
+        echo "→ ⚠ patchelf not found, will rely on LD_LIBRARY_PATH in cios-session"
     fi
-    # Copy lib (follow symlinks to get the real file)
-    if [ -f "$lib" ]; then
-        cp -L "$lib" "${PKG_DIR}/usr/lib/cios/$libname"
-    fi
-done
-
-echo "→ Bundled libs:"
-ls "${PKG_DIR}/usr/lib/cios/"
-
-# ── Set RPATH on cios-shell so it finds bundled libs WITHOUT global ldconfig ──
-# This avoids polluting the system linker cache (which broke LightDM)
-if command -v patchelf &>/dev/null; then
-    patchelf --set-rpath '/usr/lib/cios' "${PKG_DIR}/usr/bin/cios-shell"
-    echo "→ ✓ RPATH set on cios-shell"
 else
-    echo "→ ⚠ patchelf not found, will rely on LD_LIBRARY_PATH in cios-session"
+    echo "→ ⚠ Skipping compositor (not built). Package will use Openbox fallback."
+    mkdir -p "${PKG_DIR}/usr/lib/cios"
 fi
 
 # ── Session files ──
