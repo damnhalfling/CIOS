@@ -23,8 +23,12 @@
 #include <wayland-server-core.h>
 #include <wlr/types/wlr_keyboard.h>
 #include <wlr/backend.h>
-#include <wlr/backend/session.h>
 #include <wlr/xwayland.h>
+
+#include <sys/ioctl.h>
+#include <linux/vt.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "log.h"
 #include "server.h"
@@ -274,10 +278,12 @@ bool hotkeys_handle_key(struct CiosServer *server, uint32_t keycode,
     if ((modifiers & WLR_MODIFIER_CTRL) && (modifiers & WLR_MODIFIER_ALT)) {
         if (keycode >= KEY_F1 && keycode <= KEY_F12) {
             unsigned int vt = keycode - KEY_F1 + 1;
-            struct wlr_session *session = wlr_backend_get_session(server->backend);
-            if (session) {
-                LOG_INFO("hotkey: Ctrl+Alt+F%u → VT switch to %u", vt, vt);
-                wlr_session_change_vt(session, vt);
+            LOG_INFO("hotkey: Ctrl+Alt+F%u → VT switch to %u", vt, vt);
+            int tty_fd = open("/dev/tty0", O_RDWR | O_NOCTTY);
+            if (tty_fd >= 0) {
+                ioctl(tty_fd, VT_ACTIVATE, vt);
+                ioctl(tty_fd, VT_WAITACTIVE, vt);
+                close(tty_fd);
             }
             return true;
         }
