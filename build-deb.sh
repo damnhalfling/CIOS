@@ -136,7 +136,7 @@ Version: ${VERSION}
 Section: x11
 Priority: optional
 Architecture: amd64
-Depends: python3 (>= 3.10), python3-pip, python3-venv, python3-gi, gir1.2-gtk-4.0, libxkbcommon0, libinput10, libseat1, seatd, libpixman-1-0, libdrm2, libgles2, libegl1, libgbm1, libcap2, plymouth, curl, network-manager, pipewire, pipewire-pulse
+Depends: python3 (>= 3.10), python3-pip, python3-venv, python3-gi, gir1.2-gtk-4.0, sudo, libxkbcommon0, libinput10, libseat1, seatd, libpixman-1-0, libdrm2, libgles2, libegl1, libgbm1, libcap2, plymouth, curl, network-manager, pipewire, pipewire-pulse
 Recommends: xwayland, wl-clipboard
 Conflicts: lightdm, gdm3, sddm
 Provides: x-display-manager
@@ -336,9 +336,9 @@ systemctl disable getty@tty1.service 2>/dev/null || true
 systemctl mask getty@tty1.service 2>/dev/null || true
 systemctl set-default graphical.target 2>/dev/null || true
 
-# Ensure users have DRM access
+# Ensure users have DRM + sudo access
 for user in $(awk -F: '$3 >= 1000 && $3 < 65000 {print $1}' /etc/passwd); do
-    usermod -aG video,render,input "$user" 2>/dev/null || true
+    usermod -aG video,render,input,sudo "$user" 2>/dev/null || true
 done
 
 echo "[CIOS] ✓ greetd configured (Wayland-only)"
