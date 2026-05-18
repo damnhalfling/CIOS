@@ -140,7 +140,12 @@ static void handle_alt_tab(struct CiosServer *server) {
     }
 
     if (next && next != current) {
-        server_focus_surface(server, next);
+        /* Use the appropriate focus function based on surface type */
+        if (next->xdg_toplevel) {
+            server_focus_xdg_surface(server, next);
+        } else {
+            server_focus_surface(server, next);
+        }
     }
 }
 

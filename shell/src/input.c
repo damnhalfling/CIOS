@@ -82,6 +82,11 @@ void server_focus_surface(struct CiosServer *server, struct CiosSurface *surface
         surface->visible = true;
     }
 
+    /* Raise surface to top of its layer (z-order) */
+    if (surface->scene_tree) {
+        wlr_scene_node_raise_to_top(&surface->scene_tree->node);
+    }
+
     /* Deactivate previous surface */
     if (prev_focused && prev_focused->xsurface) {
         wlr_xwayland_surface_activate(prev_focused->xsurface, false);
