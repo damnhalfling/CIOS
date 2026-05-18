@@ -136,7 +136,7 @@ Version: ${VERSION}
 Section: x11
 Priority: optional
 Architecture: amd64
-Depends: python3 (>= 3.10), python3-pip, python3-venv, python3-gi, gir1.2-gtk-4.0, sudo, libxkbcommon0, libinput10, libseat1, seatd, libpixman-1-0, libdrm2, libgles2, libegl1, libgbm1, libcap2, plymouth, curl, network-manager, pipewire, pipewire-pulse
+Depends: python3 (>= 3.10), python3-pip, python3-venv, python3-gi, gir1.2-gtk-4.0, sudo, libxkbcommon0, libinput10, libseat1, seatd, libpixman-1-0, libdrm2, libgles2, libegl1, libgbm1, libcap2, plymouth, curl, network-manager, pipewire, pipewire-pulse, foot
 Recommends: xwayland, wl-clipboard
 Conflicts: lightdm, gdm3, sddm
 Provides: x-display-manager
