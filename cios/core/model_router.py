@@ -39,10 +39,10 @@ logger = logging.getLogger(__name__)
 _MAX_RETRIES = 1
 _RETRY_BACKOFF = [0.5]  # seconds between retries
 _PROVIDER_TIMEOUTS = {
-    "ollama": 15,
-    "openai": 15,
-    "anthropic": 15,
-    "cios_api": 15,
+    "ollama": 8,
+    "openai": 12,
+    "anthropic": 12,
+    "cios_api": 12,
 }
 
 # Transient errors worth retrying
