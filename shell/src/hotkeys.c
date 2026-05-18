@@ -22,6 +22,8 @@
 
 #include <wayland-server-core.h>
 #include <wlr/types/wlr_keyboard.h>
+#include <wlr/backend.h>
+#include <wlr/backend/session.h>
 #include <wlr/xwayland.h>
 
 #include "log.h"
@@ -266,6 +268,19 @@ bool hotkeys_handle_key(struct CiosServer *server, uint32_t keycode,
     if ((modifiers & WLR_MODIFIER_ALT) && keycode == KEY_F4) {
         handle_alt_f4(server);
         return true;
+    }
+
+    /* Ctrl+Alt+F1-F12: VT switch */
+    if ((modifiers & WLR_MODIFIER_CTRL) && (modifiers & WLR_MODIFIER_ALT)) {
+        if (keycode >= KEY_F1 && keycode <= KEY_F12) {
+            unsigned int vt = keycode - KEY_F1 + 1;
+            struct wlr_session *session = wlr_backend_get_session(server->backend);
+            if (session) {
+                LOG_INFO("hotkey: Ctrl+Alt+F%u → VT switch to %u", vt, vt);
+                wlr_session_change_vt(session, vt);
+            }
+            return true;
+        }
     }
 
     return false;

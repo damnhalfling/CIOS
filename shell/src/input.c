@@ -76,6 +76,12 @@ void server_focus_surface(struct CiosServer *server, struct CiosSurface *surface
     /* Activate the XWayland surface */
     wlr_xwayland_surface_activate(surface->xsurface, true);
 
+    /* Ensure the surface is visible (may have been hidden during splash) */
+    if (surface->scene_tree && !surface->visible) {
+        wlr_scene_node_set_enabled(&surface->scene_tree->node, true);
+        surface->visible = true;
+    }
+
     /* Deactivate previous surface */
     if (prev_focused && prev_focused->xsurface) {
         wlr_xwayland_surface_activate(prev_focused->xsurface, false);
