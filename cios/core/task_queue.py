@@ -181,6 +181,7 @@ class TaskManager:
     def __init__(self, on_task_complete: Callable[[Task], None] | None = None):
         self._threads: dict[str, TaskThread] = {}
         self._completed: list[Task] = []
+        self._all_tasks: dict[str, Task] = {}  # All tasks by ID for quick lookup
         self._lock = threading.Lock()
         self._on_task_complete = on_task_complete
         self._max_completed = 50
@@ -201,22 +202,15 @@ class TaskManager:
                 )
 
             self._threads[context].enqueue(task)
+            self._all_tasks[task.id] = task
 
         logger.info("task %s submitted (context=%s, desc=%s)", task.id, context, task.description)
         return task.id
 
     def get_task(self, task_id: str) -> Task | None:
-        """Get a task by ID (running, queued, or completed)."""
+        """Get a task by ID (any status)."""
         with self._lock:
-            # Check running/queued
-            for thread in self._threads.values():
-                if thread.current_task and thread.current_task.id == task_id:
-                    return thread.current_task
-            # Check completed
-            for task in self._completed:
-                if task.id == task_id:
-                    return task
-        return None
+            return self._all_tasks.get(task_id)
 
     def get_active_tasks(self) -> list[Task]:
         """Get all currently running tasks."""

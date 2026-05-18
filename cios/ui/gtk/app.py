@@ -304,6 +304,12 @@ class CIOSApplication(Gtk.Application):
                         GLib.idle_add(self._show_password_dialog, result)
                         return
 
+                    # Background task — free prompt immediately, poll for result
+                    if status == "background":
+                        task_id = data.get("task_id", "")
+                        GLib.idle_add(self._show_background_task, result, task_id)
+                        return
+
                     # Check if result contains gallery data
                     gallery = data.get("gallery")
                     if gallery:
@@ -320,6 +326,69 @@ class CIOSApplication(Gtk.Application):
             GLib.idle_add(self._show_result, result, status)
 
         threading.Thread(target=execute, daemon=True).start()
+
+    def _show_background_task(self, message: str, task_id: str):
+        """Show background task notification and free the prompt for new input."""
+        self._result_label.remove_css_class("processing")
+        self._result_label.set_label(f"⟳ {message}")
+        self._result_label.set_visible(True)
+        self._result_label.add_css_class("background-task")
+
+        # Free the prompt immediately — user can keep typing
+        self._input.set_sensitive(True)
+        self._input.grab_focus()
+        self._busy = False
+
+        # Start polling for task completion
+        if task_id:
+            GLib.timeout_add(2000, self._poll_task, task_id)
+
+    def _poll_task(self, task_id: str) -> bool:
+        """Poll a background task for completion. Returns False to stop polling."""
+        if not self._bridge:
+            return False
+
+        task_data = self._bridge.get_task_result(task_id)
+        if task_data is None:
+            return False  # Task not found, stop polling
+
+        status = task_data.get("status", "")
+
+        if status == "running":
+            # Update progress display
+            progress = task_data.get("result", {})
+            if isinstance(progress, dict):
+                msg = progress.get("result", "")
+            else:
+                msg = str(progress) if progress else ""
+            if not msg:
+                # Show latest progress from active tasks
+                active = self._bridge.get_active_tasks()
+                for t in active:
+                    if t["id"] == task_id:
+                        msg = t.get("progress", "")
+                        break
+            if msg:
+                self._result_label.set_label(f"⟳ {msg}")
+            return True  # Keep polling
+
+        if status in ("completed", "failed"):
+            # Task finished — show result
+            result_data = task_data.get("result", {})
+            if isinstance(result_data, dict):
+                result_text = result_data.get("result", "Concluído.")
+                result_status = result_data.get("status", "success")
+            else:
+                result_text = str(result_data)
+                result_status = "success" if status == "completed" else "error"
+
+            self._result_label.remove_css_class("background-task")
+            self._show_result(result_text, result_status)
+            self._thread_panel.refresh()
+            return False  # Stop polling
+
+        # Still queued
+        return True  # Keep polling
 
     def _finish_execution(self):
         """Reset UI state after execution (no result to show)."""

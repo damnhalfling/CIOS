@@ -1321,7 +1321,7 @@ class CIOSBridge:
         ]
 
     def get_task_result(self, task_id: str) -> dict | None:
-        """Get the result of a completed task."""
+        """Get the status/result of a task (running, completed, or failed)."""
         task = self._task_manager.get_task(task_id)
         if task is None:
             return None
@@ -1331,6 +1331,7 @@ class CIOSBridge:
             "status": task.status.value,
             "result": task.result,
             "duration": task.duration,
+            "progress": task.latest_progress,
         }
 
     def get_system_status(self) -> dict:
