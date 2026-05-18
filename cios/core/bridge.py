@@ -145,6 +145,10 @@ class CIOSBridge:
         # Conversation state — delegated to ThreadManager
         self._thread_store = ThreadStore()
         self._thread_manager = ThreadManager(self._thread_store)
+        # Background task execution
+        from cios.core.task_queue import TaskManager
+
+        self._task_manager = TaskManager(on_task_complete=self._on_task_complete)
         # Cancellation flag — checked by long-running operations
         self._cancelled = False
 
@@ -504,8 +508,51 @@ class CIOSBridge:
         return result
 
     def _execute_intent(self, intent: Intent, context) -> dict:
-        """Execute an intent with retry, validation, and error enrichment."""
+        """Execute an intent with retry, validation, and error enrichment.
+
+        Long-running intents (package install, upgrades) are dispatched to
+        the background TaskManager and return immediately with a task reference.
+        """
+        from cios.core.task_queue import Task, get_task_context, should_run_background
+
         context.notify_activity()
+
+        # Check if this should run in background
+        if should_run_background(intent.type.value, intent.params):
+            task = Task(
+                description=self._describe_intent(intent),
+                context=get_task_context(intent.type.value),
+            )
+
+            # Capture intent and dependencies for background execution
+            planner = self._planner
+
+            def execute_fn(t: Task) -> dict:
+                t.add_progress(f"Executando: {t.description}", 10.0)
+                plan_result = planner.execute(intent)
+                t.add_progress("Finalizando...", 90.0)
+
+                steps, summary, outcome, voice_mode = humanize_result(plan_result)
+                return {
+                    "steps": steps,
+                    "result": summary,
+                    "status": "error" if outcome == "failure" else outcome,
+                    "voice_mode": voice_mode,
+                }
+
+            task._execute_fn = execute_fn
+            task_id = self._task_manager.submit(task)
+
+            return {
+                "steps": [f"⟳ {task.description}"],
+                "result": f"Executando em background... (task {task_id})",
+                "status": "background",
+                "confirm": None,
+                "voice_mode": "brief",
+                "task_id": task_id,
+            }
+
+        # Synchronous execution for fast operations
         plan_result = self._execute_with_retry(intent)
 
         # Post-action validation
@@ -531,6 +578,37 @@ class CIOSBridge:
             result.update(plan_result.data)
 
         return result
+
+    def _describe_intent(self, intent: Intent) -> str:
+        """Generate a human-readable description of an intent for task display."""
+        action = intent.params.get("action", "")
+        package = intent.params.get("package", "")
+
+        if intent.type == IntentType.PACKAGE:
+            descriptions = {
+                "install": f"Instalando {package}",
+                "remove": f"Removendo {package}",
+                "update": "Atualizando listas de pacotes",
+                "upgrade": "Atualizando sistema",
+            }
+            return descriptions.get(action, f"package: {action}")
+        elif intent.type == IntentType.SELF_UPDATE:
+            return "Atualizando CIOS"
+
+        return f"{intent.type.value}: {action}"
+
+    def _on_task_complete(self, task) -> None:
+        """Called when a background task completes."""
+        from cios.core.task_queue import TaskStatus
+
+        status = "✓" if task.status == TaskStatus.COMPLETED else "✗"
+        logger.info(
+            "Background task %s %s: %s (%.1fs)",
+            status,
+            task.id,
+            task.description,
+            task.duration,
+        )
 
     # ═══════════════════════════════════════════════════════════════════
     #  CONVERSATION CONTEXT (#74)
@@ -1227,6 +1305,33 @@ class CIOSBridge:
         # Close thread manager and store
         self._thread_manager.close_active_thread()
         self._thread_store.close()
+
+    def get_active_tasks(self) -> list[dict]:
+        """Get all active background tasks with their progress."""
+        tasks = self._task_manager.get_active_tasks()
+        return [
+            {
+                "id": t.id,
+                "description": t.description,
+                "status": t.status.value,
+                "progress": t.latest_progress,
+                "duration": t.duration,
+            }
+            for t in tasks
+        ]
+
+    def get_task_result(self, task_id: str) -> dict | None:
+        """Get the result of a completed task."""
+        task = self._task_manager.get_task(task_id)
+        if task is None:
+            return None
+        return {
+            "id": task.id,
+            "description": task.description,
+            "status": task.status.value,
+            "result": task.result,
+            "duration": task.duration,
+        }
 
     def get_system_status(self) -> dict:
         """Return current system metrics for the status panel.
