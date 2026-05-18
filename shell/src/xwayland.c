@@ -42,13 +42,18 @@ static int handle_map_timeout(void *data) {
     /* Place surface in usable_area on BOTTOM layer */
     struct CiosOutput *primary = output_get_primary(server);
     if (primary && surface->scene_tree) {
+        /* Offset Y by titlebar height if decorated */
+        int y_offset = surface->decorated ? CIOS_TITLEBAR_HEIGHT : 0;
         wlr_scene_node_set_position(&surface->scene_tree->node,
-            primary->usable_x, primary->usable_y);
+            primary->usable_x, primary->usable_y + y_offset);
 
         /* Configure the XWayland surface geometry to fill usable area */
         wlr_xwayland_surface_configure(surface->xsurface,
-            primary->usable_x, primary->usable_y,
-            primary->usable_width, primary->usable_height);
+            primary->usable_x, primary->usable_y + y_offset,
+            primary->usable_width, primary->usable_height - y_offset);
+
+        /* Update decoration width */
+        decorations_update_size(surface, primary->usable_width);
 
         /* Ensure it's on BOTTOM layer (already default, but be explicit) */
         surface->layer = server->layer_bottom;
@@ -96,6 +101,9 @@ static void handle_xwayland_surface_map(struct wl_listener *listener, void *data
 
     /* Add to server's surfaces list */
     wl_list_insert(&server->surfaces, &surface->link);
+
+    /* Create server-side decorations (titlebar + buttons) */
+    decorations_create(surface);
 
     LOG_INFO("surface mapped: s_%u (class=%s, title=%s, pid=%d)",
         surface->id,
@@ -153,6 +161,9 @@ static void handle_xwayland_surface_unmap(struct wl_listener *listener, void *da
     if (server->focused == surface) {
         server->focused = NULL;
     }
+
+    /* Destroy decorations */
+    decorations_destroy(surface);
 
     /* Remove scene tree node */
     if (surface->scene_tree) {

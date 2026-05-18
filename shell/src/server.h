@@ -101,6 +101,13 @@ struct CiosSurface {
     bool visible;
     pid_t pid;
 
+    /* Server-side decorations */
+    bool decorated;
+    struct wlr_scene_rect *titlebar;
+    struct wlr_scene_rect *btn_close;
+    struct wlr_scene_rect *btn_minimize;
+    struct wlr_scene_rect *btn_maximize;
+
     /* 500ms timeout: if runtime doesn't configure after surface_mapped,
      * place surface in usable_area on BOTTOM layer (Req 2.4) */
     struct wl_event_source *map_timer;
@@ -211,5 +218,19 @@ bool ipc_init(struct CiosIpc *ipc, struct CiosServer *server);
 void ipc_destroy(struct CiosIpc *ipc);
 void ipc_send_event(struct CiosIpc *ipc, const char *event_type, const char *payload);
 void ipc_send_response(struct CiosIpc *ipc, const char *id, const char *response);
+
+/* decorations.c */
+#define CIOS_DECO_TITLEBAR  1
+#define CIOS_DECO_CLOSE     2
+#define CIOS_DECO_MINIMIZE  3
+#define CIOS_DECO_MAXIMIZE  4
+#define CIOS_TITLEBAR_HEIGHT 28
+
+bool decorations_create(struct CiosSurface *surface);
+void decorations_update_size(struct CiosSurface *surface, int width);
+void decorations_set_focused(struct CiosSurface *surface, bool focused);
+void decorations_destroy(struct CiosSurface *surface);
+int decorations_hit_test(struct CiosSurface *surface, int x, int y);
+void decorations_minimize(struct CiosSurface *surface);
 
 #endif /* CIOS_SERVER_H */

@@ -53,6 +53,7 @@ shell_sources = files(
   'src/layer_shell.c',
   'src/process.c',
   'src/ipc.c',
+  'src/decorations.c',
 )
 
 executable(

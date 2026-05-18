@@ -90,7 +90,11 @@ void server_focus_surface(struct CiosServer *server, struct CiosSurface *surface
     /* Deactivate previous surface */
     if (prev_focused && prev_focused->xsurface) {
         wlr_xwayland_surface_activate(prev_focused->xsurface, false);
+        decorations_set_focused(prev_focused, false);
     }
+
+    /* Update decoration focus state */
+    decorations_set_focused(surface, true);
 
     /* Set keyboard focus on the surface */
     struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(server->seat);
@@ -215,23 +219,76 @@ static void handle_cursor_button(struct wl_listener *listener, void *data) {
     struct CiosServer *server = wl_container_of(listener, server, cursor_button);
     struct wlr_pointer_button_event *event = data;
 
-    /* Notify the seat of the button event */
-    wlr_seat_pointer_notify_button(server->seat,
-        event->time_msec, event->button, event->state);
-
-    /* On button press, focus the surface under cursor */
+    /* On button press, check for decoration clicks first */
     if (event->state == WL_POINTER_BUTTON_STATE_PRESSED) {
         double sx, sy;
         struct wlr_surface *wlr_surface = NULL;
 
+        /* Check if click is on a decoration button by testing each surface */
+        struct CiosSurface *surf;
+        wl_list_for_each(surf, &server->surfaces, link) {
+            if (!surf->decorated || !surf->visible || !surf->scene_tree) {
+                continue;
+            }
+            /* Get surface position in layout coordinates */
+            int surf_x, surf_y;
+            wlr_scene_node_coords(&surf->scene_tree->node, &surf_x, &surf_y);
+
+            /* Calculate click position relative to surface */
+            int rel_x = (int)server->cursor->x - surf_x;
+            int rel_y = (int)server->cursor->y - surf_y;
+
+            int hit = decorations_hit_test(surf, rel_x, rel_y);
+            if (hit == CIOS_DECO_CLOSE) {
+                LOG_INFO("decoration click: close s_%u", surf->id);
+                if (surf->xsurface) {
+                    wlr_xwayland_surface_close(surf->xsurface);
+                }
+                return;
+            } else if (hit == CIOS_DECO_MINIMIZE) {
+                LOG_INFO("decoration click: minimize s_%u", surf->id);
+                decorations_minimize(surf);
+                return;
+            } else if (hit == CIOS_DECO_MAXIMIZE) {
+                /* Toggle maximize — for now just fill usable area */
+                LOG_INFO("decoration click: maximize s_%u", surf->id);
+                struct CiosOutput *primary = output_get_primary(server);
+                if (primary && surf->xsurface) {
+                    int y_off = CIOS_TITLEBAR_HEIGHT;
+                    wlr_scene_node_set_position(&surf->scene_tree->node,
+                        primary->usable_x, primary->usable_y + y_off);
+                    wlr_xwayland_surface_configure(surf->xsurface,
+                        primary->usable_x, primary->usable_y + y_off,
+                        primary->usable_width, primary->usable_height - y_off);
+                    decorations_update_size(surf, primary->usable_width);
+                }
+                return;
+            } else if (hit == CIOS_DECO_TITLEBAR) {
+                /* Click on titlebar — focus the surface */
+                server_focus_surface(server, surf);
+                wlr_seat_pointer_notify_button(server->seat,
+                    event->time_msec, event->button, event->state);
+                return;
+            }
+        }
+
+        /* Normal click — find surface and focus */
         struct CiosSurface *surface = surface_at(server,
             server->cursor->x, server->cursor->y,
             &wlr_surface, &sx, &sy);
 
         if (surface) {
-            server_focus_surface(server, surface);
+            if (surface->xdg_toplevel) {
+                server_focus_xdg_surface(server, surface);
+            } else {
+                server_focus_surface(server, surface);
+            }
         }
     }
+
+    /* Notify the seat of the button event */
+    wlr_seat_pointer_notify_button(server->seat,
+        event->time_msec, event->button, event->state);
 }
 
 /*
