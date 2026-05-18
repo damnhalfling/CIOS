@@ -125,20 +125,24 @@ Your voice stays on your machine. Always.
 ## A real system, not an app
 
 - Custom Wayland compositor (cios-shell) — replaces your desktop
+- Server-side decorations: titlebar with close/minimize/maximize buttons
 - Single-surface interface: prompt at bottom, results above, system status on the right
+- Background task execution: long operations (apt install) run without blocking the prompt
 - No sidebar, no menus, no page navigation — just intent
 - Minimal top bar (clock, battery, wifi, volume, CPU)
 - Processing spinner appears only when the system is thinking
 - Multi-monitor support (secondary screen shows system context)
 - Global hotkey (Ctrl+Space)
+- VT switching (Ctrl+Alt+F1-F12) for TTY access
 - Boot splash with seamless transition to main interface
 - XWayland support for legacy X11 apps (browser, editor, terminal)
+- foot terminal (Wayland-native) as default terminal
 - Onboarding wizard on first login
 
-**No GNOME. No KDE. Just intent.**
+**No GNOME. No KDE. No X11. Just intent.**
 
 ```
-Boot → Display Manager → "CIOS" → Compositor → Splash → Ready
+Boot → Plymouth → greetd (login) → cios-shell (Wayland) → Ready
 ```
 
 ## Conversational by design
@@ -210,24 +214,22 @@ All commands work in **English** and **Portuguese**.
 ## Install
 
 ```bash
-# One-line install
-curl -sL https://raw.githubusercontent.com/damnhalfling/cios/main/install-cios.sh | sudo bash
-```
-
-```bash
-# Or download the .deb from releases
-wget https://github.com/damnhalfling/CIOS/releases/latest/download/cios_1.1.0-rc3_amd64.deb
-sudo apt install ./cios_1.1.0-rc3_amd64.deb
+# Download the .deb from releases
+wget https://github.com/damnhalfling/CIOS/releases/latest/download/cios_2.0.0-rc14_amd64.deb
+sudo apt install ./cios_2.0.0-rc14_amd64.deb
 sudo reboot
 ```
 
-Select **CIOS** at the login screen. That's it.
+CIOS **replaces** the desktop. There is no "session alongside GNOME" mode.
+After install, CIOS is the system. Revert with `sudo apt remove cios && sudo reboot`.
 
-The installer offers two modes:
-1. **Session only** — adds CIOS alongside GNOME/KDE (Wayland session)
-2. **Full replacement** — switches to LightDM with CIOS theme + Plymouth boot splash (logo on boot, no text)
-
-After install, say **"update cios"** anytime to get the latest version automatically.
+The installer:
+- Compiles and installs the Wayland compositor (cios-shell)
+- Installs Ollama + Mistral (local LLM)
+- Installs Whisper (STT) + Piper (TTS)
+- Configures greetd (login manager)
+- Sets up Plymouth boot splash
+- Requires internet during install (~6GB downloads)
 
 ## Test without leaving your desktop
 
@@ -276,12 +278,14 @@ In practice: if no LLM is available, all regex-matched intents (the vast majorit
 ## Status
 
 - ✅ Custom Wayland compositor (wlroots 0.18) — running on real hardware
+- ✅ Server-side decorations (titlebar + close/minimize/maximize)
+- ✅ Background task queue — prompt stays free during long operations
 - ✅ 26 skills — Wi-Fi, audio, files, packages, windows, clipboard, dev environments, self-update, file search, workflow start, gallery management, duplicates, face clustering, screen capture
 - ✅ Hybrid intent classifier — regex + LLM cache with stemming + auto-learning
 - ✅ Voice offline — STT + TTS, fully local
 - ✅ Multi-monitor — secondary screen as full interaction surface
 - ✅ Auto-learning engine
-- ✅ .deb installable package (session-only or full replacement mode)
+- ✅ .deb installable package (full replacement, no fallbacks)
 - ✅ Plymouth boot splash (logo on boot, no text)
 - ✅ 398 tests passing (including 13 property-based tests)
 - ✅ Onboarding wizard
@@ -291,8 +295,10 @@ In practice: if no LLM is available, all regex-matched intents (the vast majorit
 - ✅ Screen capture — screenshot (full/window/region) + screen recording
 - ✅ XDG user directories — auto-created on login
 - ✅ XWayland — full support for X11 apps (browser, editor, terminal)
+- ✅ VT switching (Ctrl+Alt+Fn) for TTY access
+- ✅ greetd bundled (no dependency on external repos)
 
-**This is not a prototype. It runs.**
+**This is not a prototype. It runs on real hardware.**
 
 ## Roadmap
 
@@ -311,6 +317,9 @@ User Input → Intent Parser → Classifier → MCO → Planner → Executor →
             (PT/EN)         LLM +       (live    + Auto-     Control    to human
                            Stemming     state)   Learner      │        language
                                                             Memory
+                                                              │
+                                                         TaskQueue
+                                                     (background ops)
 ```
 
 <details>
@@ -318,19 +327,21 @@ User Input → Intent Parser → Classifier → MCO → Planner → Executor →
 
 - **Intent Parser** — 170+ regex patterns (PT/EN), hybrid LLM classifier with cache + stemming for natural language
 - **Intent Classifier** — SQLite-cached LLM classifications, fuzzy matching with light PT stemming, auto-learning from successful executions
+- **Task Queue** — Background execution for long operations (apt install, upgrades). Tasks grouped by context, sequential within context, parallel across contexts. Prompt stays free.
 - **MCP** — Live system state with reactive watchers (nmcli monitor, pactl subscribe) + adaptive polling (1s/5s/15s)
 - **MCO** — Decision layer: resolves from MCP state instantly when possible
 - **Planner** — 30 handlers with context-aware execution and `_resilient_call()` retry
 - **Executor** — Safe shell execution with timeout, blocked command list, background processes
 - **Humanizer** — 220+ translations PT/EN, all technical output becomes plain language
-- **Model Router** — Ollama (local, default) with fallback support
+- **Model Router** — Ollama (local, default) with fallback support, 8s timeout
 - **Memory** — SQLite store of intents, commands, and outcomes
 - **Error Recovery** — 19 error types classified with actionable suggestions (PT/EN)
-- **Bridge** — 3-turn conversation context, clarification, pronoun resolution, post-action validation
+- **Bridge** — 3-turn conversation context, clarification, pronoun resolution, post-action validation, background task dispatch
 - **Gallery Store** — SQLite persistence for favorites, albums, trash, face embeddings, duplicate cache
 - **Voice** — STT (whisper.cpp) + TTS (piper), both local and offline
 - **Daemon** — Unix socket server for IPC
 - **Auto-Learning** — Detects repeated patterns, saves shortcuts, reuses them
+- **Compositor** — cios-shell (C/wlroots 0.18): SSD, VT switch, Alt+Tab, layer-shell, XWayland, splash
 
 </details>
 
@@ -346,6 +357,8 @@ cios-os/
 │   │   ├── intent_parser.py    # 170+ regex patterns PT/EN
 │   │   ├── intent_classifier.py # Hybrid LLM classifier + cache + stemming
 │   │   ├── planner.py          # 30 handlers + MCO + _resilient_call()
+│   │   ├── task_queue.py       # Background task execution (TaskManager + TaskThread)
+│   │   ├── thread_manager.py   # Conversation thread state + classification
 │   │   ├── handlers/           # Intent handlers (gallery, media, screen, etc.)
 │   │   ├── mcp.py              # Live system state (watchers + adaptive polling)
 │   │   ├── executor.py         # Safe shell execution
@@ -355,6 +368,8 @@ cios-os/
 │   │   ├── memory.py           # SQLite history
 │   │   └── error_recovery.py   # 19 error types + actionable suggestions
 │   ├── skills/                 # 26 system skills
+│   │   ├── package_manager.py  # apt install/remove/search (background-capable)
+│   │   ├── app_launcher.py     # .desktop scan + aliases (foot, chrome, etc.)
 │   │   ├── gallery_store.py    # Favorites, albums, trash (SQLite)
 │   │   ├── gallery_search.py   # Date + text/CLIP search
 │   │   ├── duplicates.py       # pHash + MD5 duplicate detection
@@ -365,13 +380,18 @@ cios-os/
 │   ├── ui/                     # GUI, CLI, hotkey, topbar, splash, gallery, viewer
 │   └── infra/                  # Daemon, voice, multi-monitor
 ├── shell/                      # Wayland compositor (C, wlroots 0.18)
-│   ├── src/                    # main.c, server.c, output.c, input.c, ipc.c, ...
-│   └── meson.build             # Build system
-├── session/                    # Wayland session config + XDG setup
-├── tests/                      # 398 tests
-├── .github/workflows/          # CI: test → build compositor → build .deb → release
-├── build-deb.sh                # .deb package builder (compiles compositor + Python)
-├── install-cios.sh             # One-line installer
+│   ├── src/
+│   │   ├── main.c, server.c, output.c, input.c
+│   │   ├── hotkeys.c           # Ctrl+Space, Alt+Tab, Super, VT switch
+│   │   ├── decorations.c       # Server-side decorations (titlebar + buttons)
+│   │   ├── xwayland.c, xdg_shell.c, layer_shell.c
+│   │   ├── process.c           # Runtime lifecycle + circuit breaker
+│   │   └── ipc.c              # Unix socket JSON protocol
+│   └── meson.build
+├── session/                    # Wayland session config
+├── tests/                      # 398+ tests
+├── .github/workflows/          # CI: lint → test → build compositor → build .deb → release
+├── build-deb.sh                # .deb builder (mandatory compositor, no fallbacks)
 └── pyproject.toml
 ```
 
@@ -504,20 +524,16 @@ CIOS: Conectado na Starlink (192.168.1.42)
 ### Instalação
 
 ```bash
-# Instalação automática
-curl -sL https://raw.githubusercontent.com/damnhalfling/cios/main/install-cios.sh | sudo bash
-```
-
-```bash
-# Ou baixe o .deb da release
-wget https://github.com/damnhalfling/CIOS/releases/latest/download/cios_1.1.0-rc3_amd64.deb
-sudo apt install ./cios_1.1.0-rc3_amd64.deb
+# Baixe o .deb da release
+wget https://github.com/damnhalfling/CIOS/releases/latest/download/cios_2.0.0-rc14_amd64.deb
+sudo apt install ./cios_2.0.0-rc14_amd64.deb
 sudo reboot
 ```
 
-Selecione **CIOS** na tela de login.
+CIOS **substitui** o desktop. Não existe modo "sessão ao lado do GNOME".
+Reverter: `sudo apt remove cios && sudo reboot`.
 
-Depois de instalado, diga **"atualizar cios"** a qualquer momento para atualizar automaticamente.
+O instalador requer internet (~6GB de downloads: Ollama, Mistral, Whisper, Piper).
 
 ### Configuração de IA
 
@@ -542,4 +558,4 @@ cios --setup      # Re-executar setup
 
 ---
 
-*CIOS v1.1.0-rc3 — May 2026*
+*CIOS v2.0.0-rc14 — May 2026*

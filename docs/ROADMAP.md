@@ -1,7 +1,7 @@
 # CIOS — Roadmap
 
 > Substituindo apps por intenção.
-> Atualizado: Maio 2026 — v1.1.0-rc16
+> Atualizado: Maio 2026 — v2.0.0-rc14
 
 ---
 
@@ -96,6 +96,32 @@ Se não for 100% confiável → fluxo guiado. Se for confiável → automático.
 
 ---
 
+### Background Task Queue ✅ (v2.0.0-rc14)
+- ✅ TaskQueue: operações longas (apt install, upgrade) rodam em background threads
+- ✅ Prompt livre: usuário continua digitando enquanto tasks executam
+- ✅ Tasks agrupadas por contexto (package, network, files)
+- ✅ Execução sequencial dentro do mesmo contexto, paralela entre contextos
+- ✅ Progress polling (2s) com atualização visual na UI
+- ✅ Notificação de conclusão (sucesso/erro)
+- ✅ Bridge: `get_active_tasks()`, `get_task_result()` para UI consultar
+
+### Compositor Hardening ✅ (v2.0.0-rc8→rc14)
+- ✅ Server-side decorations: titlebar 28px com close/minimize/maximize
+- ✅ VT switching (Ctrl+Alt+F1-F12) via ioctl
+- ✅ Alt+Tab: raise_to_top + suporte XDG/XWayland
+- ✅ Focus: surfaces hidden são reveladas ao receber foco
+- ✅ greetd bundlado no .deb (não depende de repos)
+- ✅ PAM config para greetd
+- ✅ Plymouth timeout (15s) — não trava boot
+- ✅ greetd crash limit (3x em 30s → para)
+- ✅ sudo como dependência + usuários no grupo sudo
+- ✅ foot (terminal Wayland) como dependência
+- ✅ Conflicts: lightdm, gdm3, sddm — sem X11 DMs
+- ✅ Build aborta se compositor não compila (sem .deb quebrado)
+- ✅ LLM timeout reduzido (15s → 8s) para resposta mais rápida
+
+---
+
 ## Fases futuras
 
 | Fase | Objetivo | Quando |
@@ -108,6 +134,8 @@ Se não for 100% confiável → fluxo guiado. Se for confiável → automático.
 | ~~ISO própria~~ | ~~Live-build com instalador CIOS~~ | ✅ CONCLUÍDO |
 | ~~First-boot wizard~~ | ~~"Bem-vindo ao CIOS" + config inicial~~ | ✅ CONCLUÍDO |
 | ~~Update mechanism~~ | ~~"CIOS 1.2 disponível" na UI~~ | ✅ CONCLUÍDO |
+| ~~Background Tasks~~ | ~~Operações longas em background, prompt livre~~ | ✅ CONCLUÍDO |
+| ~~Server-side decorations~~ | ~~Titlebar com close/minimize/maximize~~ | ✅ CONCLUÍDO |
 
 ---
 
@@ -143,7 +171,7 @@ GRUB (0s) → Plymouth → greetd (login) → cios-session → cios-shell (Wayla
 
 ---
 
-## Números (v1.1.0-rc16)
+## Números (v2.0.0-rc14)
 
 | Métrica | Valor |
 |---------|-------|
@@ -154,12 +182,14 @@ GRUB (0s) → Plymouth → greetd (login) → cios-session → cios-shell (Wayla
 | Testes | 615 |
 | Property tests (Hypothesis) | 22 |
 | Modos de execução | 6 |
-| Itens concluídos | 185+ |
-| Compositor | cios-shell (wlroots 0.18, C) |
-| Display Manager | greetd + greeter GTK4 |
-| Boot splash | Plymouth (tema custom) |
+| Itens concluídos | 195+ |
+| Compositor | cios-shell (wlroots 0.18, C) + SSD |
+| Display Manager | greetd (bundlado) |
+| Boot splash | Plymouth (tema custom, 15s timeout) |
 | Libs bundled | ~40 (via ldd, ldconfig) |
 | UI | GTK4 Wayland-native |
+| Background tasks | TaskQueue (por contexto) |
+| Terminal | foot (Wayland-native) |
 
 ---
 
@@ -187,4 +217,4 @@ Ver `docs/BRANCHING.md` para detalhes.
 
 ---
 
-*Atualizado: Maio 2026 — v1.1.0-rc16*
+*Atualizado: Maio 2026 — v2.0.0-rc14*

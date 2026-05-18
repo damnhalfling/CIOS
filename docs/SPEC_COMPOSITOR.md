@@ -31,7 +31,6 @@ Substituir a stack X11 + Openbox por um compositor Wayland mínimo e purpose-bui
 ### NÃO faz
 
 - Tiling / stacking configurável
-- Decorações de janela (CSD — apps desenham as próprias)
 - Menus de contexto / dock / taskbar
 - Drag & drop entre apps (fase futura se necessário)
 - Configuração por arquivo (rc.xml, etc.) — comportamento é hardcoded
