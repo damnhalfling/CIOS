@@ -164,6 +164,19 @@ class CIOSApplication(Gtk.Application):
         self._sidebar = Sidebar(on_suggestion=self._on_suggestion)
         content_box.append(self._sidebar)
 
+        # ── Artifact panel (right, hidden by default) ──
+        from cios.ui.gtk.artifact_panel import ARTIFACT_PANEL_CSS, ArtifactPanel
+
+        self._artifact_panel = ArtifactPanel()
+        content_box.append(self._artifact_panel)
+
+        # Apply artifact CSS
+        artifact_css = Gtk.CssProvider()
+        artifact_css.load_from_data(ARTIFACT_PANEL_CSS.encode())
+        Gtk.StyleContext.add_provider_for_display(
+            self._win.get_display(), artifact_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+
         # ── Hotkey overlay (floating) ──
         self._hotkey_overlay = HotkeyOverlay(on_submit=self._on_hotkey_submit)
         root_overlay.add_overlay(self._hotkey_overlay)
@@ -277,73 +290,101 @@ class CIOSApplication(Gtk.Application):
         # Add user message to chat feed
         self._chat_feed.add_user_message(text)
 
-        # Show typing indicator
-        progress_bubble = self._chat_feed.add_progress_message("Pensando…")
+        # Start streaming bubble (feels like "typing...")
+        self._chat_feed.start_streaming()
 
-        # Execute in background
+        # Execute with streaming in background
         def execute():
+            import time as _time
+
+            # Human timing: brief pause before responding
+            _time.sleep(0.25)
+
             try:
                 if self._bridge:
-                    data = self._bridge.execute_command(text, confirmed=False)
+                    # Use streaming for step-by-step feedback
+                    def on_step(step: str, current: int, total: int):
+                        GLib.idle_add(self._chat_feed.append_stream_token, f"{step}\n")
+
+                    data = self._bridge.execute_streaming(text, confirmed=False, on_step=on_step)
                     result = data.get("result", "Concluído.")
                     status = data.get("status", "success")
 
-                    # Check if password is needed — show masked dialog
+                    # Password needed
                     if data.get("password_prompt"):
-                        GLib.idle_add(self._remove_bubble, progress_bubble)
+                        GLib.idle_add(self._finish_streaming_show, result, None)
                         GLib.idle_add(self._show_password_dialog, result)
                         return
 
-                    # Background task — free prompt immediately, poll for result
+                    # Background task
                     if status == "background":
                         task_id = data.get("task_id", "")
-                        GLib.idle_add(
-                            self._show_background_task_chat, progress_bubble, result, task_id
-                        )
+                        GLib.idle_add(self._finish_streaming_background, result, task_id)
                         return
 
-                    # Check if result contains gallery data
+                    # Gallery
                     gallery = data.get("gallery")
                     if gallery:
-                        GLib.idle_add(self._remove_bubble, progress_bubble)
+                        GLib.idle_add(self._chat_feed.finish_streaming)
                         GLib.idle_add(self._show_gallery, gallery)
                         GLib.idle_add(self._finish_execution)
                         return
 
                     # Normal result
-                    GLib.idle_add(self._show_chat_result, progress_bubble, result, status)
+                    GLib.idle_add(self._finish_streaming_show, result, status)
                 else:
                     GLib.idle_add(
-                        self._show_chat_result,
-                        progress_bubble,
-                        "Sistema ainda inicializando…",
-                        "error",
+                        self._finish_streaming_show, "Sistema ainda inicializando…", "error"
                     )
             except Exception as e:
-                GLib.idle_add(self._show_chat_result, progress_bubble, f"Erro: {e}", "error")
+                GLib.idle_add(self._finish_streaming_show, f"Erro: {e}", "error")
 
         threading.Thread(target=execute, daemon=True).start()
 
-    def _show_chat_result(self, progress_bubble, result: str, status: str):
-        """Replace progress bubble with final result in chat feed."""
-        self._remove_bubble(progress_bubble)
-        css_class = "error-result" if status == "error" else None
-        self._chat_feed.add_assistant_message(result)
+    def _finish_streaming_show(self, result: str, status: str | None):
+        """Finish streaming and show final result."""
+        from cios.ui.gtk.artifact_panel import is_artifact
+
+        self._chat_feed.finish_streaming()
+
+        # Long/structured content → artifact panel
+        if status and status != "error" and is_artifact(result):
+            summary = result[:80].split("\n")[0] + "…"
+            self._chat_feed.add_assistant_message(f"{summary}\n\n📄 Aberto no painel lateral.")
+            self._artifact_panel.show_artifact(result)
+        else:
+            self._chat_feed.add_assistant_message(result)
+            # Follow-up suggestion
+            follow_up = self._suggest_follow_up(result)
+            if follow_up:
+                self._chat_feed.add_assistant_message(follow_up)
+
         self._input.set_sensitive(True)
         self._input.grab_focus()
         self._busy = False
         self._thread_panel.refresh()
 
-    def _show_background_task_chat(self, progress_bubble, message: str, task_id: str):
-        """Show background task in chat and free prompt."""
-        self._chat_feed.update_progress(progress_bubble, message)
+    def _finish_streaming_background(self, message: str, task_id: str):
+        """Finish streaming, show background task progress."""
+        self._chat_feed.finish_streaming()
+        progress_bubble = self._chat_feed.add_progress_message(message)
         self._input.set_sensitive(True)
         self._input.grab_focus()
         self._busy = False
 
-        # Start polling for task completion
         if task_id:
             GLib.timeout_add(2000, self._poll_task_chat, task_id, progress_bubble)
+
+    def _suggest_follow_up(self, result: str) -> str | None:
+        """Suggest a natural follow-up based on the result."""
+        r = result.lower()
+        if "chrome" in r and ("instalado" in r or "installed" in r):
+            return "Quer que eu abra o Chrome?"
+        if "firefox" in r and ("instalado" in r or "installed" in r):
+            return "Quer que eu abra o Firefox?"
+        if "instalado" in r or "installed" in r:
+            return "Mais alguma coisa?"
+        return None
 
     def _poll_task_chat(self, task_id: str, progress_bubble) -> bool:
         """Poll a background task for completion. Updates chat feed."""
