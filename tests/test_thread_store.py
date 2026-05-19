@@ -171,7 +171,7 @@ class TestSyncSuccess:
             # Verify the request was constructed correctly
             call_args = mock_urlopen.call_args
             request = call_args[0][0]
-            assert request.full_url == "https://api.cios-ia.com/threads"
+            assert request.full_url == "https://api.cios-ia.com/v1/sync"
             assert request.get_header("Authorization") == "Bearer test-token-abc123"
             assert request.get_header("Content-type") == "application/json"
             assert request.get_method() == "POST"
@@ -208,7 +208,12 @@ class TestSyncSuccess:
             # Extract the payload that was sent
             call_args = mock_urlopen.call_args
             request = call_args[0][0]
-            payload = json.loads(request.data.decode("utf-8"))
+            raw_payload = json.loads(request.data.decode("utf-8"))
+
+            # New format: {"threads": [...], "last_sync_timestamp": 0}
+            assert "threads" in raw_payload
+            assert len(raw_payload["threads"]) == 1
+            payload = raw_payload["threads"][0]
 
             # Verify payload structure
             assert payload["thread_id"] == "abc123"

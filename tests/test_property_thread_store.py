@@ -482,6 +482,7 @@ class TestCloudSyncPayloadSanitization:
                 "closed_at",
                 "summary",
                 "outcome",
+                "dominant_intent",
                 "turns",
             }
             actual_keys = set(payload.keys())
