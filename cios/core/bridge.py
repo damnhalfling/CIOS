@@ -517,6 +517,43 @@ class CIOSBridge:
 
         context.notify_activity()
 
+        # History search — handled directly (no planner needed)
+        if intent.type == IntentType.HISTORY_SEARCH:
+            query = intent.params.get("query", "")
+            if not query:
+                return {
+                    "steps": [],
+                    "result": "O que você quer buscar no histórico?",
+                    "status": "success",
+                    "confirm": None,
+                    "voice_mode": "full",
+                }
+            results = self.search_history(query)
+            if not results:
+                return {
+                    "steps": [],
+                    "result": f"Não encontrei nada sobre '{query}' no histórico.",
+                    "status": "success",
+                    "confirm": None,
+                    "voice_mode": "full",
+                }
+            # Format results conversationally
+            lines = [f"Encontrei {len(results)} conversa(s) sobre '{query}':\n"]
+            for r in results[:5]:
+                summary = r["summary"][:60]
+                lines.append(f"  • {summary}")
+                if r["turns"]:
+                    first_result = r["turns"][0].get("result", "")
+                    if first_result:
+                        lines.append(f"    → {first_result[:50]}")
+            return {
+                "steps": [],
+                "result": "\n".join(lines),
+                "status": "success",
+                "confirm": None,
+                "voice_mode": "brief",
+            }
+
         # Check if this should run in background
         if should_run_background(intent.type.value, intent.params):
             task = Task(
@@ -1319,6 +1356,33 @@ class CIOSBridge:
             }
             for t in tasks
         ]
+
+    def search_history(self, query: str, limit: int = 10) -> list[dict]:
+        """Search conversation history for a query string.
+
+        Returns matching threads with their turns, ordered by recency.
+        """
+        threads = self._thread_store.search(query, limit=limit)
+        results = []
+        for t in threads:
+            turns_summary = []
+            for turn in t.turns[:5]:  # Max 5 turns per thread in results
+                turns_summary.append(
+                    {
+                        "input": turn.user_input,
+                        "result": turn.result_summary[:100] if turn.result_summary else "",
+                    }
+                )
+            results.append(
+                {
+                    "id": t.id,
+                    "summary": t.summary or (t.turns[0].user_input if t.turns else ""),
+                    "created_at": t.created_at,
+                    "turns": turns_summary,
+                    "outcome": t.outcome,
+                }
+            )
+        return results
 
     def get_task_result(self, task_id: str) -> dict | None:
         """Get the status/result of a task (running, completed, or failed)."""

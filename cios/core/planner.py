@@ -117,6 +117,7 @@ _HANDLER_MAP = {
     IntentType.INTELLIGENCE: handle_intelligence,
     IntentType.GALLERY_MANAGE: handle_gallery_manage,
     IntentType.SCREEN_CAPTURE: handle_screen_capture,
+    IntentType.HISTORY_SEARCH: None,  # Handled directly in bridge
 }
 
 

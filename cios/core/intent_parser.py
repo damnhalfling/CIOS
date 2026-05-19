@@ -43,6 +43,7 @@ class IntentType(Enum):
     INTELLIGENCE = "intelligence"
     GALLERY_MANAGE = "gallery_manage"
     SCREEN_CAPTURE = "screen_capture"
+    HISTORY_SEARCH = "history_search"
     UNKNOWN = "unknown"
 
 
@@ -704,6 +705,52 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
         lambda m: {"media_type": "audio"},
         0.95,
     ),
+    # --- history search (PT + EN) — MUST be before intent_browse ---
+    (
+        re.compile(
+            r"(?:busca|procura|pesquisa)\s+(?:no\s+|em\s+|nas?\s+)?(?:histórico|historico|conversas?)\s+(?:sobre\s+|por\s+)?(.+)",
+            re.IGNORECASE,
+        ),
+        IntentType.HISTORY_SEARCH,
+        lambda m: {"query": m.group(1).strip()},
+        0.95,
+    ),
+    (
+        re.compile(
+            r"(?:o\s+que|quando)\s+(?:eu\s+)?(?:falei|disse|pedi|fiz)\s+(?:sobre\s+)?(.+)",
+            re.IGNORECASE,
+        ),
+        IntentType.HISTORY_SEARCH,
+        lambda m: {"query": m.group(1).strip()},
+        0.92,
+    ),
+    (
+        re.compile(
+            r"(?:search|find)\s+(?:in\s+)?(?:history|conversations?)\s+(?:about\s+|for\s+)?(.+)",
+            re.IGNORECASE,
+        ),
+        IntentType.HISTORY_SEARCH,
+        lambda m: {"query": m.group(1).strip()},
+        0.95,
+    ),
+    (
+        re.compile(
+            r"(?:what|when)\s+did\s+I\s+(?:say|ask|do)\s+(?:about\s+)?(.+)",
+            re.IGNORECASE,
+        ),
+        IntentType.HISTORY_SEARCH,
+        lambda m: {"query": m.group(1).strip()},
+        0.92,
+    ),
+    (
+        re.compile(
+            r"(?:meu\s+)?histórico\s+(?:de\s+|sobre\s+)?(.+)",
+            re.IGNORECASE,
+        ),
+        IntentType.HISTORY_SEARCH,
+        lambda m: {"query": m.group(1).strip()},
+        0.90,
+    ),
     # --- intent browse (PT + EN) — MUST be before app_launch ---
     # With search query (excludes "pacote/package/arquivo/file" which are other intents)
     (
@@ -717,7 +764,7 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
     ),
     (
         re.compile(
-            r"(?:buscar?|procurar?)\s+(?:sobre\s+|por\s+|na\s+(?:internet|web|net)\s+)?(?!pacote\b|package\b|arquivo\b|file\b)(.+)",
+            r"(?:buscar?|procurar?)\s+(?:sobre\s+|por\s+|na\s+(?:internet|web|net)\s+)?(?!pacote\b|package\b|arquivo\b|file\b|hist[oó]rico\b|conversas?\b)(.+)",
             re.IGNORECASE,
         ),
         IntentType.INTENT_BROWSE,
@@ -726,7 +773,7 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
     ),
     (
         re.compile(
-            r"(?:search|google|look\s+up)\s+(?:for\s+|about\s+)?(?!package\b|file\b)(.+)",
+            r"(?:search|google|look\s+up)\s+(?:for\s+|about\s+)?(?!package\b|file\b|history\b|conversations?\b)(.+)",
             re.IGNORECASE,
         ),
         IntentType.INTENT_BROWSE,

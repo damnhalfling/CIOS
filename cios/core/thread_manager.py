@@ -383,6 +383,52 @@ class ThreadStore:
             except Exception as e:
                 logger.error("ThreadStore: failed to update synced flag for %s: %s", thread_id, e)
 
+    def search(self, query: str, limit: int = 20) -> list[Thread]:
+        """Full-text search across thread turns and summaries.
+
+        Searches user_input and result_summary in turns, plus thread summary.
+        Returns threads ordered by relevance (most recent first).
+        """
+        with self._lock:
+            try:
+                # Search in turns (user_input and result_summary)
+                pattern = f"%{query}%"
+                turn_thread_ids = self._conn.execute(
+                    """SELECT DISTINCT thread_id FROM thread_turns
+                       WHERE user_input LIKE ? OR result_summary LIKE ?
+                       LIMIT ?""",
+                    (pattern, pattern, limit * 2),
+                ).fetchall()
+
+                # Search in thread summaries
+                summary_ids = self._conn.execute(
+                    """SELECT id FROM threads
+                       WHERE summary LIKE ?
+                       LIMIT ?""",
+                    (pattern, limit),
+                ).fetchall()
+
+                # Combine unique IDs
+                all_ids = list({r[0] for r in turn_thread_ids} | {r[0] for r in summary_ids})
+
+                if not all_ids:
+                    return []
+
+                # Load threads ordered by created_at desc
+                placeholders = ",".join("?" * len(all_ids))
+                rows = self._conn.execute(
+                    f"""SELECT * FROM threads
+                        WHERE id IN ({placeholders})
+                        ORDER BY created_at DESC
+                        LIMIT ?""",
+                    (*all_ids, limit),
+                ).fetchall()
+
+                return [self._load_thread_with_turns(row) for row in rows]
+            except Exception as e:
+                logger.error("ThreadStore: search failed for '%s': %s", query, e)
+                return []
+
     def close(self) -> None:
         """Close the database connection."""
         try:
