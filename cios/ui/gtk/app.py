@@ -116,33 +116,22 @@ class CIOSApplication(Gtk.Application):
         center_box.set_hexpand(True)
         content_box.append(center_box)
 
-        # Feed area (scrollable)
-        scroll = Gtk.ScrolledWindow()
-        scroll.set_vexpand(True)
-        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        center_box.append(scroll)
+        # Chat feed (replaces old label-based result display)
+        from cios.ui.gtk.chat_feed import CHAT_FEED_CSS, ChatFeed
 
-        self._feed_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        self._feed_box.set_margin_start(48)
-        self._feed_box.set_margin_end(48)
-        self._feed_box.set_margin_top(32)
-        self._feed_box.set_margin_bottom(16)
-        scroll.set_child(self._feed_box)
+        self._chat_feed = ChatFeed()
+        center_box.append(self._chat_feed)
 
-        # Greeting
-        greeting = Gtk.Label(label="O que você quer fazer?")
-        greeting.add_css_class("greeting")
-        greeting.set_halign(Gtk.Align.START)
-        self._feed_box.append(greeting)
-        self._greeting = greeting
+        # Apply chat feed CSS
+        css_provider = Gtk.CssProvider()
+        css_provider.load_from_data(CHAT_FEED_CSS.encode())
+        Gtk.StyleContext.add_provider_for_display(
+            self._win.get_display(), css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
 
-        # Result area
-        self._result_label = Gtk.Label(label="")
-        self._result_label.set_wrap(True)
-        self._result_label.set_halign(Gtk.Align.START)
-        self._result_label.add_css_class("result")
-        self._result_label.set_visible(False)
-        self._feed_box.append(self._result_label)
+        # Legacy references (kept for backward compat with password dialog etc.)
+        self._greeting = self._chat_feed._greeting
+        self._feed_box = self._chat_feed._messages_box
 
         # ── Prompt area (bottom) ──
         prompt_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
@@ -285,11 +274,11 @@ class CIOSApplication(Gtk.Application):
         self._input.set_text("")
         self._input.set_sensitive(False)
 
-        # Hide greeting, show processing
-        self._greeting.set_visible(False)
-        self._result_label.set_label("⟳ Processando…")
-        self._result_label.set_visible(True)
-        self._result_label.add_css_class("processing")
+        # Add user message to chat feed
+        self._chat_feed.add_user_message(text)
+
+        # Show typing indicator
+        progress_bubble = self._chat_feed.add_progress_message("Pensando…")
 
         # Execute in background
         def execute():
@@ -301,97 +290,107 @@ class CIOSApplication(Gtk.Application):
 
                     # Check if password is needed — show masked dialog
                     if data.get("password_prompt"):
+                        GLib.idle_add(self._remove_bubble, progress_bubble)
                         GLib.idle_add(self._show_password_dialog, result)
                         return
 
                     # Background task — free prompt immediately, poll for result
                     if status == "background":
                         task_id = data.get("task_id", "")
-                        GLib.idle_add(self._show_background_task, result, task_id)
+                        GLib.idle_add(
+                            self._show_background_task_chat, progress_bubble, result, task_id
+                        )
                         return
 
                     # Check if result contains gallery data
                     gallery = data.get("gallery")
                     if gallery:
+                        GLib.idle_add(self._remove_bubble, progress_bubble)
                         GLib.idle_add(self._show_gallery, gallery)
                         GLib.idle_add(self._finish_execution)
                         return
-                else:
-                    result = "Sistema ainda inicializando…"
-                    status = "error"
-            except Exception as e:
-                result = f"Erro: {e}"
-                status = "error"
 
-            GLib.idle_add(self._show_result, result, status)
+                    # Normal result
+                    GLib.idle_add(self._show_chat_result, progress_bubble, result, status)
+                else:
+                    GLib.idle_add(
+                        self._show_chat_result,
+                        progress_bubble,
+                        "Sistema ainda inicializando…",
+                        "error",
+                    )
+            except Exception as e:
+                GLib.idle_add(self._show_chat_result, progress_bubble, f"Erro: {e}", "error")
 
         threading.Thread(target=execute, daemon=True).start()
 
-    def _show_background_task(self, message: str, task_id: str):
-        """Show background task notification and free the prompt for new input."""
-        self._result_label.remove_css_class("processing")
-        self._result_label.set_label(f"⟳ {message}")
-        self._result_label.set_visible(True)
-        self._result_label.add_css_class("background-task")
+    def _show_chat_result(self, progress_bubble, result: str, status: str):
+        """Replace progress bubble with final result in chat feed."""
+        self._remove_bubble(progress_bubble)
+        css_class = "error-result" if status == "error" else None
+        self._chat_feed.add_assistant_message(result)
+        self._input.set_sensitive(True)
+        self._input.grab_focus()
+        self._busy = False
+        self._thread_panel.refresh()
 
-        # Free the prompt immediately — user can keep typing
+    def _show_background_task_chat(self, progress_bubble, message: str, task_id: str):
+        """Show background task in chat and free prompt."""
+        self._chat_feed.update_progress(progress_bubble, message)
         self._input.set_sensitive(True)
         self._input.grab_focus()
         self._busy = False
 
         # Start polling for task completion
         if task_id:
-            GLib.timeout_add(2000, self._poll_task, task_id)
+            GLib.timeout_add(2000, self._poll_task_chat, task_id, progress_bubble)
 
-    def _poll_task(self, task_id: str) -> bool:
-        """Poll a background task for completion. Returns False to stop polling."""
+    def _poll_task_chat(self, task_id: str, progress_bubble) -> bool:
+        """Poll a background task for completion. Updates chat feed."""
         if not self._bridge:
             return False
 
         task_data = self._bridge.get_task_result(task_id)
         if task_data is None:
-            return False  # Task not found, stop polling
+            return False
 
         status = task_data.get("status", "")
 
         if status == "running":
-            # Update progress display
-            progress = task_data.get("result", {})
-            if isinstance(progress, dict):
-                msg = progress.get("result", "")
-            else:
-                msg = str(progress) if progress else ""
-            if not msg:
-                # Show latest progress from active tasks
-                active = self._bridge.get_active_tasks()
-                for t in active:
-                    if t["id"] == task_id:
-                        msg = t.get("progress", "")
-                        break
-            if msg:
-                self._result_label.set_label(f"⟳ {msg}")
-            return True  # Keep polling
+            progress = task_data.get("progress", "")
+            if progress:
+                self._chat_feed.update_progress(progress_bubble, progress)
+            return True
 
         if status in ("completed", "failed"):
-            # Task finished — show result
             result_data = task_data.get("result", {})
             if isinstance(result_data, dict):
                 result_text = result_data.get("result", "Concluído.")
-                result_status = result_data.get("status", "success")
             else:
-                result_text = str(result_data)
-                result_status = "success" if status == "completed" else "error"
+                result_text = str(result_data) if result_data else "Concluído."
 
-            self._result_label.remove_css_class("background-task")
-            self._show_result(result_text, result_status)
+            self._remove_bubble(progress_bubble)
+            self._chat_feed.add_assistant_message(result_text)
             self._thread_panel.refresh()
-            return False  # Stop polling
+            return False
 
-        # Still queued
-        return True  # Keep polling
+        return True
+
+    def _remove_bubble(self, bubble):
+        """Remove a bubble from the chat feed."""
+        if bubble and bubble.get_parent():
+            bubble.get_parent().remove(bubble)
 
     def _finish_execution(self):
         """Reset UI state after execution (no result to show)."""
+        self._input.set_sensitive(True)
+        self._input.grab_focus()
+        self._busy = False
+        self._thread_panel.refresh()
+
+    def _show_result(self, result: str, status: str):
+        """Display execution result in chat feed (legacy compat)."""
+        self._chat_feed.add_assistant_message(result)
         self._input.set_sensitive(True)
         self._input.grab_focus()
         self._busy = False
@@ -490,9 +489,7 @@ class CIOSApplication(Gtk.Application):
             dialog.close()
             if password:
                 # Send password to bridge in background
-                self._result_label.set_label("⟳ Executando…")
-                self._result_label.set_visible(True)
-                self._result_label.add_css_class("processing")
+                progress = self._chat_feed.add_progress_message("Executando…")
 
                 def execute_with_password():
                     try:
@@ -502,7 +499,7 @@ class CIOSApplication(Gtk.Application):
                     except Exception as e:
                         result = f"Erro: {e}"
                         status = "error"
-                    GLib.idle_add(self._show_result, result, status)
+                    GLib.idle_add(self._show_chat_result, progress, result, status)
 
                 threading.Thread(target=execute_with_password, daemon=True).start()
             else:
@@ -520,24 +517,6 @@ class CIOSApplication(Gtk.Application):
         entry.grab_focus()
         self._busy = False  # Allow interaction with dialog
 
-    def _show_result(self, result: str, status: str):
-        """Display execution result."""
-        self._result_label.remove_css_class("processing")
-        self._result_label.set_label(result)
-        self._result_label.set_visible(True)
-
-        if status == "error":
-            self._result_label.add_css_class("error-result")
-        else:
-            self._result_label.remove_css_class("error-result")
-
-        self._input.set_sensitive(True)
-        self._input.grab_focus()
-        self._busy = False
-
-        # Refresh thread panel
-        self._thread_panel.refresh()
-
     def _show_gallery(self, gallery_data: dict):
         """Display gallery grid in the feed area."""
         from cios.ui.gtk.gallery import GalleryComponent
@@ -552,7 +531,6 @@ class CIOSApplication(Gtk.Application):
         )
         self._feed_box.append(self._active_gallery)
         self._greeting.set_visible(False)
-        self._result_label.set_visible(False)
 
     def _open_image_viewer(self, files: list, index: int):
         """Open full-size image viewer."""
