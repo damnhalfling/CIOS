@@ -1,6 +1,6 @@
 # CIOS — TODO
 
-> Atualizado: Maio 2026 — v1.1.0-rc16
+> Atualizado: Maio 2026 — v2.0.0-rc14
 
 ---
 
@@ -537,18 +537,82 @@ Você: continua codando, consulta quando quiser
 ✅ FEITO   → P5: Intelligence API (Maestro v2.33.0)
 ✅ FEITO   → P6.5: Media Gallery Gestão Completa
 ✅ FEITO   → Screen Capture + XDG Dirs
-✅ FEITO   → Distribuição: First-boot wizard + Update UI + ISO live-build
-🟡 AGORA   → P4: Intelligence Client (2 tasks restantes)
-FASE 1    → Fechar loop (memória, runtime, confirmação semântica, terminal context)
+✅ FEITO   → Distribuição: compositor, greetd, Plymouth, .deb
+✅ FEITO   → Background Task Queue + SSD + Compositor Hardening
+🟡 AGORA   → UX Conversacional (chat feed, streaming, tom natural)
+FASE 1    → Fechar loop (memória, runtime, rollback, audit)
 FASE 2    → Computação paralela (scheduler, arbitration, multi-channel, voz)
-FASE 3    → Intent-native core (compositor wlroots, focus, placement, overlays)
+FASE 3    → Intent-native core (compositor, focus, placement, overlays)
 FASE 4    → Memória cognitiva (graph, compression, semantic indexing)
 FASE 5    → Post-app computing (filesystem semântico, antecipação, zero-click)
 ```
 
 ---
 
-*Atualizado: Maio 2026 — v1.1.0-rc16*
+## 🟡 AGORA — UX Conversacional
+
+> Objetivo: conversar com o CIOS como um humano. Fluido, natural, contínuo.
+> Princípio: mesma voz em todo lugar (OS e Intelligence). Execução é local.
+> Referência: Intelligence UI (web) define o padrão de UX. OS implementa com capacidade extra.
+
+### Princípios de design
+
+1. **Conversa, não comando** — feed de chat, não terminal
+2. **Streaming** — resposta aparece palavra por palavra
+3. **Tom natural** — "Pronto, instalei." não "Instalação concluída com sucesso."
+4. **Follow-up** — sistema antecipa o próximo passo ("Quer que eu abra?")
+5. **Histórico unificado** — ideias (web) + comandos (OS) numa timeline
+6. **Artefatos** — conteúdo longo em split view, não inline
+7. **Segurança** — execução local, sync de conteúdo, web read-only sobre ações
+
+### Regra de segurança (ver docs/ARCH_SECURITY_BOUNDARY.md)
+
+- Execução é sempre local, nunca remota
+- Sync é de conteúdo, nunca de capacidade
+- Web é read-only sobre ações do OS
+
+### Tasks
+
+| # | Task | Esforço | Dependência |
+|---|------|---------|-------------|
+| 600 | Chat feed GTK4 (substituir label por feed de mensagens) | Alto | — |
+| 601 | Message bubbles (user/assistant, timestamps, metadata) | Médio | 600 |
+| 602 | Streaming token-by-token (Intelligence responses) | Médio | 600 |
+| 603 | Progress inline para skills (streaming de steps) | Médio | 600 |
+| 604 | Tom conversacional (rewrite humanizer — curto, natural, follow-up) | Médio | — |
+| 605 | Follow-up automático ("Quer que eu abra?", "Mais alguma coisa?") | Médio | 604 |
+| 606 | Artifact panel GTK4 (split view para conteúdo longo) | Médio | 600 |
+| 607 | Histórico unificado (sync web ↔ OS, timeline única) | Alto | 600 |
+| 608 | Sanitização de sync (local_only marks, sem credenciais) | Baixo | 607 |
+| 609 | Cognitive indicator no bubble (🧠 memória, ⚖️ honesty) | Baixo | 601 |
+| 610 | Busca em histórico (Ctrl+K ou intent "busca conversa sobre X") | Médio | 607 |
+| 611 | Timing humano (200-400ms delay antes de streaming) | Baixo | 602 |
+
+### Ordem de implementação
+
+```
+Sprint 1 (fundação):
+  600 → Chat feed GTK4
+  601 → Message bubbles
+  604 → Tom conversacional (humanizer rewrite)
+
+Sprint 2 (fluidez):
+  602 → Streaming (Intelligence)
+  603 → Progress inline (skills)
+  611 → Timing humano
+  605 → Follow-up automático
+
+Sprint 3 (enriquecimento):
+  606 → Artifact panel
+  609 → Cognitive indicator
+  607 → Histórico unificado
+  608 → Sanitização de sync
+  610 → Busca em histórico
+```
+
+---
+
+*Atualizado: Maio 2026 — v2.0.0-rc14*
 
 ---
 
