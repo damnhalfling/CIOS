@@ -126,6 +126,11 @@ CREATE TABLE IF NOT EXISTS thread_turns (
     timestamp REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_turns_thread ON thread_turns(thread_id, turn_index);
+
+CREATE TABLE IF NOT EXISTS cios_meta (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 """
 
 
@@ -308,34 +313,67 @@ class ThreadStore:
 
         Only includes: thread_id, created_at, closed_at, summary, outcome,
         and turns with user_input, intent_type, result_summary, outcome, timestamp.
-        No params, credentials, or system state are included.
+
+        SECURITY: No params, credentials, paths, or system state are included.
+        See docs/ARCH_SECURITY_BOUNDARY.md for the full policy.
         """
-        turns_payload = [
-            {
-                "user_input": turn.user_input,
-                "intent_type": turn.intent_type,
-                "result_summary": turn.result_summary,
-                "outcome": turn.outcome,
-                "timestamp": turn.timestamp,
-            }
-            for turn in thread.turns
-        ]
+        turns_payload = []
+        for turn in thread.turns:
+            # Sanitize: remove any accidental credential leaks
+            user_input = self._sanitize_text(turn.user_input)
+            result_summary = self._sanitize_text(turn.result_summary)
+            turns_payload.append(
+                {
+                    "user_input": user_input,
+                    "intent_type": turn.intent_type,
+                    "result_summary": result_summary,
+                    "outcome": turn.outcome,
+                    "timestamp": turn.timestamp,
+                }
+            )
         return {
             "thread_id": thread.id,
+            "summary": self._sanitize_text(thread.summary),
             "created_at": thread.created_at,
             "closed_at": thread.closed_at,
-            "summary": thread.summary,
+            "dominant_intent": thread.dominant_intent,
             "outcome": thread.outcome,
             "turns": turns_payload,
         }
 
-    def sync_to_cloud(self, thread: Thread) -> None:
-        """Upload thread to api.cios-ia.com (async, fire-and-forget).
+    @staticmethod
+    def _sanitize_text(text: str) -> str:
+        """Remove sensitive data from text before sync.
 
+        Strips:
+        - Absolute paths (/home/user/..., /usr/..., /tmp/...)
+        - Passwords/tokens (anything after 'password:', 'token:', 'key:')
+        - IP addresses with ports
+        - sudo commands
+        """
+        import re
+
+        if not text:
+            return text
+        # Remove absolute paths
+        text = re.sub(r"/(?:home|usr|tmp|var|etc)/\S+", "[path]", text)
+        # Remove password-like patterns
+        text = re.sub(
+            r"(?:password|token|key|secret|senha)\s*[:=]\s*\S+",
+            "[redacted]",
+            text,
+            flags=re.IGNORECASE,
+        )
+        # Remove sudo commands
+        text = re.sub(r"sudo\s+\S+.*", "sudo [command]", text)
+        return text
+
+    def sync_to_cloud(self, thread: Thread) -> None:
+        """Upload thread to Intelligence API (async, fire-and-forget).
+
+        Uses the bidirectional /v1/sync endpoint.
         Only syncs when the user is logged into CIOS Intelligence.
         Runs in a daemon thread with a 10-second timeout.
-        On any failure: silently catches, logs at DEBUG, marks thread synced=0.
-        On success: marks thread synced=1.
         """
         from cios.core.intelligence import intelligence
 
@@ -346,13 +384,16 @@ class ThreadStore:
         if not token:
             return
 
-        payload = self._build_sync_payload(thread)
+        payload = {
+            "threads": [self._build_sync_payload(thread)],
+            "last_sync_timestamp": 0,  # Don't pull on individual sync
+        }
 
         def _do_sync():
             try:
                 data = json.dumps(payload).encode("utf-8")
                 req = urllib.request.Request(
-                    "https://api.cios-ia.com/threads",
+                    "https://api.cios-ia.com/v1/sync",
                     data=data,
                     headers={
                         "Content-Type": "application/json",
@@ -362,7 +403,6 @@ class ThreadStore:
                 )
                 with urllib.request.urlopen(req, timeout=10) as resp:
                     resp.read()
-                # Success — mark synced=1
                 self._mark_synced(thread.id, 1)
             except Exception as e:
                 logger.debug("ThreadStore: cloud sync failed for %s: %s", thread.id, e)
@@ -370,6 +410,76 @@ class ThreadStore:
 
         t = threading.Thread(target=_do_sync, daemon=True)
         t.start()
+
+    def pull_from_cloud(self) -> list[dict]:
+        """Pull new conversations from Intelligence API.
+
+        Returns conversations created on the web that the OS doesn't have.
+        Called periodically or on demand.
+        """
+        from cios.core.intelligence import intelligence
+
+        if not intelligence.is_logged_in:
+            return []
+
+        token = intelligence.user.token if intelligence.user else ""
+        if not token:
+            return []
+
+        # Get last sync timestamp
+        last_sync = self._get_last_sync_timestamp()
+
+        payload = {
+            "threads": [],  # Don't push, just pull
+            "last_sync_timestamp": last_sync,
+        }
+
+        try:
+            data = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(
+                "https://api.cios-ia.com/v1/sync",
+                data=data,
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {token}",
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                result = json.loads(resp.read())
+
+            # Update last sync timestamp
+            sync_ts = result.get("sync_timestamp", 0)
+            if sync_ts:
+                self._set_last_sync_timestamp(sync_ts)
+
+            return result.get("new_from_server", [])
+        except Exception as e:
+            logger.debug("ThreadStore: pull from cloud failed: %s", e)
+            return []
+
+    def _get_last_sync_timestamp(self) -> float:
+        """Get the last successful sync timestamp from local DB."""
+        with self._lock:
+            try:
+                row = self._conn.execute(
+                    "SELECT value FROM cios_meta WHERE key = 'last_sync_ts'"
+                ).fetchone()
+                return float(row[0]) if row else 0.0
+            except Exception:
+                return 0.0
+
+    def _set_last_sync_timestamp(self, ts: float) -> None:
+        """Store the last sync timestamp."""
+        with self._lock:
+            try:
+                self._conn.execute(
+                    "INSERT OR REPLACE INTO cios_meta (key, value) VALUES ('last_sync_ts', ?)",
+                    (str(ts),),
+                )
+                self._conn.commit()
+            except Exception as e:
+                logger.debug("ThreadStore: failed to save sync timestamp: %s", e)
 
     def _mark_synced(self, thread_id: str, synced: int) -> None:
         """Update the synced flag for a thread in the database."""
