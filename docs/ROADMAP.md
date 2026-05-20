@@ -1,7 +1,7 @@
 # CIOS — Roadmap
 
 > Substituindo apps por intenção.
-> Atualizado: Maio 2026 — v2.0.0-rc14
+> Atualizado: Maio 2026 — v2.0.0-rc17
 
 ---
 
@@ -69,7 +69,7 @@ Se não for 100% confiável → fluxo guiado. Se for confiável → automático.
 
 ---
 
-## Fase atual: Hardening + Intelligence
+## Fase atual: Hardening + Intelligence + UX Conversacional ✅
 
 ### P3.5 — Hardening IA local ✅
 - ✅ Ollama auto-start no boot (ollama_manager.py)
@@ -98,6 +98,33 @@ Se não for 100% confiável → fluxo guiado. Se for confiável → automático.
 
 ### Background Task Queue ✅ (v2.0.0-rc14)
 - ✅ TaskQueue: operações longas (apt install, upgrade) rodam em background threads
+
+### Hardening rc17 ✅ (v2.0.0-rc17)
+- ✅ IPC nativo `get_outputs` no compositor (elimina dependência xdpyinfo)
+- ✅ Protocolo IPC corrigido (surface_id, correlation id, response normalization)
+- ✅ `window_control.py` reescrito: 100% IPC nativo, zero código X11
+- ✅ `clipboard.py` reescrito: Wayland-only (wl-copy/wl-paste), sem fallback X11
+- ✅ deps.py: Wayland-only. Core: foot, wl-clipboard, ollama, nmcli. Sem X11
+- ✅ Ollama/Mistral como dependência crítica (sistema não funciona sem)
+- ✅ Teste E2E Intelligence Client (18 testes: auth, query, streaming, rate limit, continuity)
+- ✅ Mypy efetivo no CI (sem `|| true`, erros bloqueiam build)
+- ✅ Bug fix: `state.bluetooth_powered` → `state.bluetooth.powered` no planner
+- ✅ Bug fix: `WAYLAND_DISPLAY` ausente no app_launcher → foot não aparecia
+- ✅ Bug fix: Ollama timeout 8s → 30s (hardware lento dava circuit breaker)
+- ✅ Bug fix: Parser não reconhecia "meu disco com X% de uso" (5 patterns novos)
+- ✅ Bug fix: "analise o volume" ambíguo → clarificação ("áudio ou disco?")
+- ✅ Coverage threshold: 30% → 45%
+- ✅ 635 testes passando
+
+### UX Conversacional ✅ (v2.0.0-rc17)
+- ✅ Chat feed GTK4 (MessageBubble, scroll, greeting)
+- ✅ Message bubbles (user/assistant, timestamps, metadata cognitiva)
+- ✅ Streaming token-by-token (start_streaming, append_token, finish)
+- ✅ Progress inline para skills (add_progress_message, update_progress)
+- ✅ Tom conversacional (conversational_tone: 30+ regras PT/EN, curto e natural)
+- ✅ Follow-up automático (install→abrir, disco→liberar, erro→retry, organizar→ver)
+- ✅ Artifact panel GTK4 (split view, copy, close, auto-detect >400 chars)
+- ✅ Timing humano (250ms delay antes de responder)
 - ✅ Prompt livre: usuário continua digitando enquanto tasks executam
 - ✅ Tasks agrupadas por contexto (package, network, files)
 - ✅ Execução sequencial dentro do mesmo contexto, paralela entre contextos
@@ -171,25 +198,27 @@ GRUB (0s) → Plymouth → greetd (login) → cios-session → cios-shell (Wayla
 
 ---
 
-## Números (v2.0.0-rc14)
+## Números (v2.0.0-rc17)
 
 | Métrica | Valor |
 |---------|-------|
 | Skills | 26 |
-| Intent patterns | 171 (PT/EN) |
-| Traduções humanizer | 230+ (PT/EN) |
+| Intent patterns | 176 (PT/EN) |
+| Traduções humanizer | 260+ (PT/EN) |
+| Conversational tone rules | 30+ (PT/EN) |
 | Tipos de erro | 19 |
-| Testes | 615 |
+| Testes | 635 |
 | Property tests (Hypothesis) | 22 |
 | Modos de execução | 6 |
-| Itens concluídos | 195+ |
+| Itens concluídos | 210+ |
 | Compositor | cios-shell (wlroots 0.18, C) + SSD |
 | Display Manager | greetd (bundlado) |
 | Boot splash | Plymouth (tema custom, 15s timeout) |
-| Libs bundled | ~40 (via ldd, ldconfig) |
-| UI | GTK4 Wayland-native |
+| UI | GTK4 Wayland-native (chat feed + streaming) |
 | Background tasks | TaskQueue (por contexto) |
 | Terminal | foot (Wayland-native) |
+| Ollama timeout | 30s (tolerante a hardware lento) |
+| X11 code | zero (removido) |
 
 ---
 
@@ -198,8 +227,8 @@ GRUB (0s) → Plymouth → greetd (login) → cios-session → cios-shell (Wayla
 > Se Wi-Fi falhar 1x, volume não responder instantâneo, ou o sistema "pensar demais" → usuário volta pro GNOME em 2 minutos.
 
 Skills de sistema = execução direta, sem LLM:
-- Wi-Fi → nmcli · Volume → pactl · Apps → .desktop · Sessão → systemctl
-- Pacotes → apt · Janelas → wmctrl · Clipboard → xclip · Bateria → psutil
+- Wi-Fi → nmcli · Volume → wpctl · Apps → .desktop · Sessão → systemctl
+- Pacotes → apt · Janelas → compositor IPC · Clipboard → wl-clipboard · Bateria → psutil
 
 LLM só para intents desconhecidos. Pattern matching resolve 80%+.
 
@@ -217,4 +246,4 @@ Ver `docs/BRANCHING.md` para detalhes.
 
 ---
 
-*Atualizado: Maio 2026 — v2.0.0-rc14*
+*Atualizado: Maio 2026 — v2.0.0-rc17*

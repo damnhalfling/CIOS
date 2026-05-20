@@ -5,7 +5,7 @@
  * exactly one connection (the runtime), and exchanges JSON newline-delimited
  * messages. Every message carries "v":1 and "id" fields.
  *
- * Commands: configure_surface, focus_surface, close_surface, list_surfaces, ready, logout
+ * Commands: configure_surface, focus_surface, close_surface, list_surfaces, get_outputs, ready, logout
  * Events: surface_mapped, surface_unmapped, key_intercepted, focus_changed, output_added, output_removed
  *
  * Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8
@@ -523,6 +523,66 @@ static void handle_list_surfaces(struct CiosIpc *ipc, const char *json, const ch
     ipc_send_response(ipc, id, buf);
 }
 
+static void handle_get_outputs(struct CiosIpc *ipc, const char *json, const char *id) {
+    (void)json;
+    struct CiosServer *server = ipc->server;
+
+    /*
+     * Build JSON response: {"response":"outputs","outputs":[...]}
+     * Each entry: {"name":"...","width":N,"height":N,"x":N,"y":N,"primary":bool,
+     *              "usable_x":N,"usable_y":N,"usable_width":N,"usable_height":N}
+     */
+    char buf[CIOS_IPC_BUFFER_SIZE];
+    int offset = 0;
+
+    offset += snprintf(buf + offset, sizeof(buf) - (size_t)offset,
+                       "{\"response\":\"outputs\",\"outputs\":[");
+
+    bool first = true;
+    struct CiosOutput *output;
+    wl_list_for_each(output, &server->outputs, link) {
+        if (!output->wlr_output) {
+            continue;
+        }
+
+        int ox = 0, oy = 0;
+        struct wlr_output_layout_output *lo =
+            wlr_output_layout_get(server->output_layout, output->wlr_output);
+        if (lo) {
+            ox = lo->x;
+            oy = lo->y;
+        }
+
+        const char *name = output->wlr_output->name ? output->wlr_output->name : "unknown";
+        int width = output->wlr_output->width;
+        int height = output->wlr_output->height;
+
+        if (!first) {
+            offset += snprintf(buf + offset, sizeof(buf) - (size_t)offset, ",");
+        }
+        first = false;
+
+        offset += snprintf(buf + offset, sizeof(buf) - (size_t)offset,
+            "{\"name\":\"%s\",\"width\":%d,\"height\":%d,\"x\":%d,\"y\":%d,"
+            "\"primary\":%s,\"usable_x\":%d,\"usable_y\":%d,"
+            "\"usable_width\":%d,\"usable_height\":%d}",
+            name, width, height, ox, oy,
+            output->is_primary ? "true" : "false",
+            output->usable_x, output->usable_y,
+            output->usable_width, output->usable_height);
+
+        if ((size_t)offset >= sizeof(buf) - 128) {
+            LOG_WARN("ipc: get_outputs response truncated");
+            break;
+        }
+    }
+
+    snprintf(buf + offset, sizeof(buf) - (size_t)offset, "]}");
+
+    LOG_INFO("ipc: get_outputs id=%s", id);
+    ipc_send_response(ipc, id, buf);
+}
+
 static void handle_ready(struct CiosIpc *ipc, const char *json, const char *id) {
     (void)json;
     LOG_INFO("ipc: ready command received id=%s", id);
@@ -592,6 +652,8 @@ static void ipc_route_command(struct CiosIpc *ipc, const char *json) {
         handle_close_surface(ipc, json, id);
     } else if (strcmp(command, "list_surfaces") == 0) {
         handle_list_surfaces(ipc, json, id);
+    } else if (strcmp(command, "get_outputs") == 0) {
+        handle_get_outputs(ipc, json, id);
     } else if (strcmp(command, "ready") == 0) {
         handle_ready(ipc, json, id);
     } else if (strcmp(command, "logout") == 0) {

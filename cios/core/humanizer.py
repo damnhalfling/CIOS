@@ -676,4 +676,97 @@ def humanize_result(result: PlanResult) -> tuple[list[str], str, str, str]:
     """
     steps = [_translate_pt(humanize_step(s)) for s in result.plan_steps]
     summary = _translate_pt(humanize_summary(result.summary))
+    # Apply conversational tone to the final summary
+    summary = conversational_tone(summary)
     return steps, summary, result.outcome, result.voice_mode
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  CONVERSATIONAL TONE — transforms formal responses into natural speech
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Formal → conversational rewrites (PT-BR)
+_CONVERSATIONAL_PT: list[tuple[re.Pattern, str]] = [
+    # Success confirmations — short and warm
+    (re.compile(r"^Pronto, instalado ✓$"), "Instalei."),
+    (re.compile(r"^(.+?) pronto, instalado ✓$"), "Pronto, {0} instalado."),
+    (re.compile(r"^(.+?) removido ✓$"), "Removido."),
+    (re.compile(r"^Listas atualizadas ✓$"), "Atualizado."),
+    (re.compile(r"^Sistema atualizado ✓$"), "Sistema atualizado."),
+    (re.compile(r"^Silenciado ✓$"), "Silenciei."),
+    (re.compile(r"^Som ligado ✓$"), "Pronto, som ligado."),
+    # Connection
+    (re.compile(r"^Conectado em (.+)$"), "Conectei em {0}."),
+    (re.compile(r"^Já conectado em (.+)$"), "Já tá conectado em {0}."),
+    (re.compile(r"^Desconectado de (.+)$"), "Desconectei de {0}."),
+    # Apps
+    (re.compile(r"^(.+?) is open$"), "{0} aberto."),
+    (re.compile(r"^(.+?) está pronto$"), "{0} aberto."),
+    (re.compile(r"^(.+?) is ready$"), "{0} pronto."),
+    (re.compile(r"^Não encontrei um app chamado \"(.+?)\"$"), 'Não achei "{0}".'),
+    # Volume
+    (re.compile(r"^Volume: (\d+)%$"), "Volume tá em {0}%."),
+    # Disk
+    (re.compile(r"^Disco está (.+)$"), "Disco tá {0}."),
+    # Errors — empathetic but direct
+    (re.compile(r"^Não entendi o que você quer\.$"), "Não entendi. Tenta de outro jeito?"),
+    (re.compile(r"^Algo deu errado$"), "Deu ruim. Quer tentar de novo?"),
+    (re.compile(r"^Demorou demais — parado$"), "Demorou demais, parei."),
+    (re.compile(r"^Bloqueado por segurança$"), "Bloqueei por segurança."),
+    # Bluetooth
+    (re.compile(r"^Bluetooth ligado$"), "Bluetooth ligado."),
+    (re.compile(r"^Bluetooth desligado$"), "Bluetooth desligado."),
+    (re.compile(r"^Bluetooth já está ligado$"), "Já tá ligado."),
+    (re.compile(r"^Bluetooth já está desligado$"), "Já tá desligado."),
+    # Power
+    (re.compile(r"^Modo economia ativado$"), "Modo economia ativado."),
+    # Window
+    (re.compile(r"^Nenhuma janela aberta$"), "Nenhuma janela aberta."),
+    # Generic
+    (re.compile(r"^Pronto$"), "Pronto."),
+    (re.compile(r"^Concluído\.$"), "Pronto."),
+]
+
+# Formal → conversational rewrites (EN)
+_CONVERSATIONAL_EN: list[tuple[re.Pattern, str]] = [
+    (re.compile(r"^installed successfully$"), "Done, installed."),
+    (re.compile(r"^(.+?) installed successfully$"), "Done, {0} installed."),
+    (re.compile(r"^removed successfully$"), "Removed."),
+    (re.compile(r"^is already installed$"), "Already installed."),
+    (re.compile(r"^Connected to (.+)$"), "Connected to {0}."),
+    (re.compile(r"^Already connected to (.+)$"), "Already on {0}."),
+    (re.compile(r"^(.+?) is open$"), "{0} is open."),
+    (re.compile(r"^I couldn't find an app called \"(.+?)\"$"), 'Can\'t find "{0}".'),
+    (re.compile(r"^Everything looks good — no recent issues$"), "All good, no issues."),
+    (re.compile(r"^Something went wrong$"), "Something went wrong. Retry?"),
+    (re.compile(r"^Took too long — stopped$"), "Took too long, stopped."),
+]
+
+
+def conversational_tone(text: str) -> str:
+    """Apply conversational tone to a humanized response.
+
+    Makes responses shorter, warmer, and more natural.
+    Like talking to a person, not reading a status report.
+    """
+    if not text:
+        return text
+
+    rules = _CONVERSATIONAL_PT if _LANG == "pt" else _CONVERSATIONAL_EN
+
+    for pattern, template in rules:
+        match = pattern.match(text)
+        if match:
+            groups = match.groups()
+            result = template
+            for i, g in enumerate(groups):
+                result = result.replace(f"{{{i}}}", g)
+            return result
+
+    # No rule matched — apply light cleanup
+    # Remove trailing "…" from completed actions
+    if text.endswith("…") and not text.endswith("…\n"):
+        # Only if it looks like a completed step, not an in-progress one
+        pass
+
+    return text

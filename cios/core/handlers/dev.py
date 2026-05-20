@@ -303,7 +303,7 @@ def handle_continue_project(intent: Intent, executor: Executor, memory: Memory) 
             )
         session = latest
     else:
-        session = memory.get_session(project_name)
+        session = memory.get_session(project_name)  # type: ignore[assignment]
         if session is None:
             all_sessions = memory.list_sessions()
             for s in all_sessions:

@@ -673,6 +673,49 @@ class CIOSBridge:
         can advance through them one at a time.
         """
 
+        # AMBIGUITY: "volume" can mean audio or disk
+        if intent.type in (IntentType.AUDIO, IntentType.DISK_ANALYSIS, IntentType.UNKNOWN):
+            raw = intent.raw_input.lower() if hasattr(intent, "raw_input") else ""
+            if not raw:
+                raw = (intent.params.get("_raw", "") or "").lower()
+            if "volume" in raw:
+                # Check if there's a clear audio verb (aumentar, diminuir, mutar, etc.)
+                audio_verbs = (
+                    "aumentar",
+                    "subir",
+                    "diminuir",
+                    "abaixar",
+                    "baixar",
+                    "mutar",
+                    "silenciar",
+                    "mute",
+                    "louder",
+                    "raise",
+                    "lower",
+                )
+                has_audio_context = any(v in raw for v in audio_verbs)
+                # Check if there's a clear disk context
+                disk_words = ("disco", "disk", "ssd", "hd", "armazenamento", "storage", "parti")
+                has_disk_context = any(w in raw for w in disk_words)
+
+                if not has_audio_context and not has_disk_context:
+                    # Ambiguous — ask user
+                    self._thread_manager.set_pending_question(
+                        PendingQuestion(
+                            intent=intent,
+                            question_type="choice",
+                            options=["audio", "disco"],
+                            timestamp=time.time(),
+                        )
+                    )
+                    return {
+                        "steps": [],
+                        "result": "Volume de áudio ou espaço em disco?",
+                        "status": "success",
+                        "confirm": None,
+                        "voice_mode": "full",
+                    }
+
         # NETWORK: connect without SSID
         if intent.type == IntentType.NETWORK:
             action = intent.params.get("action", "")
@@ -875,6 +918,31 @@ class CIOSBridge:
 
         elif question.question_type == "target":
             intent.params["target"] = answer_clean
+
+        elif question.question_type == "choice":
+            # Ambiguity resolution — user picks between options
+            answer_lower = answer_clean.lower()
+            if question.options:
+                matched = self._fuzzy_match_option(answer_lower, question.options)
+                if matched == "audio" or "áudio" in answer_lower or "som" in answer_lower:
+                    # Re-classify as audio status check
+                    intent = Intent(
+                        type=IntentType.AUDIO,
+                        confidence=0.95,
+                        params={"action": "status"},
+                        raw_input=intent.raw_input,
+                    )
+                elif matched == "disco" or "disco" in answer_lower or "disk" in answer_lower:
+                    # Re-classify as disk analysis
+                    intent = Intent(
+                        type=IntentType.DISK_ANALYSIS,
+                        confidence=0.95,
+                        params={"action": "analyze"},
+                        raw_input=intent.raw_input,
+                    )
+                else:
+                    # Couldn't resolve — treat answer as new input
+                    return self._process(answer_clean, confirmed)
 
         # Now check if we need password for wifi
         if intent.type == IntentType.NETWORK and intent.params.get("action") == "connect":

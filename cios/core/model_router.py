@@ -36,13 +36,13 @@ logger = logging.getLogger(__name__)
 #  RETRY / TIMEOUT CONFIG
 # ═══════════════════════════════════════════════════════════════════════════
 
-_MAX_RETRIES = 1
-_RETRY_BACKOFF = [0.5]  # seconds between retries
+_MAX_RETRIES = 2
+_RETRY_BACKOFF = [1.0, 2.0]  # seconds between retries
 _PROVIDER_TIMEOUTS = {
-    "ollama": 8,
-    "openai": 12,
-    "anthropic": 12,
-    "cios_api": 12,
+    "ollama": 30,  # cold start on low-end hardware can take 20s+
+    "openai": 15,
+    "anthropic": 15,
+    "cios_api": 15,
 }
 
 # Transient errors worth retrying

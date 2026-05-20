@@ -11,7 +11,6 @@ Uses wl-copy/wl-paste for Wayland, falls back to xclip/xsel for X11.
 """
 
 import logging
-import os
 import re
 import subprocess
 import time
@@ -25,11 +24,6 @@ logger = logging.getLogger(__name__)
 _HISTORY_PATH = CIOS_HOME / "clipboard_history.json"
 _MAX_HISTORY = 50
 _MAX_ITEM_SIZE = 10000  # chars
-
-
-def _is_wayland() -> bool:
-    """Detect if running under Wayland."""
-    return os.environ.get("WAYLAND_DISPLAY") is not None
 
 
 @dataclass
@@ -97,27 +91,10 @@ class CognitiveClipboard:
             logger.debug("Could not save clipboard history: %s", e)
 
     def get_current(self) -> str | None:
-        """Get current clipboard content."""
-        if _is_wayland():
-            try:
-                result = subprocess.run(
-                    ["wl-paste", "--no-newline"],
-                    capture_output=True,
-                    text=True,
-                    timeout=3,
-                )
-                if result.returncode == 0:
-                    return result.stdout
-            except FileNotFoundError:
-                logger.warning("wl-paste not found — install wl-clipboard")
-            except Exception:
-                pass
-            return None
-
-        # X11 fallback
+        """Get current clipboard content via wl-paste."""
         try:
             result = subprocess.run(
-                ["xclip", "-selection", "clipboard", "-o"],
+                ["wl-paste", "--no-newline"],
                 capture_output=True,
                 text=True,
                 timeout=3,
@@ -125,56 +102,22 @@ class CognitiveClipboard:
             if result.returncode == 0:
                 return result.stdout
         except FileNotFoundError:
-            # Try xsel as fallback
-            try:
-                result = subprocess.run(
-                    ["xsel", "--clipboard", "--output"],
-                    capture_output=True,
-                    text=True,
-                    timeout=3,
-                )
-                if result.returncode == 0:
-                    return result.stdout
-            except FileNotFoundError:
-                pass
+            logger.warning("wl-paste not found — install wl-clipboard")
         except Exception:
             pass
         return None
 
     def set_clipboard(self, content: str) -> bool:
-        """Set clipboard content."""
-        if _is_wayland():
-            try:
-                proc = subprocess.Popen(
-                    ["wl-copy"],
-                    stdin=subprocess.PIPE,
-                )
-                proc.communicate(input=content.encode("utf-8"), timeout=3)
-                return proc.returncode == 0
-            except FileNotFoundError:
-                logger.warning("wl-copy not found — install wl-clipboard")
-            except Exception:
-                pass
-            return False
-
-        # X11 fallback
+        """Set clipboard content via wl-copy."""
         try:
             proc = subprocess.Popen(
-                ["xclip", "-selection", "clipboard"],
+                ["wl-copy"],
                 stdin=subprocess.PIPE,
             )
             proc.communicate(input=content.encode("utf-8"), timeout=3)
             return proc.returncode == 0
         except FileNotFoundError:
-            try:
-                proc = subprocess.Popen(
-                    ["xsel", "--clipboard", "--input"],
-                    stdin=subprocess.PIPE,
-                )
-                proc.communicate(input=content.encode("utf-8"), timeout=3)
-                return proc.returncode == 0
-            except FileNotFoundError:
-                pass
+            logger.warning("wl-copy not found — install wl-clipboard")
         except Exception:
             pass
         return False

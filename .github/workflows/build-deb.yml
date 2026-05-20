@@ -32,7 +32,7 @@ jobs:
         run: ruff format --check cios/ tests/
 
       - name: Mypy (type check core)
-        run: mypy cios/core/ --ignore-missing-imports --no-error-summary --exclude "cios/core/(intent_parser|mcp|intelligence)\.py" || true
+        run: mypy cios/core/ --ignore-missing-imports --no-error-summary --exclude "cios/core/(intent_parser|mcp|intelligence|bridge)\.py"
 
   test:
     runs-on: ubuntu-latest

@@ -1,6 +1,6 @@
 # CIOS — TODO
 
-> Atualizado: Maio 2026 — v2.0.0-rc14
+> Atualizado: Maio 2026 — v2.0.0-rc17
 
 ---
 
@@ -152,7 +152,6 @@ API em produção: `https://api.cios-ia.com/` (Maestro v2.33.0).
 
 | # | Task | Esforço |
 |---|------|---------|
-| 148 | Teste end-to-end (login → query → resposta) | 0.5 dia |
 | 151 | Verificar redirect URI no Google Console | — (config) |
 
 ---
@@ -539,7 +538,9 @@ Você: continua codando, consulta quando quiser
 ✅ FEITO   → Screen Capture + XDG Dirs
 ✅ FEITO   → Distribuição: compositor, greetd, Plymouth, .deb
 ✅ FEITO   → Background Task Queue + SSD + Compositor Hardening
-🟡 AGORA   → UX Conversacional (chat feed, streaming, tom natural)
+✅ FEITO   → UX Conversacional (chat feed, streaming, tom natural, follow-up)
+✅ FEITO   → Hardening rc17 (IPC nativo, Wayland-only, Ollama timeout, parser fixes)
+🟡 AGORA   → UX Sprint 3 (histórico unificado, busca, sync)
 FASE 1    → Fechar loop (memória, runtime, rollback, audit)
 FASE 2    → Computação paralela (scheduler, arbitration, multi-channel, voz)
 FASE 3    → Intent-native core (compositor, focus, placement, overlays)
@@ -549,70 +550,39 @@ FASE 5    → Post-app computing (filesystem semântico, antecipação, zero-cli
 
 ---
 
-## 🟡 AGORA — UX Conversacional
+## 🟡 EM ANDAMENTO — UX Conversacional
 
 > Objetivo: conversar com o CIOS como um humano. Fluido, natural, contínuo.
 > Princípio: mesma voz em todo lugar (OS e Intelligence). Execução é local.
 > Referência: Intelligence UI (web) define o padrão de UX. OS implementa com capacidade extra.
 
-### Princípios de design
+### Sprint 1 (fundação) ✅
+| # | Task | Status |
+|---|------|--------|
+| 600 | Chat feed GTK4 (substituir label por feed de mensagens) | ✅ |
+| 601 | Message bubbles (user/assistant, timestamps, metadata) | ✅ |
+| 604 | Tom conversacional (conversational_tone — curto, natural, follow-up) | ✅ |
 
-1. **Conversa, não comando** — feed de chat, não terminal
-2. **Streaming** — resposta aparece palavra por palavra
-3. **Tom natural** — "Pronto, instalei." não "Instalação concluída com sucesso."
-4. **Follow-up** — sistema antecipa o próximo passo ("Quer que eu abra?")
-5. **Histórico unificado** — ideias (web) + comandos (OS) numa timeline
-6. **Artefatos** — conteúdo longo em split view, não inline
-7. **Segurança** — execução local, sync de conteúdo, web read-only sobre ações
+### Sprint 2 (fluidez) ✅
+| # | Task | Status |
+|---|------|--------|
+| 602 | Streaming token-by-token (Intelligence + skills) | ✅ |
+| 603 | Progress inline para skills (streaming de steps) | ✅ |
+| 611 | Timing humano (250ms delay antes de streaming) | ✅ |
+| 605 | Follow-up automático ("Quer que eu abra?", "Liberar espaço?") | ✅ |
 
-### Regra de segurança (ver docs/ARCH_SECURITY_BOUNDARY.md)
-
-- Execução é sempre local, nunca remota
-- Sync é de conteúdo, nunca de capacidade
-- Web é read-only sobre ações do OS
-
-### Tasks
-
-| # | Task | Esforço | Dependência |
-|---|------|---------|-------------|
-| 600 | Chat feed GTK4 (substituir label por feed de mensagens) | Alto | — |
-| 601 | Message bubbles (user/assistant, timestamps, metadata) | Médio | 600 |
-| 602 | Streaming token-by-token (Intelligence responses) | Médio | 600 |
-| 603 | Progress inline para skills (streaming de steps) | Médio | 600 |
-| 604 | Tom conversacional (rewrite humanizer — curto, natural, follow-up) | Médio | — |
-| 605 | Follow-up automático ("Quer que eu abra?", "Mais alguma coisa?") | Médio | 604 |
-| 606 | Artifact panel GTK4 (split view para conteúdo longo) | Médio | 600 |
-| 607 | Histórico unificado (sync web ↔ OS, timeline única) | Alto | 600 |
-| 608 | Sanitização de sync (local_only marks, sem credenciais) | Baixo | 607 |
-| 609 | Cognitive indicator no bubble (🧠 memória, ⚖️ honesty) | Baixo | 601 |
-| 610 | Busca em histórico (Ctrl+K ou intent "busca conversa sobre X") | Médio | 607 |
-| 611 | Timing humano (200-400ms delay antes de streaming) | Baixo | 602 |
-
-### Ordem de implementação
-
-```
-Sprint 1 (fundação):
-  600 → Chat feed GTK4
-  601 → Message bubbles
-  604 → Tom conversacional (humanizer rewrite)
-
-Sprint 2 (fluidez):
-  602 → Streaming (Intelligence)
-  603 → Progress inline (skills)
-  611 → Timing humano
-  605 → Follow-up automático
-
-Sprint 3 (enriquecimento):
-  606 → Artifact panel
-  609 → Cognitive indicator
-  607 → Histórico unificado
-  608 → Sanitização de sync
-  610 → Busca em histórico
-```
+### Sprint 3 (enriquecimento) — pendente
+| # | Task | Status |
+|---|------|--------|
+| 606 | Artifact panel GTK4 (split view para conteúdo longo) | ✅ |
+| 609 | Cognitive indicator no bubble (🧠 memória, ⚖️ honesty) | ✅ |
+| 607 | Histórico unificado (sync web ↔ OS, timeline única) | 🟡 |
+| 608 | Sanitização de sync (local_only marks, sem credenciais) | 🟡 |
+| 610 | Busca em histórico (Ctrl+K ou intent "busca conversa sobre X") | 🟡 |
 
 ---
 
-*Atualizado: Maio 2026 — v2.0.0-rc14*
+*Atualizado: Maio 2026 — v2.0.0-rc17*
 
 ---
 

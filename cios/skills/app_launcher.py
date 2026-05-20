@@ -277,8 +277,15 @@ def launch_app(app: AppInfo) -> tuple[list[str], bool, str | None]:
     plan_steps = [f"Opening {app.name}"]
 
     try:
-        # Usar subprocess.Popen pra não bloquear
+        # Ensure Wayland env vars are set for child processes
         env = os.environ.copy()
+        runtime_dir = env.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+        if "WAYLAND_DISPLAY" not in env:
+            # Auto-detect: check for wayland-0 socket
+            wayland_sock = os.path.join(runtime_dir, "wayland-0")
+            if os.path.exists(wayland_sock):
+                env["WAYLAND_DISPLAY"] = "wayland-0"
+
         subprocess.Popen(
             app.exec_command,
             shell=True,

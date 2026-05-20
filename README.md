@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://github.com/damnhalfling/cios/releases"><img src="https://img.shields.io/github/v/release/damnhalfling/cios" alt="Release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/damnhalfling/cios" alt="License" /></a>
-  <img src="https://img.shields.io/badge/tests-398%20passing-brightgreen" alt="Tests" />
+  <img src="https://img.shields.io/badge/tests-635%20passing-brightgreen" alt="Tests" />
 </p>
 
 <p align="center">
@@ -287,7 +287,7 @@ In practice: if no LLM is available, all regex-matched intents (the vast majorit
 - ✅ Auto-learning engine
 - ✅ .deb installable package (full replacement, no fallbacks)
 - ✅ Plymouth boot splash (logo on boot, no text)
-- ✅ 398 tests passing (including 13 property-based tests)
+- ✅ 635 tests passing (including 22 property-based tests)
 - ✅ Onboarding wizard
 - ✅ Conversational UX with 3-turn context
 - ✅ Project auto-creation ("work on project X" creates it if not found)
@@ -313,7 +313,7 @@ In practice: if no LLM is available, all regex-matched intents (the vast majorit
 ```
 User Input → Intent Parser → Classifier → MCO → Planner → Executor → Humanizer → UI
                   │              │          │       │          │            │
-            170+ Patterns    Cache +      MCP     26 Skills   Shell      Translates
+            176+ Patterns    Cache +      MCP     26 Skills   Shell      Translates
             (PT/EN)         LLM +       (live    + Auto-     Control    to human
                            Stemming     state)   Learner      │        language
                                                             Memory
@@ -413,7 +413,7 @@ python3 -m venv .venv
 
 Contributions are welcome — especially in:
 
-- Conversational UX
+- Conversational UX ✅
 - New skills
 - Performance optimization
 

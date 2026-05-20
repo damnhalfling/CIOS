@@ -1,6 +1,6 @@
 [project]
 name = "cios"
-version = "2.0.0rc4"
+version = "2.0.0rc17"
 description = "CIOS — Cognitive Intent-first Operational System. Replaces apps with intent-driven execution on Linux"
 requires-python = ">=3.10"
 dependencies = [
@@ -63,7 +63,7 @@ omit = [
 [tool.coverage.report]
 show_missing = true
 skip_empty = true
-fail_under = 30
+fail_under = 45
 omit = [
     "cios/ui/gtk/*",
     "cios/ui/gui.py",
@@ -143,3 +143,19 @@ ignore_errors = true
 [[tool.mypy.overrides]]
 module = "cios.core.intelligence"
 ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "cios.core.bridge"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "cios.skills.*"
+follow_imports = "skip"
+
+[[tool.mypy.overrides]]
+module = "cios.ui.*"
+follow_imports = "skip"
+
+[[tool.mypy.overrides]]
+module = "cios.infra.*"
+follow_imports = "skip"

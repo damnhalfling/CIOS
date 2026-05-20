@@ -1,16 +1,14 @@
 """Runtime dependency checker — ensures required system tools are present.
 
-Runs once on boot. If critical tools are missing, attempts to install them
-automatically (CIOS is installed as root, so the venv has access).
+Runs once on boot. CIOS requires:
+- Wayland compositor (cios-shell) — session won't start without it
+- Ollama + Mistral model — intent classification won't work without it
+- Wayland tools (foot, wl-clipboard) — core UX depends on them
+- Network tools (nmcli) — device control depends on it
 
-For tools that need apt, uses the package_manager skill with passwordless
-sudo if available, or logs a clear warning.
-
-This is a safety net — the .deb Depends field should handle most cases,
-but upgrades from older versions or manual installs may miss new deps.
-
-Graceful degradation: when a tool cannot be installed, the corresponding
-feature is disabled with a human-readable message instead of crashing.
+If critical tools are missing, attempts to install them automatically.
+If install fails for critical deps → system cannot operate normally.
+Non-critical deps (grim, mpv, ffmpeg) degrade specific features only.
 """
 
 import logging
@@ -38,15 +36,53 @@ class DepInfo:
     critical: bool  # If True, core features break without it
 
 
-# Mapping of tool → package → feature → degradation message
-DEPENDENCY_REGISTRY: list[DepInfo] = [
+# ═══════════════════════════════════════════════════════════════════════════
+#  CORE DEPENDENCIES (system does NOT work without these)
+# ═══════════════════════════════════════════════════════════════════════════
+
+WAYLAND_REGISTRY: list[DepInfo] = [
+    DepInfo(
+        binary="foot",
+        apt_package="foot",
+        feature="Terminal",
+        degraded_msg="Terminal indisponível (instale foot)",
+        critical=True,
+    ),
+    DepInfo(
+        binary="wl-copy",
+        apt_package="wl-clipboard",
+        feature="Clipboard",
+        degraded_msg="Clipboard indisponível",
+        critical=True,
+    ),
+    DepInfo(
+        binary="wl-paste",
+        apt_package="wl-clipboard",
+        feature="Clipboard",
+        degraded_msg="Clipboard indisponível",
+        critical=True,
+    ),
+    DepInfo(
+        binary="ollama",
+        apt_package="ollama",
+        feature="IA local (Ollama + Mistral)",
+        degraded_msg="IA indisponível — intent classification não funciona",
+        critical=True,
+    ),
     DepInfo(
         binary="nmcli",
         apt_package="network-manager",
-        feature="Wi-Fi",
-        degraded_msg="Wi-Fi indisponível",
-        critical=False,
+        feature="Rede",
+        degraded_msg="Controle de rede indisponível",
+        critical=True,
     ),
+]
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  FEATURE DEPENDENCIES (specific features degrade without these)
+# ═══════════════════════════════════════════════════════════════════════════
+
+SYSTEM_REGISTRY: list[DepInfo] = [
     DepInfo(
         binary="pactl",
         apt_package="pulseaudio-utils",
@@ -69,49 +105,46 @@ DEPENDENCY_REGISTRY: list[DepInfo] = [
         critical=False,
     ),
     DepInfo(
-        binary="xdotool",
-        apt_package="xdotool",
-        feature="Controle de janelas",
-        degraded_msg="Controle de janelas indisponível",
-        critical=True,
-    ),
-    DepInfo(
-        binary="wmctrl",
-        apt_package="wmctrl",
-        feature="Controle de janelas",
-        degraded_msg="Controle de janelas indisponível",
-        critical=True,
-    ),
-    # Legacy deps (kept for backward compat)
-    DepInfo(
-        binary="xrandr",
-        apt_package="x11-xserver-utils",
-        feature="Display",
-        degraded_msg="Controle de display indisponível",
-        critical=True,
-    ),
-    DepInfo(
-        binary="xprop",
-        apt_package="x11-utils",
-        feature="Propriedades de janela",
-        degraded_msg="Propriedades de janela indisponíveis",
+        binary="mpv",
+        apt_package="mpv",
+        feature="Media Player",
+        degraded_msg="Reprodução de mídia indisponível",
         critical=False,
     ),
     DepInfo(
-        binary="xset",
-        apt_package="x11-xserver-utils",
-        feature="Configurações X11",
-        degraded_msg="Configurações X11 indisponíveis",
+        binary="ffmpeg",
+        apt_package="ffmpeg",
+        feature="Processamento de vídeo",
+        degraded_msg="Thumbnails de vídeo e gravação indisponíveis",
         critical=False,
     ),
     DepInfo(
-        binary="i3lock",
-        apt_package="i3lock",
-        feature="Bloqueio de tela",
-        degraded_msg="Bloqueio de tela indisponível",
+        binary="grim",
+        apt_package="grim",
+        feature="Screenshot",
+        degraded_msg="Screenshot indisponível",
+        critical=False,
+    ),
+    DepInfo(
+        binary="slurp",
+        apt_package="slurp",
+        feature="Seleção de região",
+        degraded_msg="Seleção de região indisponível",
         critical=False,
     ),
 ]
+
+
+def _build_registry() -> list[DepInfo]:
+    """Build the full dependency registry. Core + feature deps."""
+    registry: list[DepInfo] = []
+    registry.extend(WAYLAND_REGISTRY)  # critical — system won't work without
+    registry.extend(SYSTEM_REGISTRY)  # features — degrade individually
+    return registry
+
+
+# Combined registry (built at check time)
+DEPENDENCY_REGISTRY: list[DepInfo] = []
 
 # Module-level state: tracks which tools are missing after check
 _missing_tools: set[str] = set()
@@ -144,12 +177,17 @@ def check_and_install_deps() -> list[str]:
     Returns list of tool binaries that are still missing after attempted install.
     Called once during boot (from bridge or session script).
 
+    Builds the registry dynamically based on session type (Wayland vs X11).
+
     For each missing tool:
     1. Log which feature is affected
     2. Attempt auto-install via apt-get (if sudo available)
     3. If install fails → log warning with humanized message, track as degraded
     """
-    global _missing_tools, _degraded_features
+    global _missing_tools, _degraded_features, DEPENDENCY_REGISTRY
+
+    # Build registry based on current session type
+    DEPENDENCY_REGISTRY = _build_registry()
 
     missing: list[DepInfo] = []
 

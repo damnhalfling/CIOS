@@ -233,14 +233,14 @@ class Planner:
         # BLUETOOTH: power already in desired state
         if intent.type == IntentType.BLUETOOTH:
             action = intent.params.get("action")
-            if action == "power_on" and state.bluetooth_powered:
+            if action == "power_on" and state.bluetooth.powered:
                 return PlanResult(
                     plan_steps=["Checking Bluetooth"],
                     results=[],
                     outcome="success",
                     summary="Bluetooth is already on",
                 )
-            if action == "power_off" and not state.bluetooth_powered:
+            if action == "power_off" and not state.bluetooth.powered:
                 return PlanResult(
                     plan_steps=["Checking Bluetooth"],
                     results=[],

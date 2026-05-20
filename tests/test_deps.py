@@ -3,7 +3,9 @@
 from unittest.mock import MagicMock, patch
 
 from cios.infra.deps import (
-    DEPENDENCY_REGISTRY,
+    SYSTEM_REGISTRY,
+    WAYLAND_REGISTRY,
+    _build_registry,
     _has_passwordless_sudo,
     check_and_install_deps,
     get_degraded_features,
@@ -15,24 +17,54 @@ from cios.infra.deps import (
 class TestDependencyRegistry:
     """Verify the dependency registry is well-formed."""
 
-    def test_registry_has_required_tools(self):
-        binaries = {dep.binary for dep in DEPENDENCY_REGISTRY}
-        assert "nmcli" in binaries
+    def test_system_registry_has_required_tools(self):
+        binaries = {dep.binary for dep in SYSTEM_REGISTRY}
         assert "pactl" in binaries
         assert "wpctl" in binaries
         assert "bluetoothctl" in binaries
-        assert "xdotool" in binaries
-        assert "wmctrl" in binaries
+        assert "mpv" in binaries
+        assert "ffmpeg" in binaries
+
+    def test_wayland_registry_has_required_tools(self):
+        binaries = {dep.binary for dep in WAYLAND_REGISTRY}
+        assert "foot" in binaries
+        assert "wl-copy" in binaries
+        assert "wl-paste" in binaries
+        assert "ollama" in binaries
+        assert "nmcli" in binaries
+
+    def test_build_registry_includes_all(self):
+        """Registry includes core + feature deps."""
+        registry = _build_registry()
+        binaries = {dep.binary for dep in registry}
+        # Core (critical)
+        assert "foot" in binaries
+        assert "wl-copy" in binaries
+        assert "ollama" in binaries
+        assert "nmcli" in binaries
+        # Features (non-critical)
+        assert "mpv" in binaries
+        assert "ffmpeg" in binaries
+        # No X11
+        assert "xdotool" not in binaries
+        assert "wmctrl" not in binaries
+
+    def test_wayland_deps_are_critical(self):
+        """Core deps are all critical."""
+        for dep in WAYLAND_REGISTRY:
+            assert dep.critical, f"{dep.binary} should be critical"
 
     def test_all_deps_have_degraded_messages(self):
-        for dep in DEPENDENCY_REGISTRY:
+        registry = _build_registry()
+        for dep in registry:
             assert dep.degraded_msg, f"{dep.binary} missing degraded_msg"
             assert dep.feature, f"{dep.binary} missing feature name"
             assert dep.apt_package, f"{dep.binary} missing apt_package"
 
     def test_degraded_messages_are_humanized(self):
         """Degradation messages should be in PT-BR, not technical."""
-        for dep in DEPENDENCY_REGISTRY:
+        registry = _build_registry()
+        for dep in registry:
             assert (
                 "indisponível" in dep.degraded_msg or "indisponíveis" in dep.degraded_msg
             ), f"{dep.binary} degraded_msg should contain 'indisponível': {dep.degraded_msg}"
@@ -64,7 +96,7 @@ class TestCheckAndInstallDeps:
             result = check_and_install_deps()
             assert "nmcli" in result
             assert "nmcli" in get_missing_tools()
-            assert "Wi-Fi indisponível" in get_degraded_features().values()
+            assert "Controle de rede indisponível" in get_degraded_features().values()
 
     def test_missing_pactl_tracked(self):
         """Missing pactl is tracked as degraded."""
@@ -97,25 +129,6 @@ class TestCheckAndInstallDeps:
             result = check_and_install_deps()
             assert "bluetoothctl" in result
             assert "Bluetooth indisponível" in get_degraded_features().values()
-
-    def test_missing_xdotool_wmctrl_tracked(self):
-        """Missing xdotool/wmctrl tracked as window control degraded."""
-
-        def fake_which(binary):
-            if binary in ("xdotool", "wmctrl"):
-                return None
-            return f"/usr/bin/{binary}"
-
-        with (
-            patch("cios.infra.deps.shutil.which", side_effect=fake_which),
-            patch("cios.infra.deps._try_install", return_value=False),
-        ):
-            result = check_and_install_deps()
-            assert "xdotool" in result
-            assert "wmctrl" in result
-            degraded = get_degraded_features()
-            assert degraded.get("xdotool") == "Controle de janelas indisponível"
-            assert degraded.get("wmctrl") == "Controle de janelas indisponível"
 
     def test_successful_install_clears_missing(self):
         """After successful install, tools are no longer missing."""

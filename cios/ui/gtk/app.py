@@ -376,14 +376,50 @@ class CIOSApplication(Gtk.Application):
             GLib.timeout_add(2000, self._poll_task_chat, task_id, progress_bubble)
 
     def _suggest_follow_up(self, result: str) -> str | None:
-        """Suggest a natural follow-up based on the result."""
+        """Suggest a natural follow-up based on the result context.
+
+        Conversational UX: the system anticipates the next step.
+        """
         r = result.lower()
-        if "chrome" in r and ("instalado" in r or "installed" in r):
-            return "Quer que eu abra o Chrome?"
-        if "firefox" in r and ("instalado" in r or "installed" in r):
-            return "Quer que eu abra o Firefox?"
-        if "instalado" in r or "installed" in r:
-            return "Mais alguma coisa?"
+
+        # App installed → offer to open
+        if "instalado" in r or "installed" in r or "pronto, instalado" in r:
+            # Extract app name from result
+            for app in ("chrome", "firefox", "code", "spotify", "vlc", "brave"):
+                if app in r:
+                    return f"Quer que eu abra o {app.title()}?"
+            return "Quer que eu abra?"
+
+        # Disk analysis → offer to clean
+        if ("disco" in r or "armazenamento" in r or "storage" in r) and (
+            "cheio" in r or "quase" in r or "%" in r
+        ):
+            return "Quer que eu libere espaço?"
+
+        # Network connected → confirm
+        if "conectado" in r and ("wifi" in r or "wi-fi" in r or "rede" in r):
+            return None  # Connection is the end goal
+
+        # Process killed → confirm
+        if "parado" in r or "stopped" in r:
+            return None  # Action complete
+
+        # Error → offer retry
+        if "não consegui" in r or "falhou" in r or "erro" in r:
+            return "Quer tentar de novo?"
+
+        # Volume adjusted → no follow-up needed
+        if "volume" in r or "silenciado" in r:
+            return None
+
+        # Files organized → show result
+        if "organizados" in r or "organized" in r:
+            return "Quer ver como ficou?"
+
+        # Project started → no follow-up (already complete)
+        if "rodando" in r or "running" in r or "pronto" in r:
+            return None
+
         return None
 
     def _poll_task_chat(self, task_id: str, progress_bubble) -> bool:

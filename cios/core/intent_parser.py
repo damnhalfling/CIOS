@@ -912,6 +912,51 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
         lambda m: {"action": "clean"},
         0.95,
     ),
+    (
+        re.compile(
+            r"(?:meu\s+)?(?:disco|disk|ssd|hd)\s+(?:est[aá]|t[aá]|is)\s+(?:com\s+)?\d+\s*%?\s*(?:de\s+)?(?:uso)?",
+            re.IGNORECASE,
+        ),
+        IntentType.DISK_ANALYSIS,
+        lambda m: {"action": "analyze"},
+        0.95,
+    ),
+    (
+        re.compile(
+            r"(?:analis[ae]r?|avaliar?|verificar?|checar?|check)\s+(?:o\s+)?(?:disco|disk|ssd|hd|armazenamento|storage|uso\s+d[eo]\s+disco)",
+            re.IGNORECASE,
+        ),
+        IntentType.DISK_ANALYSIS,
+        lambda m: {"action": "analyze"},
+        0.95,
+    ),
+    (
+        re.compile(
+            r"(?:uso|utiliza[cç][aã]o|consumo)\s+(?:do?\s+)?(?:disco|disk|ssd|hd|armazenamento|storage)",
+            re.IGNORECASE,
+        ),
+        IntentType.DISK_ANALYSIS,
+        lambda m: {"action": "analyze"},
+        0.90,
+    ),
+    (
+        re.compile(
+            r"(?:disco|disk|ssd|hd)\s+(?:com\s+)?\d+\s*%?\s*(?:de\s+)?(?:uso|ocupa[cç][aã]o|cheio|full)",
+            re.IGNORECASE,
+        ),
+        IntentType.DISK_ANALYSIS,
+        lambda m: {"action": "analyze"},
+        0.95,
+    ),
+    (
+        re.compile(
+            r"(?:meu\s+)?(?:disco|disk|ssd|hd)\s+.{0,20}(?:avali[ae]|analis[ae]|verifi(?:que|car))",
+            re.IGNORECASE,
+        ),
+        IntentType.DISK_ANALYSIS,
+        lambda m: {"action": "analyze"},
+        0.90,
+    ),
     # --- file organize (EN) ---
     (
         re.compile(
