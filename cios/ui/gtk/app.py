@@ -26,6 +26,7 @@ from cios.ui.theme import (  # noqa: E402
     BG_CARD,
     BG_INPUT,
     BORDER,
+    ERROR,
     FG,
     FG_DIM,
     FG_SEC,
@@ -489,32 +490,32 @@ class CIOSApplication(Gtk.Application):
 
         # Apply dark styling
         css = Gtk.CssProvider()
-        css.load_from_string("""
-            .password-dialog {
-                background-color: #161b24;
-                border: 1px solid #1f2937;
+        css.load_from_string(f"""
+            .password-dialog {{
+                background-color: {BG_CARD};
+                border: 1px solid {BORDER};
                 border-radius: 12px;
                 padding: 24px;
-            }
-            .password-label {
-                color: #e5e7eb;
+            }}
+            .password-label {{
+                color: {FG};
                 font-size: 14px;
                 margin-bottom: 12px;
-            }
-            .password-entry {
-                background: #0b0f14;
-                color: #e5e7eb;
-                border: 1px solid #1f2937;
+            }}
+            .password-entry {{
+                background: {BG_INPUT};
+                color: {FG};
+                border: 1px solid {BORDER};
                 border-radius: 8px;
                 padding: 12px 16px;
                 font-size: 15px;
                 min-height: 20px;
-            }
-            .password-entry:focus {
-                border-color: #a78bfa;
-            }
-            .password-btn {
-                background: #7c3aed;
+            }}
+            .password-entry:focus {{
+                border-color: {ACCENT_LT};
+            }}
+            .password-btn {{
+                background: {ACCENT};
                 color: white;
                 border-radius: 8px;
                 padding: 10px 24px;
@@ -522,16 +523,16 @@ class CIOSApplication(Gtk.Application):
                 font-weight: bold;
                 border: none;
                 margin-top: 12px;
-            }
-            .password-cancel {
+            }}
+            .password-cancel {{
                 background: transparent;
-                color: #6b7280;
-                border: 1px solid #1f2937;
+                color: {FG_DIM};
+                border: 1px solid {BORDER};
                 border-radius: 8px;
                 padding: 10px 24px;
                 font-size: 14px;
                 margin-top: 12px;
-            }
+            }}
         """)
         Gtk.StyleContext.add_provider_for_display(
             dialog.get_display(), css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
@@ -695,7 +696,7 @@ class CIOSApplication(Gtk.Application):
                 font-style: italic;
             }}
             .error-result {{
-                color: #ef4444;
+                color: {ERROR};
             }}
             .prompt-area {{
                 background-color: {BG_CARD};

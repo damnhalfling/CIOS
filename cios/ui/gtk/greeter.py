@@ -74,15 +74,15 @@ def _greetd_cancel_session() -> dict:
 #  GTK4 Greeter Application
 # ═══════════════════════════════════════════════════════════════
 
-BG = "#0b0f14"
-RED_ACCENT = "#dc2626"
-RED_GLOW = "#991b1b"
-FG = "#e5e7eb"
-FG_DIM = "#6b7280"
-ACCENT = "#7c3aed"
-ACCENT_LT = "#a78bfa"
-BG_INPUT = "#161b24"
-BORDER = "#1f2937"
+BG = "#00050d"
+RED_ACCENT = "#ff1744"
+RED_GLOW = "#b71c1c"
+FG = "#e0f4ff"
+FG_DIM = "#3a6080"
+ACCENT = "#00e5ff"
+ACCENT_LT = "#40f0ff"
+BG_INPUT = "#001225"
+BORDER = "#002040"
 
 
 class CIOSGreeter(Gtk.Application):

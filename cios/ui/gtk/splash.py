@@ -39,7 +39,7 @@ def show_splash() -> None:
         _wait_for_signal()
         return
 
-    from cios.ui.theme import ACCENT_LT, BG, FG_DIM
+    from cios.ui.theme import ACCENT_LT, BG, BORDER, FG_DIM
 
     app = Gtk.Application(application_id="com.cios.splash")
 
@@ -104,7 +104,7 @@ def show_splash() -> None:
                 border-radius: 2px;
             }}
             .splash-progress trough {{
-                background-color: #1f2937;
+                background-color: {BORDER};
                 min-height: 3px;
             }}
             .splash-progress progress {{

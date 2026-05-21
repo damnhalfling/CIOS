@@ -18,40 +18,41 @@ import time
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Backgrounds (deep black → subtle elevation)
-BG = "#08090d"
-BG_PANEL = "#0c0e14"
-BG_CARD = "#12151e"
-BG_INPUT = "#141720"
-BG_HOVER = "#1a1e2c"
-BG_PRESS = "#222838"
+BG = "#00050d"
+BG_PANEL = "#000a14"
+BG_CARD = "#001020"
+BG_INPUT = "#001225"
+BG_HOVER = "#001a30"
+BG_PRESS = "#002040"
 
 # Borders (subtle glow, not solid lines)
-BORDER = "#1a1f2e"
-BORDER_LT = "#252d40"
+BORDER = "#002040"
+BORDER_LT = "#003060"
 
 # Foreground
-FG = "#e8eaf0"
-FG_SEC = "#8b92a8"
-FG_DIM = "#505872"
+FG = "#e0f4ff"
+FG_SEC = "#7eb8d8"
+FG_DIM = "#3a6080"
 
-# Accent (electric blue/cyan — Tron signature)
-ACCENT = "#0ea5e9"
-ACCENT_LT = "#38bdf8"
-ACCENT_DK = "#0284c7"
-ACCENT_GLOW = "rgba(14,165,233,0.2)"
+# Accent (electric cyan — Tron: Legacy signature)
+ACCENT = "#00e5ff"
+ACCENT_LT = "#40f0ff"
+ACCENT_DK = "#009db8"
+ACCENT_GLOW = "rgba(0,229,255,0.25)"
 
 # Semantic
-SUCCESS = "#22c55e"
-SUCCESS_BG = "#0a1a0f"
-WARNING = "#f59e0b"
-ERROR = "#ef4444"
-CYAN = "#06b6d4"
+SUCCESS = "#00e676"
+SUCCESS_BG = "#001a0f"
+WARNING = "#ff6d00"
+ERROR = "#ff1744"
+CYAN = "#00e5ff"
 
 # State ring colors
-RING_IDLE = ACCENT_LT
-RING_PROCESSING = ACCENT
-RING_SUCCESS = SUCCESS
-RING_ERROR = ERROR
+RING_IDLE = "#00e5ff"
+RING_PROCESSING = "#00b8d4"
+RING_SUCCESS = "#00e676"
+RING_ERROR = "#ff1744"
+RING_CLOUD = "#ff6d00"
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -161,15 +162,15 @@ def lerp(c1: str, c2: str, t: float) -> str:
 
 CSS_VARS = f""":root{{
   --bg:{BG};
-  --bg-panel:rgba(12,14,20,0.85);
-  --bg-card:rgba(18,21,30,0.7);
-  --bg-card-hover:rgba(26,30,44,0.8);
-  --bg-input:rgba(20,23,32,0.85);
-  --border:rgba(255,255,255,0.04);
-  --border-focus:rgba(14,165,233,0.5);
+  --bg-panel:rgba(0,10,20,0.9);
+  --bg-card:rgba(0,16,32,0.75);
+  --bg-card-hover:rgba(0,26,48,0.85);
+  --bg-input:rgba(0,18,37,0.9);
+  --border:rgba(0,229,255,0.06);
+  --border-focus:rgba(0,229,255,0.5);
   --fg:{FG};
-  --fg-dim:#505872;
-  --fg-muted:#8b92a8;
+  --fg-dim:{FG_DIM};
+  --fg-muted:{FG_SEC};
   --accent:{ACCENT};
   --accent-lt:{ACCENT_LT};
   --accent-glow:{ACCENT_GLOW};
@@ -183,4 +184,5 @@ CSS_VARS = f""":root{{
   --ring-processing:{RING_PROCESSING};
   --ring-success:{RING_SUCCESS};
   --ring-error:{RING_ERROR};
+  --ring-cloud:{RING_CLOUD};
 }}"""
