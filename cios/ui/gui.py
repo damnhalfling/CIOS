@@ -12,7 +12,6 @@ State ring communicates system status without words.
 Everything fades, nothing snaps. Conversation, not dashboard.
 """
 
-import platform
 import threading
 import tkinter as tk
 from collections.abc import Callable
@@ -48,7 +47,6 @@ from cios.ui.theme import (
     SP_SECTION,
     SP_TIGHT,
     SUCCESS,
-    SUCCESS_BG,
     T_DOTS,
     T_FAST,
     T_NORMAL,
