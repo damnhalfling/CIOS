@@ -5,42 +5,45 @@ GUI, CLI, topbar, splash, onboarding, hotkey overlay.
 
 Every color, spacing, timing, and font decision lives here.
 Import from here — never hardcode values in UI modules.
+
+Design language: Tron-inspired — dark, glowing edges, floating elements,
+minimal borders, neon accents on deep black. No 90s dividers.
 """
 
 import os
 import time
 
 # ═══════════════════════════════════════════════════════════════════════════
-#  COLORS
+#  COLORS — Tron-inspired palette
 # ═══════════════════════════════════════════════════════════════════════════
 
-# Backgrounds (darkest → lightest)
-BG = "#0b0f14"
-BG_PANEL = "#0f1319"
-BG_CARD = "#111827"
-BG_INPUT = "#161b24"
-BG_HOVER = "#1e2738"
-BG_PRESS = "#252e3f"
+# Backgrounds (deep black → subtle elevation)
+BG = "#08090d"
+BG_PANEL = "#0c0e14"
+BG_CARD = "#12151e"
+BG_INPUT = "#141720"
+BG_HOVER = "#1a1e2c"
+BG_PRESS = "#222838"
 
-# Borders
-BORDER = "#1f2937"
-BORDER_LT = "#2d3748"
+# Borders (subtle glow, not solid lines)
+BORDER = "#1a1f2e"
+BORDER_LT = "#252d40"
 
 # Foreground
-FG = "#e5e7eb"
-FG_SEC = "#9ca3af"
-FG_DIM = "#6b7280"
+FG = "#e8eaf0"
+FG_SEC = "#8b92a8"
+FG_DIM = "#505872"
 
-# Accent (purple)
-ACCENT = "#7c3aed"
-ACCENT_LT = "#a78bfa"
-ACCENT_DK = "#6d28d9"
-ACCENT_GLOW = "rgba(124,111,247,0.25)"  # CSS only
+# Accent (electric blue/cyan — Tron signature)
+ACCENT = "#0ea5e9"
+ACCENT_LT = "#38bdf8"
+ACCENT_DK = "#0284c7"
+ACCENT_GLOW = "rgba(14,165,233,0.2)"
 
 # Semantic
 SUCCESS = "#22c55e"
 SUCCESS_BG = "#0a1a0f"
-WARNING = "#eab308"
+WARNING = "#f59e0b"
 ERROR = "#ef4444"
 CYAN = "#06b6d4"
 
@@ -56,12 +59,12 @@ RING_ERROR = ERROR
 # ═══════════════════════════════════════════════════════════════════════════
 
 SP_MICRO = 4
-SP_TIGHT = 8
-SP_COMPACT = 12
-SP_DEFAULT = 16
-SP_SECTION = 24
-SP_BLOCK = 32
-SP_PAGE = 40
+SP_TIGHT = 6
+SP_COMPACT = 10
+SP_DEFAULT = 14
+SP_SECTION = 20
+SP_BLOCK = 28
+SP_PAGE = 32
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -81,7 +84,7 @@ T_RING = 60  # state ring animation frame rate
 # ═══════════════════════════════════════════════════════════════════════════
 
 SIDEBAR_W = 240
-RIGHT_W = 280
+RIGHT_W = 260
 BAR_HEIGHT = 28
 
 
@@ -158,22 +161,22 @@ def lerp(c1: str, c2: str, t: float) -> str:
 
 CSS_VARS = f""":root{{
   --bg:{BG};
-  --bg-panel:rgba(16,16,24,0.75);
-  --bg-card:rgba(26,28,38,0.65);
-  --bg-card-hover:rgba(42,47,58,0.75);
-  --bg-input:rgba(22,22,32,0.8);
-  --border:rgba(255,255,255,0.06);
-  --border-focus:rgba(124,111,247,0.5);
+  --bg-panel:rgba(12,14,20,0.85);
+  --bg-card:rgba(18,21,30,0.7);
+  --bg-card-hover:rgba(26,30,44,0.8);
+  --bg-input:rgba(20,23,32,0.85);
+  --border:rgba(255,255,255,0.04);
+  --border-focus:rgba(14,165,233,0.5);
   --fg:{FG};
-  --fg-dim:#6b6b7b;
-  --fg-muted:#8a8a9a;
+  --fg-dim:#505872;
+  --fg-muted:#8b92a8;
   --accent:{ACCENT};
   --accent-lt:{ACCENT_LT};
   --accent-glow:{ACCENT_GLOW};
   --success:{SUCCESS};
   --warning:{WARNING};
   --error:{ERROR};
-  --purple-soft:{ACCENT_LT};
+  --cyan:{CYAN};
   --radius:12px;
   --radius-lg:16px;
   --ring-idle:{RING_IDLE};

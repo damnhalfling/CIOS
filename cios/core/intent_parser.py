@@ -58,6 +58,17 @@ class Intent:
 
 # Pattern rules: (compiled regex, IntentType, param extractor, confidence)
 _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
+    # --- greetings (PT + EN) — instant response, no LLM needed ---
+    (
+        re.compile(
+            r"^(?:ol[aá]|oi|hey|hi|hello|e\s*a[ií]?|fala|salve|bom\s+dia|boa\s+(?:tarde|noite)|good\s+(?:morning|afternoon|evening))"
+            r"(?:\s+(?:cios|cio|sistema|system|ai|ia|tudo\s+bem|como\s+vai))?[!?.,]*$",
+            re.IGNORECASE,
+        ),
+        IntentType.EXPLORE_SYSTEM,
+        None,
+        0.95,
+    ),
     # --- dev_start (EN) ---
     (
         re.compile(

@@ -52,7 +52,7 @@ _DEFAULTS: dict[str, Any] = {
     "preferred_external_provider": "",
     # Ollama (local LLM — primary, required)
     "ollama_url": "http://localhost:11434",
-    "ollama_model": "mistral",
+    "ollama_model": "qwen2:1.5b",  # Safe default; cios-setup-ai selects optimal model
     # OpenAI (client's own key — external)
     "openai_api_key": "",
     "openai_model": "gpt-4o-mini",

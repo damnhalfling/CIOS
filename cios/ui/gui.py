@@ -1113,96 +1113,71 @@ class CIOSApp:
         self._thread_panel.refresh()
 
     # ═══════════════════════════════════════════════════════════════════════
-    #  RIGHT PANEL (passive system status)
+    #  RIGHT PANEL (system status + history + intelligence)
     # ═══════════════════════════════════════════════════════════════════════
 
     def _build_right_panel(self) -> None:
         rp = tk.Frame(self.root, bg=BG_PANEL, width=RIGHT_W)
         rp.grid(row=0, column=1, sticky="nsew")
         rp.grid_propagate(False)
+        self._right_panel = rp
 
-        # Use pack with a bottom-anchored frame for Intelligence
-        rp.rowconfigure(0, weight=1)
-        rp.columnconfigure(0, weight=1)
+        # ── Top: Condensed System Status (icons + percentages only) ──
+        status_frame = tk.Frame(rp, bg=BG_PANEL)
+        status_frame.pack(side="top", fill="x", padx=SP_COMPACT, pady=(SP_DEFAULT, SP_TIGHT))
 
-        # Top content (system status, suggestions)
-        top = tk.Frame(rp, bg=BG_PANEL)
-        top.pack(side="top", fill="both", expand=True)
+        # Status in a compact 2x2 grid
+        status_grid = tk.Frame(status_frame, bg=BG_PANEL)
+        status_grid.pack(fill="x")
+        status_grid.columnconfigure(0, weight=1)
+        status_grid.columnconfigure(1, weight=1)
 
-        # ── System Status ──
-        tk.Label(
-            top,
-            text="📈 Status do Sistema",
-            font=self._f["sec"],
-            fg=FG_SEC,
-            bg=BG_PANEL,
-            anchor="w",
-        ).pack(fill="x", padx=SP_DEFAULT, pady=(SP_SECTION, SP_DEFAULT))
+        metrics_config = [
+            ("cpu", "⚡", ACCENT),
+            ("mem", "◈", CYAN),
+            ("disk", "◉", SUCCESS),
+            ("net", "⇅", WARNING),
+        ]
 
-        for key, label, color in [
-            ("cpu", "CPU", ACCENT),
-            ("mem", "Memória", CYAN),
-            ("disk", "Disco", SUCCESS),
-            ("net", "Rede", WARNING),
-        ]:
-            mf = tk.Frame(top, bg=BG_CARD, padx=14, pady=SP_COMPACT)
-            mf.pack(fill="x", padx=SP_COMPACT, pady=3)
+        for i, (key, icon, color) in enumerate(metrics_config):
+            row, col = divmod(i, 2)
+            cell = tk.Frame(status_grid, bg=BG_PANEL, padx=SP_TIGHT, pady=SP_TIGHT)
+            cell.grid(row=row, column=col, sticky="ew", padx=2, pady=2)
 
-            hdr = tk.Frame(mf, bg=BG_CARD)
-            hdr.pack(fill="x")
-            tk.Label(hdr, text=label, font=self._f["metric"], fg=FG_SEC, bg=BG_CARD).pack(
-                side="left"
+            # Icon + value in one line
+            tk.Label(
+                cell, text=icon, font=self._f["metric"], fg=color, bg=BG_PANEL
+            ).pack(side="left")
+            val = tk.Label(
+                cell, text="--", font=self._f["metric_v"], fg=FG, bg=BG_PANEL
             )
-            val = tk.Label(hdr, text="--", font=self._f["metric_v"], fg=FG, bg=BG_CARD)
-            val.pack(side="right")
+            val.pack(side="left", padx=(SP_TIGHT, 0))
 
-            bar_bg = tk.Frame(mf, bg=BORDER, height=5)
-            bar_bg.pack(fill="x", pady=(SP_TIGHT, 0))
-            bar_fill = tk.Frame(bar_bg, bg=color, height=5)
+            # Thin glow bar underneath
+            bar_bg = tk.Frame(cell, bg=BORDER, height=2)
+            bar_bg.pack(fill="x", side="bottom", pady=(SP_MICRO, 0))
+            bar_fill = tk.Frame(bar_bg, bg=color, height=2)
             bar_fill.place(x=0, y=0, relheight=1.0, relwidth=0.005)
 
             self._metrics[key] = {"val": val, "fill": bar_fill, "color": color}
 
-        # ── Separator ──
-        tk.Frame(top, bg=BORDER, height=1).pack(
-            fill="x", padx=SP_DEFAULT, pady=(SP_DEFAULT, SP_COMPACT)
-        )
+        # ── Middle: Thread History (scrollable) ──
+        history_frame = tk.Frame(rp, bg=BG_PANEL)
+        history_frame.pack(side="top", fill="both", expand=True, padx=SP_COMPACT, pady=(SP_COMPACT, 0))
 
-        # ── Environment ──
-        env_text = (
-            f"Host: {platform.node()}\n" f"Kernel: {platform.release()}\n" f"Interface: Tkinter"
-        )
+        # History header
+        hist_header = tk.Frame(history_frame, bg=BG_PANEL)
+        hist_header.pack(fill="x", pady=(0, SP_TIGHT))
         tk.Label(
-            top, text=env_text, font=self._f["small"], fg=FG_DIM, bg=BG_PANEL, justify="left"
-        ).pack(anchor="w", padx=20)
+            hist_header, text="Conversas", font=self._f["small"], fg=FG_DIM, bg=BG_PANEL
+        ).pack(side="left")
 
-        # ── Security badge ──
-        badge = tk.Frame(top, bg=SUCCESS_BG, padx=SP_COMPACT, pady=9)
-        badge.pack(fill="x", padx=SP_COMPACT, pady=(SP_DEFAULT, SP_COMPACT))
-        tk.Label(
-            badge, text="🛡️  Tudo sob controle", font=self._f["metric"], fg=SUCCESS, bg=SUCCESS_BG
-        ).pack(anchor="w")
+        # Thread list (scrollable)
+        self._sidebar_thread_panel = ThreadPanel(history_frame, self._bridge, self._f)
+        self._sidebar_thread_panel.widget.pack(fill="both", expand=True)
+        self._sidebar_thread_panel.load()
 
-        # ── Suggestions ──
-        tk.Label(
-            top, text="💡 Sugestões", font=self._f["sec"], fg=FG_SEC, bg=BG_PANEL, anchor="w"
-        ).pack(fill="x", padx=SP_DEFAULT, pady=(SP_DEFAULT, SP_COMPACT))
-
-        for icon, text, cmd in [
-            ("📁", "Organizar downloads", "organize my downloads"),
-            ("🔍", "Verificar performance", "my computer is slow"),
-            ("📋", "Revisar logs", "show logs"),
-        ]:
-            sf = tk.Frame(top, bg=BG_CARD, padx=SP_COMPACT, pady=9)
-            sf.pack(fill="x", padx=SP_COMPACT, pady=2)
-            tk.Label(sf, text=icon, font=self._f["metric"], bg=BG_CARD).pack(
-                side="left", padx=(0, SP_TIGHT)
-            )
-            tk.Label(sf, text=text, font=self._f["metric"], fg=FG_SEC, bg=BG_CARD).pack(side="left")
-            _hoverable(self._anim, sf, on_click=lambda c=cmd: self._on_card(c))
-
-        # ── Intelligence Section (bottom of sidebar) ──
-        tk.Frame(rp, bg=BORDER, height=1).pack(side="bottom", fill="x", padx=SP_DEFAULT, pady=0)
+        # ── Bottom: Intelligence Section (always at bottom) ──
         self._build_intelligence_section(rp)
 
     def _build_intelligence_section(self, parent) -> None:
@@ -1227,13 +1202,13 @@ class CIOSApp:
         frame = self._intel_frame
 
         if not intelligence.is_logged_in:
-            # ── Not logged in: promo + login button ──
-            card = tk.Frame(frame, bg=BG_CARD, padx=SP_DEFAULT, pady=SP_DEFAULT)
+            # ── Not logged in: compact login button ──
+            card = tk.Frame(frame, bg=BG_CARD, padx=SP_DEFAULT, pady=SP_COMPACT)
             card.pack(fill="x")
 
             tk.Label(
                 card,
-                text="⚡ CIOS Intelligence",
+                text="⚡ Intelligence",
                 font=self._f["sec"],
                 fg=ACCENT_LT,
                 bg=BG_CARD,
@@ -1242,29 +1217,18 @@ class CIOSApp:
 
             tk.Label(
                 card,
-                text="Resumos, traduções e textos\ngerados por IA avançada.",
+                text="IA avançada · 5/dia grátis",
                 font=self._f["small"],
-                fg=FG_SEC,
+                fg=FG_DIM,
                 bg=BG_CARD,
-                justify="left",
                 anchor="w",
-            ).pack(fill="x", pady=(SP_TIGHT, 0))
-
-            tk.Label(
-                card,
-                text="✓ 5 consultas/dia grátis\n✓ Sem cartão de crédito",
-                font=self._f["small"],
-                fg=SUCCESS,
-                bg=BG_CARD,
-                justify="left",
-                anchor="w",
-            ).pack(fill="x", pady=(SP_TIGHT, 0))
+            ).pack(fill="x", pady=(SP_MICRO, 0))
 
             btn = tk.Frame(card, bg=ACCENT, padx=SP_DEFAULT, pady=SP_TIGHT)
-            btn.pack(fill="x", pady=(SP_DEFAULT, 0))
+            btn.pack(fill="x", pady=(SP_COMPACT, 0))
             tk.Label(
                 btn,
-                text="🔑 Entrar com Google",
+                text="Entrar",
                 font=self._f["btn"],
                 fg="#fff",
                 bg=ACCENT,
@@ -1388,6 +1352,11 @@ class CIOSApp:
         import webbrowser
 
         webbrowser.open("https://cios-ia.com/upgrade")
+
+    def _refresh_sidebar_threads(self) -> None:
+        """Refresh the sidebar thread history panel."""
+        if hasattr(self, "_sidebar_thread_panel"):
+            self._sidebar_thread_panel.refresh()
 
     # ═══════════════════════════════════════════════════════════════════════
     #  DATA LOADERS
@@ -1893,6 +1862,8 @@ class CIOSApp:
 
         # Refresh Intelligence sidebar (usage counter may have changed)
         self.root.after(delay + 300, self._refresh_intelligence_ui)
+        # Refresh sidebar thread history
+        self.root.after(delay + 350, self._refresh_sidebar_threads)
 
     # ── Spinner (only visible when processing) ─────────────────────────
 
@@ -2008,33 +1979,25 @@ class CIOSApp:
         return has_separators or has_platform_headers
 
     def _show_artifact(self, content: str) -> None:
-        """Show artifact content in the right panel (split view)."""
+        """Show artifact content in the center feed area (never replaces sidebar)."""
         from cios.ui.artifact_panel import ArtifactPanel
 
-        # Clear the right panel content
-        rp = self.root.grid_slaves(row=0, column=1)
-        if rp:
-            for widget in rp[0].winfo_children():
-                widget.destroy()
+        # Show artifact inline in the feed area
+        self._result_frame.pack(fill="both", expand=True, pady=(SP_DEFAULT, 0))
 
-            # Create artifact panel in the right panel frame
-            self._artifact_panel = ArtifactPanel(
-                parent=rp[0],
-                fonts=self._f,
-                on_close=self._close_artifact,
-            )
-            self._artifact_panel.show(content)
+        self._artifact_panel = ArtifactPanel(
+            parent=self._result_frame,
+            fonts=self._f,
+            on_close=self._close_artifact,
+        )
+        self._artifact_panel.show(content)
 
     def _close_artifact(self) -> None:
-        """Close artifact panel and restore the right sidebar."""
+        """Close artifact panel in the feed area."""
         if hasattr(self, "_artifact_panel") and self._artifact_panel:
             self._artifact_panel.hide()
             self._artifact_panel = None
-        # Rebuild the right panel
-        rp = self.root.grid_slaves(row=0, column=1)
-        if rp:
-            rp[0].destroy()
-        self._build_right_panel()
+        self._clear_result()
 
     def _show_confirm(self, msg: str, cmd: str) -> None:
         self._pending = cmd

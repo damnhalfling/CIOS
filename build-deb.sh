@@ -146,7 +146,7 @@ Description: CIOS — AI-first operating system (Wayland)
  execution. Speak intent, get results.
  .
  Core stack: custom Wayland compositor (cios-shell/wlroots),
- greetd login, Ollama+Mistral LLM, Whisper STT, Piper TTS.
+ greetd login, Ollama LLM (auto-selected), Whisper STT, Piper TTS.
  .
  This is NOT a session to run alongside GNOME/KDE.
  CIOS replaces the entire desktop environment.
@@ -225,10 +225,10 @@ fi
 echo "[CIOS] ✓ Python environment ready"
 
 # ══════════════════════════════════════════════════
-#  2. Ollama + Mistral (mandatory AI backend)
+#  2. Ollama + AI model (hardware-aware selection)
 # ══════════════════════════════════════════════════
 
-echo "[CIOS] [2/6] AI backend (Ollama + Mistral)..."
+echo "[CIOS] [2/6] AI backend (Ollama + auto-selected model)..."
 
 if ! command -v ollama &>/dev/null; then
     echo "[CIOS]   Downloading Ollama..."
@@ -240,17 +240,50 @@ if ! command -v ollama &>/dev/null; then
     }
 fi
 
-# Pull Mistral
-systemctl start ollama 2>/dev/null || (ollama serve &>/dev/null & sleep 3)
-echo "[CIOS]   Downloading Mistral model (~4GB)..."
-if ! ollama pull mistral; then
-    echo "[CIOS] ✗ FAILED to download Mistral model."
-    echo "[CIOS]   CIOS requires a local LLM. Run manually:"
-    echo "[CIOS]   ollama pull mistral"
-    exit 1
+# Run hardware-aware model selection
+if [ -x /usr/local/bin/cios-setup-ai ]; then
+    /usr/local/bin/cios-setup-ai
+else
+    # Fallback: inline hardware detection
+    systemctl start ollama 2>/dev/null || (ollama serve &>/dev/null & sleep 3)
+
+    RAM_MB=$(awk '/MemTotal/ {printf "%d", $2/1024}' /proc/meminfo 2>/dev/null || echo 4096)
+    CPU_CORES=$(nproc 2>/dev/null || echo 2)
+    CPU_BOGOMIPS=$(awk '/bogomips/ {printf "%d", $3; exit}' /proc/cpuinfo 2>/dev/null || echo 0)
+    CPU_SCORE=$(( CPU_CORES * CPU_BOGOMIPS / 1000 ))
+    DISK_FREE_GB=$(df -BG / 2>/dev/null | awk 'NR==2 {gsub("G",""); print $4}' || echo 10)
+
+    # Select model based on hardware
+    if [ "$CPU_CORES" -ge 8 ] && [ "$RAM_MB" -ge 12000 ] && [ "$CPU_SCORE" -ge 40 ]; then
+        AI_MODEL="mistral"
+    elif [ "$CPU_CORES" -ge 4 ] && [ "$RAM_MB" -ge 7000 ] && [ "$CPU_SCORE" -ge 20 ] && [ "$DISK_FREE_GB" -ge 5 ]; then
+        AI_MODEL="qwen2:7b"
+    else
+        AI_MODEL="qwen2:1.5b"
+    fi
+
+    echo "[CIOS]   Hardware: ${CPU_CORES} cores, ${RAM_MB}MB RAM, score=${CPU_SCORE}"
+    echo "[CIOS]   Selected model: ${AI_MODEL}"
+    echo "[CIOS]   Downloading ${AI_MODEL}..."
+
+    if ! ollama pull "$AI_MODEL"; then
+        echo "[CIOS] ✗ FAILED to download model."
+        echo "[CIOS]   Run manually: sudo cios-setup-ai"
+        exit 1
+    fi
+
+    # Update settings for the first user
+    CIOS_USER=$(awk -F: '$3 >= 1000 && $3 < 65000 {print $1; exit}' /etc/passwd)
+    if [ -n "$CIOS_USER" ]; then
+        CIOS_HOME=$(eval echo "~$CIOS_USER")
+        mkdir -p "$CIOS_HOME/.cios"
+        echo "{\"ollama_model\": \"$AI_MODEL\"}" > "$CIOS_HOME/.cios/settings.json"
+        chown -R "$CIOS_USER:$CIOS_USER" "$CIOS_HOME/.cios"
+        chmod 600 "$CIOS_HOME/.cios/settings.json"
+    fi
 fi
 
-echo "[CIOS] ✓ Ollama + Mistral ready"
+echo "[CIOS] ✓ AI backend ready"
 
 # ══════════════════════════════════════════════════
 #  3. Piper TTS (mandatory voice output)
@@ -413,7 +446,7 @@ echo ""
 echo "  Stack:"
 echo "    Compositor: cios-shell (Wayland/wlroots)"
 echo "    Login:      greetd"
-echo "    LLM:        Ollama + Mistral"
+echo "    LLM:        Ollama (hardware-aware model)"
 echo "    STT:        Whisper"
 echo "    TTS:        Piper"
 echo "    Boot:       Plymouth (CIOS theme)"
@@ -667,6 +700,11 @@ vt = 1
 command = "/usr/local/bin/cios-greeter-session"
 user = "greeter"
 GREETD
+
+# ── cios-setup-ai script ──
+echo "→ Installing cios-setup-ai..."
+cp scripts/cios-setup-ai "${PKG_DIR}/usr/local/bin/cios-setup-ai"
+chmod 755 "${PKG_DIR}/usr/local/bin/cios-setup-ai"
 
 # ── Assets ──
 echo "→ Copying assets..."

@@ -473,6 +473,13 @@ class CIOSApplication(Gtk.Application):
         self._busy = False
         self._thread_panel.refresh()
 
+    def _finish_chat_execution(self, progress_bubble, result: str, status: str):
+        """Remove progress bubble and display the final result."""
+        parent = progress_bubble.get_parent()
+        if parent:
+            parent.remove(progress_bubble)
+        self._show_result(result, status)
+
     def _show_password_dialog(self, prompt_text: str):
         """Show a modal password dialog with masked input."""
         dialog = Gtk.Window(transient_for=self._win, modal=True)
@@ -576,7 +583,7 @@ class CIOSApplication(Gtk.Application):
                     except Exception as e:
                         result = f"Erro: {e}"
                         status = "error"
-                    GLib.idle_add(self._show_chat_result, progress, result, status)
+                    GLib.idle_add(self._finish_chat_execution, progress, result, status)
 
                 threading.Thread(target=execute_with_password, daemon=True).start()
             else:
