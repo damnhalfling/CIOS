@@ -95,7 +95,7 @@ class CIOSApplication(Gtk.Application):
         from cios.ui.gtk.sidebar import Sidebar
         from cios.ui.gtk.topbar import Topbar
 
-        # Root: overlay for hotkey popup
+        # Root: overlay for floating prompt + hotkey popup
         root_overlay = Gtk.Overlay()
 
         # Main vertical layout
@@ -146,14 +146,19 @@ class CIOSApplication(Gtk.Application):
         self._greeting = self._chat_feed._greeting
         self._feed_box = self._chat_feed._messages_box
 
-        # ── Prompt area (bottom) ──
+        # ── Sidebar (right, always rightmost) ──
+        self._sidebar = Sidebar()
+        content_box.append(self._sidebar)
+
+        # ── Floating prompt (full width, bottom of window) ──
         prompt_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         prompt_box.set_margin_start(48)
         prompt_box.set_margin_end(48)
         prompt_box.set_margin_top(8)
         prompt_box.set_margin_bottom(12)
+        prompt_box.set_halign(Gtk.Align.FILL)
+        prompt_box.set_valign(Gtk.Align.END)
         prompt_box.add_css_class("prompt-area")
-        center_box.append(prompt_box)
 
         # Input field
         self._input = Gtk.Entry()
@@ -169,9 +174,8 @@ class CIOSApplication(Gtk.Application):
         send_btn.connect("clicked", self._on_submit)
         prompt_box.append(send_btn)
 
-        # ── Sidebar (right, always rightmost) ──
-        self._sidebar = Sidebar()
-        content_box.append(self._sidebar)
+        # Add prompt as overlay (floats over everything at bottom)
+        root_overlay.add_overlay(prompt_box)
 
         # ── Hotkey overlay (floating) ──
         self._hotkey_overlay = HotkeyOverlay(on_submit=self._on_hotkey_submit)
@@ -689,9 +693,10 @@ class CIOSApplication(Gtk.Application):
                 color: {ERROR};
             }}
             .prompt-area {{
-                background-color: {BG_CARD};
+                background-color: rgba(0,16,32,0.92);
                 border-radius: 12px;
                 padding: 12px 16px;
+                border: 1px solid {BORDER};
             }}
             .prompt-input {{
                 background: {BG_INPUT};
