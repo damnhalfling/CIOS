@@ -1143,12 +1143,10 @@ class CIOSApp:
             cell.grid(row=row, column=col, sticky="ew", padx=2, pady=2)
 
             # Icon + value in one line
-            tk.Label(
-                cell, text=icon, font=self._f["metric"], fg=color, bg=BG_PANEL
-            ).pack(side="left")
-            val = tk.Label(
-                cell, text="--", font=self._f["metric_v"], fg=FG, bg=BG_PANEL
+            tk.Label(cell, text=icon, font=self._f["metric"], fg=color, bg=BG_PANEL).pack(
+                side="left"
             )
+            val = tk.Label(cell, text="--", font=self._f["metric_v"], fg=FG, bg=BG_PANEL)
             val.pack(side="left", padx=(SP_TIGHT, 0))
 
             # Thin glow bar underneath
@@ -1161,14 +1159,16 @@ class CIOSApp:
 
         # ── Middle: Thread History (scrollable) ──
         history_frame = tk.Frame(rp, bg=BG_PANEL)
-        history_frame.pack(side="top", fill="both", expand=True, padx=SP_COMPACT, pady=(SP_COMPACT, 0))
+        history_frame.pack(
+            side="top", fill="both", expand=True, padx=SP_COMPACT, pady=(SP_COMPACT, 0)
+        )
 
         # History header
         hist_header = tk.Frame(history_frame, bg=BG_PANEL)
         hist_header.pack(fill="x", pady=(0, SP_TIGHT))
-        tk.Label(
-            hist_header, text="Conversas", font=self._f["small"], fg=FG_DIM, bg=BG_PANEL
-        ).pack(side="left")
+        tk.Label(hist_header, text="Conversas", font=self._f["small"], fg=FG_DIM, bg=BG_PANEL).pack(
+            side="left"
+        )
 
         # Thread list (scrollable)
         self._sidebar_thread_panel = ThreadPanel(history_frame, self._bridge, self._f)
