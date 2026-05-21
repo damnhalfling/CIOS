@@ -255,6 +255,7 @@ class CIOSApplication(Gtk.Application):
         self._input.set_sensitive(True)
         self._input.grab_focus()
         self._sidebar.set_bridge(self._bridge)
+        self._sidebar.set_artifact_panel(self._artifact_panel)
 
     def _on_hotkey_submit(self, text: str):
         """Handle hotkey overlay submission."""

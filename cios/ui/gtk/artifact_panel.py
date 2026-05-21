@@ -1,13 +1,28 @@
-"""Artifact Panel — Split view for long-form content.
+"""Artifact Panel — Split view for long-form content and web views.
 
 When the system generates long content (text, code, posts, articles),
-it opens in a side panel instead of inline in the chat. The chat stays
-clean and the artifact is readable, scrollable, and copiable.
+it opens in a side panel instead of inline in the chat. Also supports
+loading URLs (like Maestro) as embedded web views.
 """
 
 import gi
 
 gi.require_version("Gtk", "4.0")
+
+try:
+    gi.require_version("WebKit", "6.0")
+    from gi.repository import WebKit  # noqa: E402
+
+    HAS_WEBKIT = True
+except (ValueError, ImportError):
+    try:
+        gi.require_version("WebKit2", "5.0")
+        from gi.repository import WebKit2 as WebKit  # noqa: E402
+
+        HAS_WEBKIT = True
+    except (ValueError, ImportError):
+        HAS_WEBKIT = False
+
 from gi.repository import Gtk  # noqa: E402
 
 from cios.ui.theme import BG, BG_CARD, BORDER, FG, FG_DIM, FG_SEC  # noqa: E402
@@ -82,21 +97,68 @@ class ArtifactPanel(Gtk.Box):
         self._content_view.add_css_class("artifact-content")
         scroll.set_child(self._content_view)
 
+        # Web view (for URLs like Maestro)
+        self._web_view = None
+        if HAS_WEBKIT:
+            self._web_view = WebKit.WebView()
+            self._web_view.set_vexpand(True)
+
+        self._scroll = scroll
         self._content = ""
+        self._mode = "text"  # "text" or "web"
         self.set_visible(False)
 
     def show_artifact(self, content: str, title: str = "Artefato") -> None:
-        """Display content in the artifact panel."""
+        """Display text content in the artifact panel."""
         self._content = content
         self._title.set_label(title)
+        self._switch_to_text()
         buf = self._content_view.get_buffer()
         buf.set_text(content)
         self.set_visible(True)
+
+    def show_url(self, url: str, title: str = "Maestro") -> None:
+        """Load a URL in the artifact panel using WebKit."""
+        self._title.set_label(title)
+        self._content = url
+
+        if self._web_view and HAS_WEBKIT:
+            self._switch_to_web()
+            self._web_view.load_uri(url)
+            self.set_visible(True)
+        else:
+            # Fallback: open in browser if no WebKit
+            import subprocess
+
+            try:
+                subprocess.Popen(
+                    ["xdg-open", url],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            except Exception:
+                pass
+
+    def _switch_to_text(self) -> None:
+        """Switch panel to text mode."""
+        if self._mode == "web" and self._web_view:
+            self.remove(self._web_view)
+            self.append(self._scroll)
+        self._mode = "text"
+
+    def _switch_to_web(self) -> None:
+        """Switch panel to web view mode."""
+        if self._mode == "text":
+            self.remove(self._scroll)
+            self.append(self._web_view)
+        self._mode = "web"
 
     def close(self) -> None:
         """Close the artifact panel."""
         self.set_visible(False)
         self._content = ""
+        if self._mode == "web" and self._web_view:
+            self._web_view.load_uri("about:blank")
 
     def _on_copy(self, *args) -> None:
         """Copy artifact content to clipboard."""

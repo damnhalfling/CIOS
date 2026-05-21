@@ -38,6 +38,7 @@ class Sidebar(Gtk.Box):
         self.set_margin_end(12)
         self.set_margin_bottom(12)
         self._bridge = None
+        self._artifact_panel = None
 
         # ── System metrics (compact, icon-based) ──
         metrics_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
@@ -125,6 +126,10 @@ class Sidebar(Gtk.Box):
         """Set bridge for history access."""
         self._bridge = bridge
         self.refresh_history()
+
+    def set_artifact_panel(self, panel):
+        """Set reference to artifact panel for opening URLs."""
+        self._artifact_panel = panel
 
     def refresh_history(self):
         """Reload thread history."""
@@ -255,9 +260,21 @@ class Sidebar(Gtk.Box):
         return True
 
     def _on_maestro_click(self, gesture, n_press, x, y):
-        """Handle maestro login click."""
-        # TODO: open maestro connection dialog
-        self._maestro_status.set_label("conectando…")
+        """Open Maestro in the artifact panel."""
+        if self._artifact_panel:
+            self._artifact_panel.show_url("https://maestro.cios-ai.com", title="Maestro")
+        else:
+            # Fallback if no panel reference
+            import subprocess
+
+            try:
+                subprocess.Popen(
+                    ["xdg-open", "https://maestro.cios-ai.com"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            except Exception:
+                pass
 
     @staticmethod
     def get_css() -> str:
