@@ -93,7 +93,6 @@ class CIOSApplication(Gtk.Application):
         """Build the main CIOS interface with topbar + sidebar + prompt."""
         from cios.ui.gtk.hotkey_overlay import HotkeyOverlay
         from cios.ui.gtk.sidebar import Sidebar
-        from cios.ui.gtk.thread_panel import ThreadPanel
         from cios.ui.gtk.topbar import Topbar
 
         # Root: overlay for hotkey popup
@@ -107,10 +106,23 @@ class CIOSApplication(Gtk.Application):
         self._topbar = Topbar()
         outer_box.append(self._topbar)
 
-        # ── Content area (horizontal: center + sidebar) ──
+        # ── Content area (horizontal: artifact + center + sidebar) ──
         content_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         content_box.set_vexpand(True)
         outer_box.append(content_box)
+
+        # ── Artifact panel (left, hidden by default) ──
+        from cios.ui.gtk.artifact_panel import ARTIFACT_PANEL_CSS, ArtifactPanel
+
+        self._artifact_panel = ArtifactPanel()
+        content_box.append(self._artifact_panel)
+
+        # Apply artifact CSS
+        artifact_css = Gtk.CssProvider()
+        artifact_css.load_from_data(ARTIFACT_PANEL_CSS.encode())
+        Gtk.StyleContext.add_provider_for_display(
+            self._win.get_display(), artifact_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
 
         # Center column
         center_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -157,26 +169,9 @@ class CIOSApplication(Gtk.Application):
         send_btn.connect("clicked", self._on_submit)
         prompt_box.append(send_btn)
 
-        # ── Thread panel (below prompt) ──
-        self._thread_panel = ThreadPanel()
-        center_box.append(self._thread_panel)
-
-        # ── Sidebar (right) ──
-        self._sidebar = Sidebar(on_suggestion=self._on_suggestion)
+        # ── Sidebar (right, always rightmost) ──
+        self._sidebar = Sidebar()
         content_box.append(self._sidebar)
-
-        # ── Artifact panel (right, hidden by default) ──
-        from cios.ui.gtk.artifact_panel import ARTIFACT_PANEL_CSS, ArtifactPanel
-
-        self._artifact_panel = ArtifactPanel()
-        content_box.append(self._artifact_panel)
-
-        # Apply artifact CSS
-        artifact_css = Gtk.CssProvider()
-        artifact_css.load_from_data(ARTIFACT_PANEL_CSS.encode())
-        Gtk.StyleContext.add_provider_for_display(
-            self._win.get_display(), artifact_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-        )
 
         # ── Hotkey overlay (floating) ──
         self._hotkey_overlay = HotkeyOverlay(on_submit=self._on_hotkey_submit)
@@ -255,12 +250,7 @@ class CIOSApplication(Gtk.Application):
         """Called when bridge is initialized."""
         self._input.set_sensitive(True)
         self._input.grab_focus()
-        self._thread_panel.set_bridge(self._bridge)
-
-    def _on_suggestion(self, cmd: str):
-        """Handle suggestion chip click."""
-        self._input.set_text(cmd)
-        self._on_submit()
+        self._sidebar.set_bridge(self._bridge)
 
     def _on_hotkey_submit(self, text: str):
         """Handle hotkey overlay submission."""
@@ -363,7 +353,7 @@ class CIOSApplication(Gtk.Application):
         self._input.set_sensitive(True)
         self._input.grab_focus()
         self._busy = False
-        self._thread_panel.refresh()
+        self._sidebar.refresh_history()
 
     def _finish_streaming_background(self, message: str, task_id: str):
         """Finish streaming, show background task progress."""
@@ -449,7 +439,7 @@ class CIOSApplication(Gtk.Application):
 
             self._remove_bubble(progress_bubble)
             self._chat_feed.add_assistant_message(result_text)
-            self._thread_panel.refresh()
+            self._sidebar.refresh_history()
             return False
 
         return True
@@ -464,7 +454,7 @@ class CIOSApplication(Gtk.Application):
         self._input.set_sensitive(True)
         self._input.grab_focus()
         self._busy = False
-        self._thread_panel.refresh()
+        self._sidebar.refresh_history()
 
     def _show_result(self, result: str, status: str):
         """Display execution result in chat feed (legacy compat)."""
@@ -472,7 +462,7 @@ class CIOSApplication(Gtk.Application):
         self._input.set_sensitive(True)
         self._input.grab_focus()
         self._busy = False
-        self._thread_panel.refresh()
+        self._sidebar.refresh_history()
 
     def _finish_chat_execution(self, progress_bubble, result: str, status: str):
         """Remove progress bubble and display the final result."""
