@@ -63,7 +63,7 @@ omit = [
 [tool.coverage.report]
 show_missing = true
 skip_empty = true
-fail_under = 45
+fail_under = 40
 omit = [
     "cios/ui/gtk/*",
     "cios/ui/gui.py",

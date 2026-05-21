@@ -19,6 +19,9 @@ _BLOCKED_COMMANDS = {
     "xdotool",
     "wmctrl",
     "xbindkeys",
+    "sudo apt",
+    "apt-get",
+    "apt install",
 }
 
 
@@ -92,6 +95,9 @@ def isolate_home(tmp_path):
             patch("cios.core.config.SETTINGS_PATH", cios_home / "settings.json"),
             patch("subprocess.run", _safe_subprocess_run(original_run)),
             patch("subprocess.Popen", _safe_subprocess_popen(original_popen)),
+            patch("cios.infra.deps.check_and_install_deps", return_value=[]),
+            patch("cios.infra.deps._try_install", return_value=True),
+            patch("cios.infra.deps._run_apt", return_value=True),
         ):
             yield fake_home
 
