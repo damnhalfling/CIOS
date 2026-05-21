@@ -28,16 +28,53 @@ from gi.repository import Gtk  # noqa: E402
 from cios.ui.theme import BG, BG_CARD, BORDER, FG, FG_DIM, FG_SEC  # noqa: E402
 
 # Threshold: content longer than this goes to artifact panel
-ARTIFACT_THRESHOLD = 400
+ARTIFACT_THRESHOLD = 600
 
-# Patterns that indicate multi-section content
+# Patterns that indicate multi-section content (generated artifacts)
 ARTIFACT_PATTERNS = ["=== ", "---\n", "## ", "### ", "```"]
+
+# Patterns that indicate conversational content (NOT artifacts)
+CONVERSATIONAL_PATTERNS = [
+    "?",  # Questions
+    "preciso de",
+    "posso",
+    "você quer",
+    "me diga",
+    "qual",
+    "como",
+    "antes de",
+    "para que",
+    "com essas",
+    "o que você",
+    "poderia",
+]
 
 
 def is_artifact(content: str) -> bool:
-    """Determine if content should be displayed as an artifact."""
-    if len(content) > ARTIFACT_THRESHOLD:
-        return True
+    """Determine if content should be displayed as an artifact.
+
+    Artifacts are generated content (code, articles, plans, tables).
+    Conversational responses (questions, clarifications) stay inline.
+    """
+    # Too short → never artifact
+    if len(content) < ARTIFACT_THRESHOLD:
+        return False
+
+    # Check if it's conversational (questions, clarifications)
+    content_lower = content.lower()
+    question_marks = content_lower.count("?")
+    if question_marks >= 2:
+        return False
+
+    # If most of the content is questions/clarification, not artifact
+    for pattern in CONVERSATIONAL_PATTERNS:
+        if pattern in content_lower[:200]:
+            # Only exclude if there's no strong artifact signal
+            has_artifact_signal = any(p in content for p in ARTIFACT_PATTERNS)
+            if not has_artifact_signal:
+                return False
+
+    # Has structural patterns → artifact
     return any(p in content for p in ARTIFACT_PATTERNS)
 
 
