@@ -150,14 +150,39 @@ class CIOSApplication(Gtk.Application):
         self._sidebar = Sidebar()
         content_box.append(self._sidebar)
 
-        # ── Floating prompt (full width, bottom of window) ──
+        # ── Floating prompt with status line (full width, bottom of window) ──
+        prompt_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        prompt_container.set_margin_start(48)
+        prompt_container.set_margin_end(48)
+        prompt_container.set_margin_bottom(12)
+        prompt_container.set_halign(Gtk.Align.FILL)
+        prompt_container.set_valign(Gtk.Align.END)
+
+        # Status line (hidden by default, shown during processing)
+        self._status_line = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        self._status_line.set_margin_start(16)
+        self._status_line.set_margin_bottom(4)
+        self._status_line.add_css_class("status-line")
+        self._status_line.set_visible(False)
+
+        self._status_dot = Gtk.Label(label="●")
+        self._status_dot.add_css_class("status-dot")
+        self._status_line.append(self._status_dot)
+
+        self._status_label = Gtk.Label(label="")
+        self._status_label.add_css_class("status-text")
+        self._status_line.append(self._status_label)
+
+        # Glowing separator line
+        self._status_bar = Gtk.Box()
+        self._status_bar.set_hexpand(True)
+        self._status_bar.add_css_class("status-glow-bar")
+        self._status_line.append(self._status_bar)
+
+        prompt_container.append(self._status_line)
+
+        # Prompt input row
         prompt_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        prompt_box.set_margin_start(48)
-        prompt_box.set_margin_end(48)
-        prompt_box.set_margin_top(8)
-        prompt_box.set_margin_bottom(12)
-        prompt_box.set_halign(Gtk.Align.FILL)
-        prompt_box.set_valign(Gtk.Align.END)
         prompt_box.add_css_class("prompt-area")
 
         # Input field
@@ -174,8 +199,10 @@ class CIOSApplication(Gtk.Application):
         send_btn.connect("clicked", self._on_submit)
         prompt_box.append(send_btn)
 
-        # Add prompt as overlay (floats over everything at bottom)
-        root_overlay.add_overlay(prompt_box)
+        prompt_container.append(prompt_box)
+
+        # Add prompt container as overlay (floats over everything at bottom)
+        root_overlay.add_overlay(prompt_container)
 
         # ── Hotkey overlay (floating) ──
         self._hotkey_overlay = HotkeyOverlay(on_submit=self._on_hotkey_submit)
@@ -286,28 +313,30 @@ class CIOSApplication(Gtk.Application):
         # Add user message to chat feed
         self._chat_feed.add_user_message(text)
 
-        # Start streaming bubble (feels like "typing...")
-        self._chat_feed.start_streaming()
+        # Show status line instead of streaming bubble
+        self._set_status("pensando")
 
         # Execute with streaming in background
         def execute():
             import time as _time
 
-            # Human timing: brief pause before responding
             _time.sleep(0.25)
+            GLib.idle_add(self._set_status, "buscando contexto")
 
             try:
                 if self._bridge:
-                    # Use streaming for step-by-step feedback
-                    def on_step(step: str, current: int, total: int):
-                        GLib.idle_add(self._chat_feed.append_stream_token, f"{step}\n")
 
+                    def on_step(step: str, current: int, total: int):
+                        GLib.idle_add(self._set_status, "executando")
+
+                    GLib.idle_add(self._set_status, "processando")
                     data = self._bridge.execute_streaming(text, confirmed=False, on_step=on_step)
                     result = data.get("result", "Concluído.")
                     status = data.get("status", "success")
 
                     # Password needed
                     if data.get("password_prompt"):
+                        GLib.idle_add(self._hide_status)
                         GLib.idle_add(self._finish_streaming_show, result, None)
                         GLib.idle_add(self._show_password_dialog, result)
                         return
@@ -315,20 +344,23 @@ class CIOSApplication(Gtk.Application):
                     # Background task
                     if status == "background":
                         task_id = data.get("task_id", "")
+                        GLib.idle_add(self._hide_status)
                         GLib.idle_add(self._finish_streaming_background, result, task_id)
                         return
 
                     # Gallery
                     gallery = data.get("gallery")
                     if gallery:
-                        GLib.idle_add(self._chat_feed.finish_streaming)
+                        GLib.idle_add(self._hide_status)
                         GLib.idle_add(self._show_gallery, gallery)
                         GLib.idle_add(self._finish_execution)
                         return
 
                     # Normal result
+                    GLib.idle_add(self._hide_status)
                     GLib.idle_add(self._finish_streaming_show, result, status)
                 else:
+                    GLib.idle_add(self._hide_status)
                     GLib.idle_add(
                         self._finish_streaming_show, "Sistema ainda inicializando…", "error"
                     )
@@ -337,11 +369,19 @@ class CIOSApplication(Gtk.Application):
 
         threading.Thread(target=execute, daemon=True).start()
 
-    def _finish_streaming_show(self, result: str, status: str | None):
-        """Finish streaming and show final result."""
-        from cios.ui.gtk.artifact_panel import is_artifact
+    def _set_status(self, phase: str):
+        """Show status line with current processing phase."""
+        self._status_label.set_label(phase)
+        self._status_line.set_visible(True)
 
-        self._chat_feed.finish_streaming()
+    def _hide_status(self):
+        """Hide the status line."""
+        self._status_line.set_visible(False)
+        self._status_label.set_label("")
+
+    def _finish_streaming_show(self, result: str, status: str | None):
+        """Show final result in chat."""
+        from cios.ui.gtk.artifact_panel import is_artifact
 
         # Long/structured content → artifact panel
         if status and status != "error" and is_artifact(result):
@@ -361,8 +401,7 @@ class CIOSApplication(Gtk.Application):
         self._sidebar.refresh_history()
 
     def _finish_streaming_background(self, message: str, task_id: str):
-        """Finish streaming, show background task progress."""
-        self._chat_feed.finish_streaming()
+        """Show background task progress."""
         progress_bubble = self._chat_feed.add_progress_message(message)
         self._input.set_sensitive(True)
         self._input.grab_focus()
@@ -698,6 +737,27 @@ class CIOSApplication(Gtk.Application):
                 border-radius: 12px;
                 padding: 12px 16px;
                 border: 1px solid {BORDER};
+            }}
+            .status-line {{
+                padding: 2px 0;
+            }}
+            .status-dot {{
+                color: {ACCENT};
+                font-size: 8px;
+                opacity: 0.9;
+            }}
+            .status-text {{
+                color: {ACCENT};
+                font-size: 11px;
+                font-weight: 500;
+                opacity: 0.7;
+                letter-spacing: 0.5px;
+            }}
+            .status-glow-bar {{
+                min-height: 1px;
+                background: linear-gradient(90deg, {ACCENT}, transparent);
+                opacity: 0.3;
+                border-radius: 1px;
             }}
             .prompt-input {{
                 background: {BG_INPUT};
