@@ -308,29 +308,24 @@ class Sidebar(Gtk.Box):
             pass
 
     def _on_maestro_click(self, gesture, n_press, x, y):
-        """Start Maestro OAuth login flow inline (no external browser)."""
+        """Start Maestro device auth flow."""
         import threading
 
-        from gi.repository import GLib
+        from cios.core.intelligence import intelligence
+
+        if intelligence.is_logged_in:
+            name = intelligence.user.name if intelligence.user else "online"
+            self._maestro_status.set_label(name or "online")
+            return
 
         self._maestro_status.set_label("conectando…")
-
-        def _do_login():
-            from cios.core.intelligence import intelligence
-
-            if intelligence.is_logged_in:
-                # Already logged in — just show status
-                name = intelligence.user.name if intelligence.user else "online"
-                GLib.idle_add(self._maestro_status.set_label, name or "online")
-            else:
-                # Start OAuth flow (QR code in artifact panel)
-                self._start_inline_auth()
-
-        threading.Thread(target=_do_login, daemon=True).start()
+        threading.Thread(target=self._start_inline_auth, daemon=True).start()
 
     def _start_inline_auth(self):
-        """Device auth flow: get code from API, show QR, poll for confirmation."""
-        import threading
+        """Device auth flow using subprocess curl (avoids requests/SSL crash)."""
+        import json
+        import subprocess
+        import time
 
         from gi.repository import GLib
 
@@ -338,64 +333,68 @@ class Sidebar(Gtk.Box):
 
         GLib.idle_add(self._maestro_status.set_label, "aguardando…")
 
-        def _device_flow():
-            import time
-
-            import requests
-
-            # Step 1: Get device code from backend
-            try:
-                resp = requests.post(f"{API_BASE}/v1/auth/device", timeout=10)
-                resp.raise_for_status()
-                data = resp.json()
-            except Exception:
+        # Step 1: Get device code via curl (safe, no SSL in-process)
+        try:
+            result = subprocess.run(
+                ["curl", "-s", "-X", "POST", f"{API_BASE}/v1/auth/device"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode != 0:
                 GLib.idle_add(self._maestro_status.set_label, "erro")
                 return
+            data = json.loads(result.stdout)
+        except Exception:
+            GLib.idle_add(self._maestro_status.set_label, "sem rede")
+            return
 
-            device_code = data["device_code"]
-            verification_url = data["verification_url"]
-            expires_in = data.get("expires_in", 300)
+        device_code = data.get("device_code", "")
+        verification_url = data.get("verification_url", "")
+        expires_in = data.get("expires_in", 300)
 
-            # Step 2: Show QR code in artifact panel
-            GLib.idle_add(self._show_qr_in_artifact, verification_url)
+        if not device_code:
+            GLib.idle_add(self._maestro_status.set_label, "erro")
+            return
 
-            # Step 3: Poll for confirmation
-            deadline = time.time() + expires_in
-            while time.time() < deadline:
-                time.sleep(3)
-                try:
-                    status_resp = requests.get(
-                        f"{API_BASE}/v1/auth/device/status",
-                        params={"code": device_code},
-                        timeout=10,
-                    )
-                    status_data = status_resp.json()
+        # Step 2: Show QR code
+        GLib.idle_add(self._show_qr_in_artifact, verification_url)
 
-                    if status_data["status"] == "confirmed":
-                        # Save token locally
-                        from cios.core.intelligence import intelligence
+        # Step 3: Poll via curl (every 4s, max 5 min)
+        deadline = time.time() + expires_in
+        while time.time() < deadline:
+            time.sleep(4)
+            try:
+                poll = subprocess.run(
+                    ["curl", "-s", f"{API_BASE}/v1/auth/device/status?code={device_code}"],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+                if poll.returncode != 0:
+                    continue
+                status_data = json.loads(poll.stdout)
 
-                        token = status_data["token"]
-                        user_data = status_data["user"]
-                        intelligence.save_auth(token, user_data)
-                        name = user_data.get("name", "online")
-                        GLib.idle_add(self._maestro_status.set_label, name)
-                        # Close QR panel
-                        if self._artifact_panel:
-                            GLib.idle_add(self._artifact_panel.close)
-                        return
+                if status_data.get("status") == "confirmed":
+                    from cios.core.intelligence import intelligence
 
-                    if status_data["status"] == "expired":
-                        GLib.idle_add(self._maestro_status.set_label, "expirado")
-                        return
+                    token = status_data["token"]
+                    user_data = status_data["user"]
+                    intelligence.save_auth(token, user_data)
+                    name = user_data.get("name", "online")
+                    GLib.idle_add(self._maestro_status.set_label, name)
+                    if self._artifact_panel:
+                        GLib.idle_add(self._artifact_panel.close)
+                    return
 
-                except Exception:
-                    pass
+                if status_data.get("status") == "expired":
+                    GLib.idle_add(self._maestro_status.set_label, "expirado")
+                    return
 
-            # Timeout
-            GLib.idle_add(self._maestro_status.set_label, "expirado")
+            except Exception:
+                continue
 
-        threading.Thread(target=_device_flow, daemon=True).start()
+        GLib.idle_add(self._maestro_status.set_label, "expirado")
 
     def _show_qr_in_artifact(self, url: str):
         """Generate QR code and show it in the artifact panel."""
