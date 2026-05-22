@@ -40,22 +40,25 @@ class Sidebar(Gtk.Box):
         self._bridge = None
         self._artifact_panel = None
 
-        # ── System metrics (compact, icon-based) ──
-        metrics_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        metrics_box.set_margin_start(12)
-        metrics_box.set_margin_end(12)
-        metrics_box.set_margin_top(8)
+        # ── System metrics (icon + sigla + value) ──
+        metrics_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        metrics_box.set_margin_start(10)
+        metrics_box.set_margin_end(10)
+        metrics_box.set_margin_top(10)
         metrics_box.set_margin_bottom(8)
         self.append(metrics_box)
 
-        self._cpu_metric = self._create_icon_metric("⚡", "0%")
+        self._cpu_metric = self._create_icon_metric("⚡", "CPU", "0%")
         metrics_box.append(self._cpu_metric["box"])
 
-        self._mem_metric = self._create_icon_metric("◈", "0%")
+        self._mem_metric = self._create_icon_metric("◈", "MEM", "0%")
         metrics_box.append(self._mem_metric["box"])
 
-        self._disk_metric = self._create_icon_metric("◉", "0%")
+        self._disk_metric = self._create_icon_metric("◉", "DISC", "0%")
         metrics_box.append(self._disk_metric["box"])
+
+        self._ai_metric = self._create_icon_metric("◎", "IA", "off")
+        metrics_box.append(self._ai_metric["box"])
 
         # Separator
         sep1 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
@@ -209,9 +212,9 @@ class Sidebar(Gtk.Box):
         except Exception:
             return ""
 
-    def _create_icon_metric(self, icon: str, value: str) -> dict:
-        """Create a compact icon + value metric."""
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+    def _create_icon_metric(self, icon: str, sigla: str, value: str) -> dict:
+        """Create a compact icon + sigla + value metric."""
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1)
         box.set_halign(Gtk.Align.CENTER)
         box.set_hexpand(True)
 
@@ -219,11 +222,15 @@ class Sidebar(Gtk.Box):
         icon_lbl.add_css_class("metric-icon")
         box.append(icon_lbl)
 
+        sigla_lbl = Gtk.Label(label=sigla)
+        sigla_lbl.add_css_class("metric-sigla")
+        box.append(sigla_lbl)
+
         val_lbl = Gtk.Label(label=value)
         val_lbl.add_css_class("metric-value")
         box.append(val_lbl)
 
-        return {"box": box, "icon": icon_lbl, "value": val_lbl}
+        return {"box": box, "icon": icon_lbl, "sigla": sigla_lbl, "value": val_lbl}
 
     def _update_metrics(self):
         """Poll system metrics."""
@@ -299,7 +306,13 @@ class Sidebar(Gtk.Box):
             }}
             .metric-icon {{
                 color: {ACCENT_LT};
-                font-size: 18px;
+                font-size: 16px;
+            }}
+            .metric-sigla {{
+                color: {FG_DIM};
+                font-size: 8px;
+                font-weight: bold;
+                letter-spacing: 0.5px;
             }}
             .metric-value {{
                 color: {FG_SEC};

@@ -150,13 +150,12 @@ class CIOSApplication(Gtk.Application):
         self._sidebar = Sidebar()
         content_box.append(self._sidebar)
 
-        # ── Floating prompt with status line (full width, bottom of window) ──
+        # ── Prompt with status line (bottom of center area, not over sidebar) ──
         prompt_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         prompt_container.set_margin_start(48)
-        prompt_container.set_margin_end(48)
+        prompt_container.set_margin_end(16)
         prompt_container.set_margin_bottom(12)
-        prompt_container.set_halign(Gtk.Align.FILL)
-        prompt_container.set_valign(Gtk.Align.END)
+        prompt_container.set_margin_top(8)
 
         # Status line (hidden by default, shown during processing)
         self._status_line = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
@@ -201,8 +200,8 @@ class CIOSApplication(Gtk.Application):
 
         prompt_container.append(prompt_box)
 
-        # Add prompt container as overlay (floats over everything at bottom)
-        root_overlay.add_overlay(prompt_container)
+        # Prompt goes at bottom of center column (respects sidebar boundary)
+        center_box.append(prompt_container)
 
         # ── Hotkey overlay (floating) ──
         self._hotkey_overlay = HotkeyOverlay(on_submit=self._on_hotkey_submit)
