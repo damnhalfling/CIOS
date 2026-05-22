@@ -1,11 +1,10 @@
 """CIOS GTK4 Sidebar — System status + history + maestro login.
 
+Visual: TRON-inspired glow cards, geometric icons, subtle borders.
 Layout (top to bottom):
-- System metrics (icon + value, compact)
-- Separator
+- System metrics (glow cards with icon + sigla + value)
 - Message history (scrollable)
-- Separator
-- Maestro login link (always at bottom)
+- Maestro login (glow card at bottom)
 """
 
 import time as _time
@@ -27,7 +26,7 @@ from cios.ui.theme import (
 
 
 class Sidebar(Gtk.Box):
-    """Right sidebar: metrics (icons) + history + maestro login."""
+    """Right sidebar: glow-card metrics + history + maestro login."""
 
     def __init__(self):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -40,25 +39,28 @@ class Sidebar(Gtk.Box):
         self._bridge = None
         self._artifact_panel = None
 
-        # ── System metrics (icon + sigla + value) ──
-        metrics_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        metrics_box.set_margin_start(10)
-        metrics_box.set_margin_end(10)
-        metrics_box.set_margin_top(10)
-        metrics_box.set_margin_bottom(8)
-        self.append(metrics_box)
+        # ── System metrics (glow cards in 2x2 grid) ──
+        metrics_grid = Gtk.Grid()
+        metrics_grid.set_row_spacing(6)
+        metrics_grid.set_column_spacing(6)
+        metrics_grid.set_margin_start(10)
+        metrics_grid.set_margin_end(10)
+        metrics_grid.set_margin_top(10)
+        metrics_grid.set_margin_bottom(10)
+        metrics_grid.set_column_homogeneous(True)
+        self.append(metrics_grid)
 
-        self._cpu_metric = self._create_icon_metric("⚡", "CPU", "0%")
-        metrics_box.append(self._cpu_metric["box"])
+        self._cpu_metric = self._create_glow_card("◇", "CPU", "0%")
+        metrics_grid.attach(self._cpu_metric["frame"], 0, 0, 1, 1)
 
-        self._mem_metric = self._create_icon_metric("◈", "MEM", "0%")
-        metrics_box.append(self._mem_metric["box"])
+        self._mem_metric = self._create_glow_card("⬡", "MEM", "0%")
+        metrics_grid.attach(self._mem_metric["frame"], 1, 0, 1, 1)
 
-        self._disk_metric = self._create_icon_metric("◉", "DISC", "0%")
-        metrics_box.append(self._disk_metric["box"])
+        self._disk_metric = self._create_glow_card("⊡", "DISC", "0%")
+        metrics_grid.attach(self._disk_metric["frame"], 0, 1, 1, 1)
 
-        self._ai_metric = self._create_icon_metric("◎", "IA", "off")
-        metrics_box.append(self._ai_metric["box"])
+        self._ai_metric = self._create_glow_card("◎", "IA", "off")
+        metrics_grid.attach(self._ai_metric["frame"], 1, 1, 1, 1)
 
         # Separator
         sep1 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
@@ -92,13 +94,20 @@ class Sidebar(Gtk.Box):
         sep2.add_css_class("sidebar-sep")
         self.append(sep2)
 
-        # ── Maestro login (always at bottom) ──
+        # ── Maestro login (glow card at bottom) ──
+        login_frame = Gtk.Frame()
+        login_frame.add_css_class("maestro-card")
+        login_frame.set_margin_start(10)
+        login_frame.set_margin_end(10)
+        login_frame.set_margin_top(8)
+        login_frame.set_margin_bottom(10)
+
         login_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        login_box.set_margin_start(12)
-        login_box.set_margin_end(12)
-        login_box.set_margin_top(10)
-        login_box.set_margin_bottom(10)
-        login_box.add_css_class("maestro-login")
+        login_box.set_margin_start(10)
+        login_box.set_margin_end(10)
+        login_box.set_margin_top(8)
+        login_box.set_margin_bottom(8)
+        login_frame.set_child(login_box)
 
         login_icon = Gtk.Label(label="⬡")
         login_icon.add_css_class("maestro-icon")
@@ -117,9 +126,9 @@ class Sidebar(Gtk.Box):
         # Make clickable
         click_ctrl = Gtk.GestureClick()
         click_ctrl.connect("released", self._on_maestro_click)
-        login_box.add_controller(click_ctrl)
+        login_frame.add_controller(click_ctrl)
 
-        self.append(login_box)
+        self.append(login_frame)
 
         # Start polling metrics
         GLib.timeout_add(5000, self._update_metrics)
@@ -136,7 +145,6 @@ class Sidebar(Gtk.Box):
 
     def refresh_history(self):
         """Reload thread history."""
-        # Clear existing
         child = self._history_list.get_first_child()
         while child:
             next_child = child.get_next_sibling()
@@ -169,7 +177,6 @@ class Sidebar(Gtk.Box):
         row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         row.add_css_class("history-row")
 
-        # Status icon
         outcome = getattr(thread, "outcome", "") or ""
         icon = "✓" if outcome == "success" else "○"
         icon_lbl = Gtk.Label(label=icon)
@@ -178,7 +185,6 @@ class Sidebar(Gtk.Box):
             icon_lbl.add_css_class("history-icon-ok")
         row.append(icon_lbl)
 
-        # Summary
         summary = getattr(thread, "summary", "") or "…"
         summary_lbl = Gtk.Label(label=summary)
         summary_lbl.set_halign(Gtk.Align.START)
@@ -187,7 +193,6 @@ class Sidebar(Gtk.Box):
         summary_lbl.add_css_class("history-summary")
         row.append(summary_lbl)
 
-        # Time
         created = getattr(thread, "created_at", None)
         if created:
             time_str = self._format_time(created)
@@ -212,11 +217,19 @@ class Sidebar(Gtk.Box):
         except Exception:
             return ""
 
-    def _create_icon_metric(self, icon: str, sigla: str, value: str) -> dict:
-        """Create a compact icon + sigla + value metric."""
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1)
+    def _create_glow_card(self, icon: str, sigla: str, value: str) -> dict:
+        """Create a metric card with glow border (TRON style)."""
+        frame = Gtk.Frame()
+        frame.add_css_class("metric-card")
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         box.set_halign(Gtk.Align.CENTER)
-        box.set_hexpand(True)
+        box.set_valign(Gtk.Align.CENTER)
+        box.set_margin_top(8)
+        box.set_margin_bottom(8)
+        box.set_margin_start(4)
+        box.set_margin_end(4)
+        frame.set_child(box)
 
         icon_lbl = Gtk.Label(label=icon)
         icon_lbl.add_css_class("metric-icon")
@@ -230,7 +243,7 @@ class Sidebar(Gtk.Box):
         val_lbl.add_css_class("metric-value")
         box.append(val_lbl)
 
-        return {"box": box, "icon": icon_lbl, "sigla": sigla_lbl, "value": val_lbl}
+        return {"frame": frame, "box": box, "icon": icon_lbl, "sigla": sigla_lbl, "value": val_lbl}
 
     def _update_metrics(self):
         """Poll system metrics."""
@@ -271,7 +284,6 @@ class Sidebar(Gtk.Box):
         if self._artifact_panel:
             self._artifact_panel.show_url("https://maestro.cios-ai.com", title="Maestro")
         else:
-            # Fallback if no panel reference
             import subprocess
 
             try:
@@ -285,12 +297,11 @@ class Sidebar(Gtk.Box):
 
     @staticmethod
     def get_css() -> str:
-        """Return CSS for sidebar styling."""
+        """Return CSS for sidebar — TRON glow card aesthetic."""
         return f"""
             .sidebar {{
                 background-color: {BG_PANEL};
                 border-left: 1px solid {BORDER};
-                border-radius: 0;
             }}
             .sidebar-title {{
                 color: {FG_DIM};
@@ -302,11 +313,21 @@ class Sidebar(Gtk.Box):
             .sidebar-sep {{
                 background-color: {BORDER};
                 min-height: 1px;
-                margin: 0 8px;
+                margin: 4px 10px;
+            }}
+            .metric-card {{
+                background-color: {BG_CARD};
+                border: 1px solid rgba(0,229,255,0.12);
+                border-radius: 8px;
+                box-shadow: 0 0 8px rgba(0,229,255,0.04), inset 0 1px 0 rgba(0,229,255,0.06);
+            }}
+            .metric-card:hover {{
+                border-color: rgba(0,229,255,0.25);
+                box-shadow: 0 0 12px rgba(0,229,255,0.08);
             }}
             .metric-icon {{
                 color: {ACCENT_LT};
-                font-size: 16px;
+                font-size: 18px;
             }}
             .metric-sigla {{
                 color: {FG_DIM};
@@ -326,8 +347,8 @@ class Sidebar(Gtk.Box):
                 padding: 8px 0;
             }}
             .history-row {{
-                padding: 4px 6px;
-                border-radius: 4px;
+                padding: 5px 8px;
+                border-radius: 6px;
             }}
             .history-row:hover {{
                 background-color: {BG_HOVER};
@@ -347,17 +368,19 @@ class Sidebar(Gtk.Box):
                 color: {FG_DIM};
                 font-size: 10px;
             }}
-            .maestro-login {{
-                padding: 8px;
-                border-radius: 6px;
-                cursor: pointer;
-            }}
-            .maestro-login:hover {{
+            .maestro-card {{
                 background-color: {BG_CARD};
+                border: 1px solid rgba(0,229,255,0.15);
+                border-radius: 8px;
+                box-shadow: 0 0 10px rgba(0,229,255,0.05);
+            }}
+            .maestro-card:hover {{
+                border-color: rgba(0,229,255,0.35);
+                box-shadow: 0 0 16px rgba(0,229,255,0.1);
             }}
             .maestro-icon {{
                 color: {ACCENT};
-                font-size: 16px;
+                font-size: 18px;
             }}
             .maestro-label {{
                 color: {FG};
