@@ -335,7 +335,7 @@ class Sidebar(Gtk.Box):
         threading.Thread(target=_do_login, daemon=True).start()
 
     def _start_inline_auth(self):
-        """Start OAuth flow using the artifact panel WebView instead of external browser."""
+        """Start OAuth flow — no browser, no WebKit. Just callback server."""
         import json
         import threading
         from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -348,7 +348,10 @@ class Sidebar(Gtk.Box):
             f"{API_BASE}/v1/auth/google?state=cios&redirect_uri=http://localhost:7778/callback"
         )
 
-        # Start local callback server
+        # Update status — user needs to open URL on another device
+        GLib.idle_add(self._maestro_status.set_label, "aguardando…")
+
+        # Start local callback server (waits for OAuth redirect)
         def _run_callback_server():
             class CallbackHandler(BaseHTTPRequestHandler):
                 def do_GET(self_handler):
@@ -366,13 +369,6 @@ class Sidebar(Gtk.Box):
                                 intelligence.save_auth(token, user_data)
                                 name = user_data.get("name", "online")
                                 GLib.idle_add(self._maestro_status.set_label, name)
-                                # Close auth view, open maestro
-                                if self._artifact_panel:
-                                    GLib.idle_add(
-                                        self._artifact_panel.show_url,
-                                        "https://maestro.cios-ai.com",
-                                        "Maestro",
-                                    )
 
                                 self_handler.send_response(200)
                                 self_handler.send_header("Content-Type", "text/html")
@@ -381,7 +377,7 @@ class Sidebar(Gtk.Box):
                                     b"<html><body style='background:#00050d;color:#00e5ff;"
                                     b"font-family:sans-serif;text-align:center;padding:60px'>"
                                     b"<h2>Login realizado</h2>"
-                                    b"<p>Pode fechar esta aba.</p></body></html>"
+                                    b"<p>Volte ao CIOS.</p></body></html>"
                                 )
                             except Exception:
                                 GLib.idle_add(self._maestro_status.set_label, "erro")
@@ -404,16 +400,32 @@ class Sidebar(Gtk.Box):
                 server.handle_request()
                 server.server_close()
             except Exception:
-                GLib.idle_add(self._maestro_status.set_label, "erro")
+                GLib.idle_add(self._maestro_status.set_label, "offline")
 
         threading.Thread(target=_run_callback_server, daemon=True).start()
 
-        # Open auth URL in artifact panel (inline WebKit, no external browser)
-        import time
+        # Open URL via xdg-open only if foot terminal or similar is available
+        # Otherwise just log the URL — user can open on phone
+        import logging
+        import subprocess
 
-        time.sleep(0.3)
-        if self._artifact_panel:
-            GLib.idle_add(self._artifact_panel.show_url, auth_url, "Login Maestro")
+        logging.getLogger(__name__).info("Maestro auth URL: %s", auth_url)
+        try:
+            # Try opening in foot terminal (lightweight, won't crash compositor)
+            subprocess.Popen(
+                [
+                    "foot",
+                    "-e",
+                    "sh",
+                    "-c",
+                    f'echo "Abra no celular:"; echo ""; echo "{auth_url}"; echo ""; echo "Aguardando login..."; sleep 120',
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except Exception:
+            # No foot available — just wait for callback silently
+            pass
 
     @staticmethod
     def get_css() -> str:
