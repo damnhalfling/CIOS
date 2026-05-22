@@ -132,6 +132,9 @@ class Sidebar(Gtk.Box):
         GLib.timeout_add(5000, self._update_metrics)
         self._update_metrics()
 
+        # Check initial login state
+        GLib.idle_add(self._check_login_state)
+
     def set_bridge(self, bridge):
         """Set bridge for history access."""
         self._bridge = bridge
@@ -293,21 +296,48 @@ class Sidebar(Gtk.Box):
         if pct >= 80:
             frame.add_css_class("metric-card-warn")
 
-    def _on_maestro_click(self, gesture, n_press, x, y):
-        """Open Maestro in the artifact panel."""
-        if self._artifact_panel:
-            self._artifact_panel.show_url("https://maestro.cios-ai.com", title="Maestro")
-        else:
-            import subprocess
+    def _check_login_state(self):
+        """Check if already logged into Maestro."""
+        try:
+            from cios.core.intelligence import intelligence
 
-            try:
-                subprocess.Popen(
-                    ["xdg-open", "https://maestro.cios-ai.com"],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-            except Exception:
-                pass
+            if intelligence.is_logged_in:
+                name = intelligence.user.name if intelligence.user else "online"
+                self._maestro_status.set_label(name or "online")
+        except Exception:
+            pass
+
+    def _on_maestro_click(self, gesture, n_press, x, y):
+        """Start Maestro OAuth login flow."""
+        import threading
+
+        from gi.repository import GLib
+
+        self._maestro_status.set_label("conectando…")
+
+        def _do_login():
+            from cios.core.intelligence import intelligence, start_auth_flow
+
+            if intelligence.is_logged_in:
+                # Already logged in — open maestro in artifact panel
+                GLib.idle_add(self._maestro_status.set_label, intelligence.user.name or "online")
+                if self._artifact_panel:
+                    GLib.idle_add(
+                        self._artifact_panel.show_url,
+                        "https://maestro.cios-ai.com",
+                        "Maestro",
+                    )
+            else:
+                # Start OAuth flow (opens browser, waits for callback)
+                def on_complete(success, message):
+                    if success:
+                        GLib.idle_add(self._maestro_status.set_label, "online")
+                    else:
+                        GLib.idle_add(self._maestro_status.set_label, "erro")
+
+                start_auth_flow(on_complete=on_complete)
+
+        threading.Thread(target=_do_login, daemon=True).start()
 
     @staticmethod
     def get_css() -> str:
