@@ -16,8 +16,6 @@ from cios.ui.theme import (
     ACCENT_LT,
     BG_CARD,
     BG_HOVER,
-    BG_PANEL,
-    BORDER,
     FG,
     FG_DIM,
     FG_SEC,
@@ -246,7 +244,7 @@ class Sidebar(Gtk.Box):
         return {"frame": frame, "box": box, "icon": icon_lbl, "sigla": sigla_lbl, "value": val_lbl}
 
     def _update_metrics(self):
-        """Poll system metrics."""
+        """Poll system metrics and apply color states."""
         try:
             with open("/proc/loadavg") as f:
                 load = float(f.read().split()[0])
@@ -255,6 +253,7 @@ class Sidebar(Gtk.Box):
                 cpus = os.cpu_count() or 1
                 cpu_pct = min(int(load / cpus * 100), 100)
                 self._cpu_metric["value"].set_label(f"{cpu_pct}%")
+                self._apply_card_state(self._cpu_metric["frame"], cpu_pct)
         except Exception:
             pass
 
@@ -265,6 +264,7 @@ class Sidebar(Gtk.Box):
                 avail = int(lines[2].split()[1])
                 mem_pct = int((1 - avail / total) * 100)
                 self._mem_metric["value"].set_label(f"{mem_pct}%")
+                self._apply_card_state(self._mem_metric["frame"], mem_pct)
         except Exception:
             pass
 
@@ -274,10 +274,24 @@ class Sidebar(Gtk.Box):
             usage = shutil.disk_usage("/")
             disk_pct = int(usage.used / usage.total * 100)
             self._disk_metric["value"].set_label(f"{disk_pct}%")
+            self._apply_card_state(self._disk_metric["frame"], disk_pct)
         except Exception:
             pass
 
         return True
+
+    def _apply_card_state(self, frame: Gtk.Frame, pct: int):
+        """Apply color state to metric card based on value.
+
+        - < 50%: normal (cyan/blue)
+        - 50-79%: normal
+        - >= 80%: warn (red)
+        """
+        frame.remove_css_class("metric-card-warn")
+        frame.remove_css_class("metric-card-focus")
+
+        if pct >= 80:
+            frame.add_css_class("metric-card-warn")
 
     def _on_maestro_click(self, gesture, n_press, x, y):
         """Open Maestro in the artifact panel."""
@@ -297,11 +311,10 @@ class Sidebar(Gtk.Box):
 
     @staticmethod
     def get_css() -> str:
-        """Return CSS for sidebar — TRON glow card aesthetic."""
+        """Return CSS for sidebar — borderless floating glow cards."""
         return f"""
             .sidebar {{
-                background-color: {BG_PANEL};
-                border-left: 1px solid {BORDER};
+                background-color: transparent;
             }}
             .sidebar-title {{
                 color: {FG_DIM};
@@ -311,19 +324,40 @@ class Sidebar(Gtk.Box):
                 text-transform: uppercase;
             }}
             .sidebar-sep {{
-                background-color: {BORDER};
-                min-height: 1px;
-                margin: 4px 10px;
+                min-height: 0;
+                margin: 0;
+                background: transparent;
             }}
             .metric-card {{
                 background-color: {BG_CARD};
                 border: 1px solid rgba(0,229,255,0.12);
                 border-radius: 8px;
                 box-shadow: 0 0 8px rgba(0,229,255,0.04), inset 0 1px 0 rgba(0,229,255,0.06);
+                transition: all 200ms ease;
             }}
             .metric-card:hover {{
-                border-color: rgba(0,229,255,0.25);
-                box-shadow: 0 0 12px rgba(0,229,255,0.08);
+                border-color: rgba(0,229,255,0.3);
+                box-shadow: 0 0 14px rgba(0,229,255,0.1);
+            }}
+            .metric-card-warn {{
+                border-color: rgba(255,23,68,0.3);
+                box-shadow: 0 0 10px rgba(255,23,68,0.08);
+            }}
+            .metric-card-warn .metric-icon {{
+                color: #ff1744;
+            }}
+            .metric-card-warn .metric-value {{
+                color: #ff1744;
+            }}
+            .metric-card-focus {{
+                border-color: rgba(0,230,118,0.3);
+                box-shadow: 0 0 10px rgba(0,230,118,0.08);
+            }}
+            .metric-card-focus .metric-icon {{
+                color: #00e676;
+            }}
+            .metric-card-focus .metric-value {{
+                color: #00e676;
             }}
             .metric-icon {{
                 color: {ACCENT_LT};
@@ -373,10 +407,11 @@ class Sidebar(Gtk.Box):
                 border: 1px solid rgba(0,229,255,0.15);
                 border-radius: 8px;
                 box-shadow: 0 0 10px rgba(0,229,255,0.05);
+                transition: all 200ms ease;
             }}
             .maestro-card:hover {{
-                border-color: rgba(0,229,255,0.35);
-                box-shadow: 0 0 16px rgba(0,229,255,0.1);
+                border-color: rgba(0,229,255,0.4);
+                box-shadow: 0 0 18px rgba(0,229,255,0.12);
             }}
             .maestro-icon {{
                 color: {ACCENT};

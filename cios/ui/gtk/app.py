@@ -283,6 +283,15 @@ class CIOSApplication(Gtk.Application):
         self._sidebar.set_bridge(self._bridge)
         self._sidebar.set_artifact_panel(self._artifact_panel)
 
+        # Start command poller for cross-device commands
+        try:
+            from cios.core.command_poller import CommandPoller
+
+            self._command_poller = CommandPoller(bridge=self._bridge)
+            self._command_poller.start()
+        except Exception as e:
+            logger.debug("Command poller not started: %s", e)
+
     def _on_hotkey_submit(self, text: str):
         """Handle hotkey overlay submission."""
         self._input.set_text(text)
@@ -732,10 +741,16 @@ class CIOSApplication(Gtk.Application):
                 color: {ERROR};
             }}
             .prompt-area {{
-                background-color: rgba(0,16,32,0.92);
+                background-color: {BG_CARD};
                 border-radius: 12px;
                 padding: 12px 16px;
-                border: 1px solid {BORDER};
+                border: 1px solid rgba(0,229,255,0.12);
+                box-shadow: 0 0 8px rgba(0,229,255,0.04);
+                transition: all 200ms ease;
+            }}
+            .prompt-area:focus-within {{
+                border-color: rgba(0,230,118,0.4);
+                box-shadow: 0 0 14px rgba(0,230,118,0.08);
             }}
             .status-line {{
                 padding: 2px 0;
@@ -769,7 +784,7 @@ class CIOSApplication(Gtk.Application):
                 box-shadow: none;
             }}
             .prompt-input:focus {{
-                border-color: {ACCENT_LT};
+                border-color: rgba(0,230,118,0.5);
             }}
             .send-btn {{
                 background: {ACCENT};
