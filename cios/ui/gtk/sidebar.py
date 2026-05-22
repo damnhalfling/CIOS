@@ -319,17 +319,11 @@ class Sidebar(Gtk.Box):
             from cios.core.intelligence import intelligence
 
             if intelligence.is_logged_in:
-                # Already logged in — open maestro in artifact panel
+                # Already logged in — just show status
                 name = intelligence.user.name if intelligence.user else "online"
                 GLib.idle_add(self._maestro_status.set_label, name or "online")
-                if self._artifact_panel:
-                    GLib.idle_add(
-                        self._artifact_panel.show_url,
-                        "https://maestro.cios-ai.com",
-                        "Maestro",
-                    )
             else:
-                # Start OAuth flow INLINE (in artifact panel, not external browser)
+                # Start OAuth flow (QR code in artifact panel)
                 self._start_inline_auth()
 
         threading.Thread(target=_do_login, daemon=True).start()
