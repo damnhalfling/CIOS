@@ -308,7 +308,7 @@ class Sidebar(Gtk.Box):
             pass
 
     def _on_maestro_click(self, gesture, n_press, x, y):
-        """Start Maestro OAuth login flow."""
+        """Start Maestro OAuth login flow inline (no external browser)."""
         import threading
 
         from gi.repository import GLib
@@ -316,11 +316,12 @@ class Sidebar(Gtk.Box):
         self._maestro_status.set_label("conectando…")
 
         def _do_login():
-            from cios.core.intelligence import intelligence, start_auth_flow
+            from cios.core.intelligence import intelligence
 
             if intelligence.is_logged_in:
                 # Already logged in — open maestro in artifact panel
-                GLib.idle_add(self._maestro_status.set_label, intelligence.user.name or "online")
+                name = intelligence.user.name if intelligence.user else "online"
+                GLib.idle_add(self._maestro_status.set_label, name or "online")
                 if self._artifact_panel:
                     GLib.idle_add(
                         self._artifact_panel.show_url,
@@ -328,16 +329,91 @@ class Sidebar(Gtk.Box):
                         "Maestro",
                     )
             else:
-                # Start OAuth flow (opens browser, waits for callback)
-                def on_complete(success, message):
-                    if success:
-                        GLib.idle_add(self._maestro_status.set_label, "online")
-                    else:
-                        GLib.idle_add(self._maestro_status.set_label, "erro")
-
-                start_auth_flow(on_complete=on_complete)
+                # Start OAuth flow INLINE (in artifact panel, not external browser)
+                self._start_inline_auth()
 
         threading.Thread(target=_do_login, daemon=True).start()
+
+    def _start_inline_auth(self):
+        """Start OAuth flow using the artifact panel WebView instead of external browser."""
+        import json
+        import threading
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+
+        from gi.repository import GLib
+
+        from cios.core.intelligence import API_BASE, intelligence
+
+        auth_url = (
+            f"{API_BASE}/v1/auth/google?state=cios&redirect_uri=http://localhost:7778/callback"
+        )
+
+        # Start local callback server
+        def _run_callback_server():
+            class CallbackHandler(BaseHTTPRequestHandler):
+                def do_GET(self_handler):
+                    from urllib.parse import parse_qs, urlparse
+
+                    parsed = urlparse(self_handler.path)
+                    if parsed.path == "/callback":
+                        params = parse_qs(parsed.query)
+                        token = params.get("token", [""])[0]
+                        user_json = params.get("user", [""])[0]
+
+                        if token and user_json:
+                            try:
+                                user_data = json.loads(user_json)
+                                intelligence.save_auth(token, user_data)
+                                name = user_data.get("name", "online")
+                                GLib.idle_add(self._maestro_status.set_label, name)
+                                # Close auth view, open maestro
+                                if self._artifact_panel:
+                                    GLib.idle_add(
+                                        self._artifact_panel.show_url,
+                                        "https://maestro.cios-ai.com",
+                                        "Maestro",
+                                    )
+
+                                self_handler.send_response(200)
+                                self_handler.send_header("Content-Type", "text/html")
+                                self_handler.end_headers()
+                                self_handler.wfile.write(
+                                    b"<html><body style='background:#00050d;color:#00e5ff;"
+                                    b"font-family:sans-serif;text-align:center;padding:60px'>"
+                                    b"<h2>Login realizado</h2>"
+                                    b"<p>Pode fechar esta aba.</p></body></html>"
+                                )
+                            except Exception:
+                                GLib.idle_add(self._maestro_status.set_label, "erro")
+                                self_handler.send_response(400)
+                                self_handler.end_headers()
+                        else:
+                            GLib.idle_add(self._maestro_status.set_label, "erro")
+                            self_handler.send_response(400)
+                            self_handler.end_headers()
+                    else:
+                        self_handler.send_response(404)
+                        self_handler.end_headers()
+
+                def log_message(self_handler, format, *args):
+                    pass
+
+            try:
+                server = HTTPServer(("localhost", 7778), CallbackHandler)
+                server.timeout = 120
+                server.handle_request()
+                server.server_close()
+            except Exception:
+                GLib.idle_add(self._maestro_status.set_label, "erro")
+
+        threading.Thread(target=_run_callback_server, daemon=True).start()
+
+        # Open auth URL in artifact panel (inline WebKit, no external browser)
+        import time
+
+        time.sleep(0.3)
+        if self._artifact_panel:
+            GLib.idle_add(self._artifact_panel.show_url, auth_url, "Login Maestro")
 
     @staticmethod
     def get_css() -> str:
