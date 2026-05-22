@@ -329,77 +329,73 @@ class Sidebar(Gtk.Box):
         threading.Thread(target=_do_login, daemon=True).start()
 
     def _start_inline_auth(self):
-        """Start OAuth flow — no browser, no WebKit. Just callback server."""
-        import json
+        """Device auth flow: get code from API, show QR, poll for confirmation."""
         import threading
-        from http.server import BaseHTTPRequestHandler, HTTPServer
 
         from gi.repository import GLib
 
-        from cios.core.intelligence import API_BASE, intelligence
+        from cios.core.intelligence import API_BASE
 
-        auth_url = (
-            f"{API_BASE}/v1/auth/google?state=cios&redirect_uri=http://localhost:7778/callback"
-        )
-
-        # Update status — user needs to open URL on another device
         GLib.idle_add(self._maestro_status.set_label, "aguardando…")
 
-        # Start local callback server (waits for OAuth redirect)
-        def _run_callback_server():
-            class CallbackHandler(BaseHTTPRequestHandler):
-                def do_GET(self_handler):
-                    from urllib.parse import parse_qs, urlparse
+        def _device_flow():
+            import time
 
-                    parsed = urlparse(self_handler.path)
-                    if parsed.path == "/callback":
-                        params = parse_qs(parsed.query)
-                        token = params.get("token", [""])[0]
-                        user_json = params.get("user", [""])[0]
+            import requests
 
-                        if token and user_json:
-                            try:
-                                user_data = json.loads(user_json)
-                                intelligence.save_auth(token, user_data)
-                                name = user_data.get("name", "online")
-                                GLib.idle_add(self._maestro_status.set_label, name)
+            # Step 1: Get device code from backend
+            try:
+                resp = requests.post(f"{API_BASE}/v1/auth/device", timeout=10)
+                resp.raise_for_status()
+                data = resp.json()
+            except Exception:
+                GLib.idle_add(self._maestro_status.set_label, "erro")
+                return
 
-                                self_handler.send_response(200)
-                                self_handler.send_header("Content-Type", "text/html")
-                                self_handler.end_headers()
-                                self_handler.wfile.write(
-                                    b"<html><body style='background:#00050d;color:#00e5ff;"
-                                    b"font-family:sans-serif;text-align:center;padding:60px'>"
-                                    b"<h2>Login realizado</h2>"
-                                    b"<p>Volte ao CIOS.</p></body></html>"
-                                )
-                            except Exception:
-                                GLib.idle_add(self._maestro_status.set_label, "erro")
-                                self_handler.send_response(400)
-                                self_handler.end_headers()
-                        else:
-                            GLib.idle_add(self._maestro_status.set_label, "erro")
-                            self_handler.send_response(400)
-                            self_handler.end_headers()
-                    else:
-                        self_handler.send_response(404)
-                        self_handler.end_headers()
+            device_code = data["device_code"]
+            verification_url = data["verification_url"]
+            expires_in = data.get("expires_in", 300)
 
-                def log_message(self_handler, format, *args):
+            # Step 2: Show QR code in artifact panel
+            GLib.idle_add(self._show_qr_in_artifact, verification_url)
+
+            # Step 3: Poll for confirmation
+            deadline = time.time() + expires_in
+            while time.time() < deadline:
+                time.sleep(3)
+                try:
+                    status_resp = requests.get(
+                        f"{API_BASE}/v1/auth/device/status",
+                        params={"code": device_code},
+                        timeout=10,
+                    )
+                    status_data = status_resp.json()
+
+                    if status_data["status"] == "confirmed":
+                        # Save token locally
+                        from cios.core.intelligence import intelligence
+
+                        token = status_data["token"]
+                        user_data = status_data["user"]
+                        intelligence.save_auth(token, user_data)
+                        name = user_data.get("name", "online")
+                        GLib.idle_add(self._maestro_status.set_label, name)
+                        # Close QR panel
+                        if self._artifact_panel:
+                            GLib.idle_add(self._artifact_panel.close)
+                        return
+
+                    if status_data["status"] == "expired":
+                        GLib.idle_add(self._maestro_status.set_label, "expirado")
+                        return
+
+                except Exception:
                     pass
 
-            try:
-                server = HTTPServer(("localhost", 7778), CallbackHandler)
-                server.timeout = 120
-                server.handle_request()
-                server.server_close()
-            except Exception:
-                GLib.idle_add(self._maestro_status.set_label, "offline")
+            # Timeout
+            GLib.idle_add(self._maestro_status.set_label, "expirado")
 
-        threading.Thread(target=_run_callback_server, daemon=True).start()
-
-        # Show QR code in the artifact panel (left side, like an artifact)
-        GLib.idle_add(self._show_qr_in_artifact, auth_url)
+        threading.Thread(target=_device_flow, daemon=True).start()
 
     def _show_qr_in_artifact(self, url: str):
         """Generate QR code and show it in the artifact panel."""
@@ -408,7 +404,6 @@ class Sidebar(Gtk.Box):
 
             import qrcode
 
-            # Generate QR as text (ASCII art) — no image deps needed
             qr = qrcode.QRCode(
                 version=1,
                 error_correction=qrcode.constants.ERROR_CORRECT_M,
@@ -418,25 +413,22 @@ class Sidebar(Gtk.Box):
             qr.add_data(url)
             qr.make(fit=True)
 
-            # Get ASCII representation
             f = io.StringIO()
             qr.print_ascii(out=f, invert=True)
             qr_text = f.getvalue()
 
-            # Show in artifact panel as text content
             content = (
-                "Escaneie o QR code com seu celular para logar:\n\n"
+                "Escaneie com o celular para autorizar:\n\n"
                 f"{qr_text}\n\n"
-                f"Ou abra manualmente:\n{url}\n\n"
-                "Aguardando login..."
+                f"{url}\n\n"
+                "Aguardando confirmação…"
             )
 
             if self._artifact_panel:
                 self._artifact_panel.show_artifact(content, title="Login Maestro")
 
         except ImportError:
-            # qrcode not installed — show URL as text in artifact panel
-            content = "Abra no celular para logar:\n\n" f"{url}\n\n" "Aguardando login..."
+            content = f"Abra no celular:\n\n{url}\n\nAguardando confirmação…"
             if self._artifact_panel:
                 self._artifact_panel.show_artifact(content, title="Login Maestro")
 
