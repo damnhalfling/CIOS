@@ -404,28 +404,47 @@ class Sidebar(Gtk.Box):
 
         threading.Thread(target=_run_callback_server, daemon=True).start()
 
-        # Open URL via xdg-open only if foot terminal or similar is available
-        # Otherwise just log the URL — user can open on phone
-        import logging
-        import subprocess
+        # Show QR code in the artifact panel (left side, like an artifact)
+        GLib.idle_add(self._show_qr_in_artifact, auth_url)
 
-        logging.getLogger(__name__).info("Maestro auth URL: %s", auth_url)
+    def _show_qr_in_artifact(self, url: str):
+        """Generate QR code and show it in the artifact panel."""
         try:
-            # Try opening in foot terminal (lightweight, won't crash compositor)
-            subprocess.Popen(
-                [
-                    "foot",
-                    "-e",
-                    "sh",
-                    "-c",
-                    f'echo "Abra no celular:"; echo ""; echo "{auth_url}"; echo ""; echo "Aguardando login..."; sleep 120',
-                ],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+            import io
+
+            import qrcode
+
+            # Generate QR as text (ASCII art) — no image deps needed
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_M,
+                box_size=1,
+                border=2,
             )
-        except Exception:
-            # No foot available — just wait for callback silently
-            pass
+            qr.add_data(url)
+            qr.make(fit=True)
+
+            # Get ASCII representation
+            f = io.StringIO()
+            qr.print_ascii(out=f, invert=True)
+            qr_text = f.getvalue()
+
+            # Show in artifact panel as text content
+            content = (
+                "Escaneie o QR code com seu celular para logar:\n\n"
+                f"{qr_text}\n\n"
+                f"Ou abra manualmente:\n{url}\n\n"
+                "Aguardando login..."
+            )
+
+            if self._artifact_panel:
+                self._artifact_panel.show_artifact(content, title="Login Maestro")
+
+        except ImportError:
+            # qrcode not installed — show URL as text in artifact panel
+            content = "Abra no celular para logar:\n\n" f"{url}\n\n" "Aguardando login..."
+            if self._artifact_panel:
+                self._artifact_panel.show_artifact(content, title="Login Maestro")
 
     @staticmethod
     def get_css() -> str:

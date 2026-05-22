@@ -1,6 +1,6 @@
 [project]
 name = "cios"
-version = "2.0.0rc17"
+version = "2.0.0rc18"
 description = "CIOS — Cognitive Intent-first Operational System. Replaces apps with intent-driven execution on Linux"
 requires-python = ">=3.10"
 dependencies = [
@@ -8,6 +8,7 @@ dependencies = [
     "rich==13.9.4",
     "psutil==6.1.1",
     "Pillow>=10.0.0",
+    "qrcode>=7.4",
 ]
 
 [project.optional-dependencies]

@@ -218,7 +218,8 @@ fi
     prompt_toolkit==3.0.48 \
     rich==13.9.4 \
     psutil==6.1.1 \
-    Pillow
+    Pillow \
+    qrcode
 
 /usr/share/cios/.venv/bin/pip install -e /usr/share/cios
 
