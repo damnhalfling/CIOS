@@ -219,7 +219,10 @@ fi
     rich==13.9.4 \
     psutil==6.1.1 \
     Pillow \
-    qrcode
+    qrcode \
+    requests \
+    beautifulsoup4 \
+    pymupdf
 
 /usr/share/cios/.venv/bin/pip install -e /usr/share/cios
 
