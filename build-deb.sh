@@ -293,45 +293,47 @@ echo "[CIOS] ✓ AI backend ready"
 #  3. Piper TTS (mandatory voice output)
 # ══════════════════════════════════════════════════
 
-echo "[CIOS] [3/6] Piper TTS..."
+echo "[CIOS] [3/6] Piper TTS (opcional)..."
 
 if ! command -v piper &>/dev/null; then
     PIPER_VERSION="2023.11.14-2"
     PIPER_URL="https://github.com/rhasspy/piper/releases/download/${PIPER_VERSION}/piper_linux_x86_64.tar.gz"
-    curl -fsSL "$PIPER_URL" -o /tmp/piper.tar.gz || {
-        echo "[CIOS] ✗ FAILED to download Piper TTS."
-        exit 1
-    }
-    tar -xzf /tmp/piper.tar.gz -C /usr/local/bin/ --strip-components=1 piper/piper
-    rm -f /tmp/piper.tar.gz
+    curl -fsSL "$PIPER_URL" -o /tmp/piper.tar.gz && {
+        tar -xzf /tmp/piper.tar.gz -C /usr/local/bin/ --strip-components=1 piper/piper
+        rm -f /tmp/piper.tar.gz
 
-    mkdir -p /usr/share/piper/voices
-    VOICE_URL="https://huggingface.co/rhasspy/piper-voices/resolve/main/pt/pt_BR/faber/medium/pt_BR-faber-medium.onnx"
-    curl -fsSL "$VOICE_URL" -o /usr/share/piper/voices/pt_BR-faber-medium.onnx || {
-        echo "[CIOS] ✗ FAILED to download voice model."
-        exit 1
+        mkdir -p /usr/share/piper/voices
+        VOICE_URL="https://huggingface.co/rhasspy/piper-voices/resolve/main/pt/pt_BR/faber/medium/pt_BR-faber-medium.onnx"
+        curl -fsSL "$VOICE_URL" -o /usr/share/piper/voices/pt_BR-faber-medium.onnx || true
+        curl -fsSL "${VOICE_URL}.json" -o /usr/share/piper/voices/pt_BR-faber-medium.onnx.json || true
+        echo "[CIOS] ✓ Piper TTS ready"
+    } || {
+        echo "[CIOS] ⚠ Piper não instalado (sem rede ou sem espaço)."
+        echo "[CIOS]   Voz não disponível. O CIOS funciona normalmente sem TTS."
     }
-    curl -fsSL "${VOICE_URL}.json" -o /usr/share/piper/voices/pt_BR-faber-medium.onnx.json || true
+else
+    echo "[CIOS] ✓ Piper já instalado"
 fi
 
-echo "[CIOS] ✓ Piper TTS ready"
-
 # ══════════════════════════════════════════════════
-#  4. Whisper STT (mandatory voice input)
+#  4. Whisper STT (optional voice input)
 # ══════════════════════════════════════════════════
 
-echo "[CIOS] [4/6] Whisper STT..."
-echo "[CIOS]   Downloading Whisper + PyTorch (~2GB, pode demorar)..."
+echo "[CIOS] [4/6] Whisper STT (opcional)..."
 
 if ! command -v whisper &>/dev/null; then
-    /usr/share/cios/.venv/bin/pip install openai-whisper || {
-        echo "[CIOS] ✗ FAILED to install Whisper."
-        exit 1
+    echo "[CIOS]   Tentando instalar Whisper + PyTorch..."
+    /usr/share/cios/.venv/bin/pip install --no-cache-dir openai-whisper 2>/dev/null && {
+        ln -sf /usr/share/cios/.venv/bin/whisper /usr/local/bin/whisper
+        echo "[CIOS] ✓ Whisper STT ready"
+    } || {
+        echo "[CIOS] ⚠ Whisper não instalado (sem espaço ou sem rede)."
+        echo "[CIOS]   Voz não disponível. Instale depois: pip install openai-whisper"
+        echo "[CIOS]   O CIOS funciona normalmente sem voz."
     }
-    ln -sf /usr/share/cios/.venv/bin/whisper /usr/local/bin/whisper
+else
+    echo "[CIOS] ✓ Whisper já instalado"
 fi
-
-echo "[CIOS] ✓ Whisper STT ready"
 
 # ══════════════════════════════════════════════════
 #  5. greetd + session (Wayland-only, no X11)
