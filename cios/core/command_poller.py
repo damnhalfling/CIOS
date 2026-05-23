@@ -1,10 +1,10 @@
-"""Command Poller — fetches and executes remote commands from Maestro.
+"""Command Poller — fetches and executes remote commands from CIOS Cloud.
 
 Polls GET /v1/commands/pending periodically and executes commands
-received from other clients (Puccini, Intelligence Web).
+received from other clients (mobile, web).
 
 This enables cross-device continuity:
-- Puccini sends "update spreadsheet X" → Maestro queues it
+- Mobile sends "update spreadsheet X" → Cloud queues it
 - OS polls → receives command → executes via bridge → reports result
 
 Lifecycle:
@@ -33,7 +33,7 @@ _AUTH_FILE = CIOS_HOME / "intelligence.json"
 
 @dataclass
 class RemoteCommand:
-    """A command received from Maestro."""
+    """A command received from CIOS Cloud."""
 
     id: int
     command: str
@@ -41,7 +41,7 @@ class RemoteCommand:
 
 
 class CommandPoller:
-    """Polls Maestro for pending commands and executes them."""
+    """Polls CIOS Cloud for pending commands and executes them."""
 
     def __init__(self, bridge=None) -> None:
         """Initialize poller.
@@ -118,7 +118,7 @@ class CommandPoller:
                 time.sleep(0.5)
 
     def _fetch_pending(self) -> list[RemoteCommand]:
-        """Fetch pending commands from Maestro."""
+        """Fetch pending commands from CIOS Cloud."""
         if not self._token:
             if not self._load_auth():
                 return []
@@ -196,7 +196,7 @@ class CommandPoller:
         )
 
     def _update_status(self, command_id: int, status: str, result: str | None = None) -> None:
-        """Update command status on Maestro."""
+        """Update command status on CIOS Cloud."""
         url = f"{self._api_base}/v1/commands/{command_id}"
         headers = {
             "Authorization": f"Bearer {self._token}",

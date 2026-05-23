@@ -1,7 +1,7 @@
-"""Intelligence Client — connects CIOS to the cloud API (Maestro).
+"""Intelligence Client — connects CIOS to the cloud API.
 
 Handles:
-- Authentication state (JWT stored locally)
+- Authentication state (stored locally)
 - Token optimization (compress input via Ollama before sending)
 - SSE streaming from /v1/chat/stream
 - Conversation continuity (persists conversation_id per session)
@@ -42,7 +42,7 @@ AUTH_FILE = CIOS_HOME / "intelligence.json"
 SESSION_FILE = CIOS_HOME / "intelligence_session.json"
 FACE_PATH = Path.home() / ".face"
 
-_TIMEOUT = 30  # seconds (increased for streaming/DeepSeek)
+_TIMEOUT = 30  # seconds (increased for streaming)
 _STREAM_TIMEOUT = 60  # seconds for streaming connections
 
 
@@ -175,7 +175,7 @@ def _compress_input(text: str) -> str:
 
 
 class IntelligenceClient:
-    """Client for the CIOS Intelligence API (Maestro)."""
+    """Client for the CIOS Intelligence API."""
 
     def __init__(self) -> None:
         self._user: UserProfile | None = None
@@ -616,11 +616,11 @@ def _get_system_context() -> dict:
 
 
 def start_auth_flow(on_complete: Callable[[bool, str], None] | None = None) -> None:
-    """Start the Google OAuth flow.
+    """Start the authentication flow.
 
-    1. Opens browser to api.cios-ai.com/v1/auth/google
+    1. Opens browser to the auth endpoint
     2. Starts a local HTTP server on port 7778 to capture the callback
-    3. Saves JWT and user data
+    3. Saves credentials and user data
     4. Calls on_complete(success, message)
     """
     import webbrowser

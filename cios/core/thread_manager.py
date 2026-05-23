@@ -393,7 +393,7 @@ class ThreadStore:
             try:
                 data = json.dumps(payload).encode("utf-8")
                 req = urllib.request.Request(
-                    "https://api.cios-ia.com/v1/sync",
+                    "https://api.cios-ai.com/v1/sync",
                     data=data,
                     headers={
                         "Content-Type": "application/json",
@@ -437,7 +437,7 @@ class ThreadStore:
         try:
             data = json.dumps(payload).encode("utf-8")
             req = urllib.request.Request(
-                "https://api.cios-ia.com/v1/sync",
+                "https://api.cios-ai.com/v1/sync",
                 data=data,
                 headers={
                     "Content-Type": "application/json",

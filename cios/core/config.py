@@ -59,7 +59,7 @@ _DEFAULTS: dict[str, Any] = {
     # Anthropic (client's own key — external)
     "anthropic_api_key": "",
     "anthropic_model": "claude-3-haiku-20240307",
-    # CIOS Intelligence API (Maestro/Bedrock — always available as final fallback)
+    # CIOS Intelligence API (always available as final fallback)
     "cios_api_key": "",
     "cios_api_url": "https://api.cios-ai.com",
 }

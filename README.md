@@ -164,7 +164,7 @@ Every error includes a recovery suggestion. **Zero dead-ends.**
 
 For tasks that need cloud AI — like summarizing news, generating text, or translating — CIOS can connect to **CIOS Intelligence**, an optional cloud service.
 
-The OS uses Ollama locally to compress your input before sending, keeping token usage minimal. Authentication is via Google login.
+The OS optimizes requests locally before sending, keeping usage minimal. Authentication is handled via the onboarding flow.
 
 ```
 You: "what happened in the world today?"
@@ -188,7 +188,7 @@ Phone: "correct it to 1.750"
 → Next time you open it, the value is already there
 ```
 
-The OS polls for remote commands every 5 seconds. When another device (Puccini mobile, Intelligence Web) needs something executed locally, it happens automatically.
+The OS polls for remote commands every 5 seconds. When another device (mobile, web) needs something executed locally, it happens automatically.
 
 ## What you can say
 
@@ -234,8 +234,8 @@ All commands work in **English** and **Portuguese**.
 
 ```bash
 # Download the .deb from releases
-wget https://github.com/damnhalfling/CIOS/releases/latest/download/cios_2.0.0-rc14_amd64.deb
-sudo apt install ./cios_2.0.0-rc14_amd64.deb
+wget https://github.com/damnhalfling/CIOS/releases/latest/download/cios_2.0.0-rc18_amd64.deb
+sudo apt install ./cios_2.0.0-rc18_amd64.deb
 sudo reboot
 ```
 
@@ -276,7 +276,7 @@ CIOS uses **Ollama** as its local LLM provider. Ollama runs entirely on your mac
 
 Ollama handles:
 - Intent classification for unknown patterns
-- Token compression before sending to CIOS Intelligence (optional)
+- Local AI optimization for cloud requests (optional)
 - Local AI tasks that don't need cloud processing
 
 Ollama is auto-installed during setup.
@@ -299,7 +299,7 @@ In practice: if no LLM is available, all regex-matched intents (the vast majorit
 - ✅ Custom Wayland compositor (wlroots 0.18) — running on real hardware
 - ✅ Server-side decorations (titlebar + close/minimize/maximize)
 - ✅ Background task queue — prompt stays free during long operations
-- ✅ 26 skills — Wi-Fi, audio, files, packages, windows, clipboard, dev environments, self-update, file search, workflow start, gallery management, duplicates, face clustering, screen capture
+- ✅ 27 skills — Wi-Fi, audio, files, packages, windows, clipboard, dev environments, self-update, file search, workflow start, gallery management, duplicates, face clustering, screen capture, spreadsheets
 - ✅ Hybrid intent classifier — regex + LLM cache with stemming + auto-learning
 - ✅ Voice offline — STT + TTS, fully local
 - ✅ Multi-monitor — secondary screen as full interaction surface
@@ -321,18 +321,18 @@ In practice: if no LLM is available, all regex-matched intents (the vast majorit
 
 ## Roadmap
 
-- ⏳ CIOS Intelligence integration (optional cloud AI) — almost done
-- ⏳ Voice module (STT/TTS as alternative I/O)
-- ⏳ Google Workspace MCP (Calendar, Gmail, Drive)
-- ⏳ Custom Debian-based distribution
+- ✅ ~~CIOS Intelligence integration~~ — done (cloud API, auth, streaming)
 - ✅ ~~Wayland compositor~~ — done (wlroots 0.18, XWayland, layer-shell)
+- ✅ ~~Custom Debian-based distribution~~ — done (greetd, Plymouth, ISO)
+- ⏳ Voice module (STT/TTS as alternative I/O)
+- ⏳ Cognitive memory (intent graph, semantic indexing)
 
 ## Architecture (for contributors)
 
 ```
 User Input → Intent Parser → Classifier → MCO → Planner → Executor → Humanizer → UI
                   │              │          │       │          │            │
-            176+ Patterns    Cache +      MCP     26 Skills   Shell      Translates
+            189 Patterns     Cache +      MCP     27 Skills   Shell      Translates
             (PT/EN)         LLM +       (live    + Auto-     Control    to human
                            Stemming     state)   Learner      │        language
                                                             Memory
@@ -344,14 +344,14 @@ User Input → Intent Parser → Classifier → MCO → Planner → Executor →
 <details>
 <summary><strong>Core components</strong></summary>
 
-- **Intent Parser** — 170+ regex patterns (PT/EN), hybrid LLM classifier with cache + stemming for natural language
+- **Intent Parser** — 189 regex patterns (PT/EN), hybrid LLM classifier with cache + stemming for natural language
 - **Intent Classifier** — SQLite-cached LLM classifications, fuzzy matching with light PT stemming, auto-learning from successful executions
 - **Task Queue** — Background execution for long operations (apt install, upgrades). Tasks grouped by context, sequential within context, parallel across contexts. Prompt stays free.
 - **MCP** — Live system state with reactive watchers (nmcli monitor, pactl subscribe) + adaptive polling (1s/5s/15s)
 - **MCO** — Decision layer: resolves from MCP state instantly when possible
-- **Planner** — 30 handlers with context-aware execution and `_resilient_call()` retry
+- **Planner** — 29 handlers with context-aware execution and `_resilient_call()` retry
 - **Executor** — Safe shell execution with timeout, blocked command list, background processes
-- **Humanizer** — 220+ translations PT/EN, all technical output becomes plain language
+- **Humanizer** — 260+ translations PT/EN, all technical output becomes plain language
 - **Model Router** — Ollama (local, default) with fallback support, 8s timeout
 - **Memory** — SQLite store of intents, commands, and outcomes
 - **Error Recovery** — 19 error types classified with actionable suggestions (PT/EN)
@@ -373,20 +373,20 @@ cios-os/
 │   ├── main.py                 # Entry point (6 modes)
 │   ├── core/
 │   │   ├── bridge.py           # UI ↔ backend (sync + streaming + conversation)
-│   │   ├── intent_parser.py    # 170+ regex patterns PT/EN
+│   │   ├── intent_parser.py    # 189 regex patterns PT/EN
 │   │   ├── intent_classifier.py # Hybrid LLM classifier + cache + stemming
-│   │   ├── planner.py          # 30 handlers + MCO + _resilient_call()
+│   │   ├── planner.py          # 29 handlers + MCO + _resilient_call()
 │   │   ├── task_queue.py       # Background task execution (TaskManager + TaskThread)
 │   │   ├── thread_manager.py   # Conversation thread state + classification
 │   │   ├── handlers/           # Intent handlers (gallery, media, screen, etc.)
 │   │   ├── mcp.py              # Live system state (watchers + adaptive polling)
 │   │   ├── executor.py         # Safe shell execution
-│   │   ├── humanizer.py        # Technical → human translation (220+ PT/EN)
+│   │   ├── humanizer.py        # Technical → human translation (260+ PT/EN)
 │   │   ├── model_router.py     # LLM routing (Ollama default, full fallback chain)
 │   │   ├── config.py           # Persistent settings (~/.cios/) + XDG dirs
 │   │   ├── memory.py           # SQLite history
 │   │   └── error_recovery.py   # 19 error types + actionable suggestions
-│   ├── skills/                 # 26 system skills
+│   ├── skills/                 # 27 system skills
 │   │   ├── package_manager.py  # apt install/remove/search (background-capable)
 │   │   ├── app_launcher.py     # .desktop scan + aliases (foot, chrome, etc.)
 │   │   ├── gallery_store.py    # Favorites, albums, trash (SQLite)
@@ -408,7 +408,7 @@ cios-os/
 │   │   └── ipc.c              # Unix socket JSON protocol
 │   └── meson.build
 ├── session/                    # Wayland session config
-├── tests/                      # 398+ tests
+├── tests/                      # 635 tests
 ├── .github/workflows/          # CI: lint → test → build compositor → build .deb → release
 ├── build-deb.sh                # .deb builder (mandatory compositor, no fallbacks)
 └── pyproject.toml
@@ -423,7 +423,7 @@ cd cios-os
 python3 -m venv .venv
 .venv/bin/pip install -e ".[test]"
 .venv/bin/cios              # GUI
-.venv/bin/pytest tests/ -v      # 398 tests
+.venv/bin/pytest tests/ -v      # 635 tests
 ```
 
 **Requirements:** Python 3.10+ · Linux (Ubuntu/Debian) · Optional: Ollama, wl-clipboard, brightnessctl
@@ -496,7 +496,7 @@ Pronto.
 
 Para tarefas que precisam de IA cloud — como resumir notícias, gerar texto, ou traduzir — o CIOS pode se conectar ao **CIOS Intelligence**, um serviço cloud opcional.
 
-O OS usa Ollama localmente para comprimir seu input antes de enviar, mantendo o uso de tokens mínimo. Autenticação via login Google.
+O OS otimiza requisições localmente antes de enviar, mantendo o uso mínimo. Autenticação é feita pelo fluxo de onboarding.
 
 ```
 Você: "o que aconteceu hoje no mundo?"
@@ -544,8 +544,8 @@ CIOS: Conectado na Starlink (192.168.1.42)
 
 ```bash
 # Baixe o .deb da release
-wget https://github.com/damnhalfling/CIOS/releases/latest/download/cios_2.0.0-rc14_amd64.deb
-sudo apt install ./cios_2.0.0-rc14_amd64.deb
+wget https://github.com/damnhalfling/CIOS/releases/latest/download/cios_2.0.0-rc18_amd64.deb
+sudo apt install ./cios_2.0.0-rc18_amd64.deb
 sudo reboot
 ```
 
@@ -577,4 +577,4 @@ cios --setup      # Re-executar setup
 
 ---
 
-*CIOS v2.0.0-rc14 — May 2026*
+*CIOS v2.0.0-rc18 — May 2026*

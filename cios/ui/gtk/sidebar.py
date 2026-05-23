@@ -1,10 +1,10 @@
-"""CIOS GTK4 Sidebar — System status + history + maestro login.
+"""CIOS GTK4 Sidebar — System status + history + cloud login.
 
 Visual: TRON-inspired glow cards, geometric icons, subtle borders.
 Layout (top to bottom):
 - System metrics (glow cards with icon + sigla + value)
 - Message history (scrollable)
-- Maestro login (glow card at bottom)
+- Intelligence login (glow card at bottom)
 """
 
 import time as _time
@@ -24,7 +24,7 @@ from cios.ui.theme import (
 
 
 class Sidebar(Gtk.Box):
-    """Right sidebar: glow-card metrics + history + maestro login."""
+    """Right sidebar: glow-card metrics + history + intelligence login."""
 
     def __init__(self):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -92,9 +92,9 @@ class Sidebar(Gtk.Box):
         sep2.add_css_class("sidebar-sep")
         self.append(sep2)
 
-        # ── Maestro login (glow card at bottom) ──
+        # ── Intelligence login (glow card at bottom) ──
         login_frame = Gtk.Frame()
-        login_frame.add_css_class("maestro-card")
+        login_frame.add_css_class("intelligence-card")
         login_frame.set_margin_start(10)
         login_frame.set_margin_end(10)
         login_frame.set_margin_top(8)
@@ -108,22 +108,22 @@ class Sidebar(Gtk.Box):
         login_frame.set_child(login_box)
 
         login_icon = Gtk.Label(label="⬡")
-        login_icon.add_css_class("maestro-icon")
+        login_icon.add_css_class("intelligence-icon")
         login_box.append(login_icon)
 
-        login_label = Gtk.Label(label="Maestro")
-        login_label.add_css_class("maestro-label")
+        login_label = Gtk.Label(label="Intelligence")
+        login_label.add_css_class("intelligence-label")
         login_label.set_hexpand(True)
         login_label.set_halign(Gtk.Align.START)
         login_box.append(login_label)
 
-        self._maestro_status = Gtk.Label(label="offline")
-        self._maestro_status.add_css_class("maestro-status")
-        login_box.append(self._maestro_status)
+        self._intelligence_status = Gtk.Label(label="offline")
+        self._intelligence_status.add_css_class("intelligence-status")
+        login_box.append(self._intelligence_status)
 
         # Make clickable
         click_ctrl = Gtk.GestureClick()
-        click_ctrl.connect("released", self._on_maestro_click)
+        click_ctrl.connect("released", self._on_intelligence_click)
         login_frame.add_controller(click_ctrl)
 
         self.append(login_frame)
@@ -308,13 +308,13 @@ class Sidebar(Gtk.Box):
             frame.add_css_class("metric-card-warn")
 
     def _check_login_state(self):
-        """Check if already logged into Maestro and update AI card."""
+        """Check if already logged into Intelligence and update AI card."""
         try:
             from cios.core.intelligence import intelligence
 
             if intelligence.is_logged_in:
                 name = intelligence.user.name if intelligence.user else "online"
-                self._maestro_status.set_label(name or "online")
+                self._intelligence_status.set_label(name or "online")
                 self._ai_metric["value"].set_label("on")
                 self._ai_metric["frame"].remove_css_class("metric-card-warn")
             else:
@@ -322,18 +322,18 @@ class Sidebar(Gtk.Box):
         except Exception:
             pass
 
-    def _on_maestro_click(self, gesture, n_press, x, y):
-        """Start Maestro device auth flow."""
+    def _on_intelligence_click(self, gesture, n_press, x, y):
+        """Start Intelligence device auth flow."""
         import threading
 
         from cios.core.intelligence import intelligence
 
         if intelligence.is_logged_in:
             name = intelligence.user.name if intelligence.user else "online"
-            self._maestro_status.set_label(name or "online")
+            self._intelligence_status.set_label(name or "online")
             return
 
-        self._maestro_status.set_label("conectando…")
+        self._intelligence_status.set_label("conectando…")
         threading.Thread(target=self._start_inline_auth, daemon=True).start()
 
     def _start_inline_auth(self):
@@ -346,7 +346,7 @@ class Sidebar(Gtk.Box):
 
         from cios.core.intelligence import API_BASE
 
-        GLib.idle_add(self._maestro_status.set_label, "aguardando…")
+        GLib.idle_add(self._intelligence_status.set_label, "aguardando…")
 
         # Step 1: Get device code via curl (safe, no SSL in-process)
         try:
@@ -357,11 +357,11 @@ class Sidebar(Gtk.Box):
                 timeout=10,
             )
             if result.returncode != 0:
-                GLib.idle_add(self._maestro_status.set_label, "erro")
+                GLib.idle_add(self._intelligence_status.set_label, "erro")
                 return
             data = json.loads(result.stdout)
         except Exception:
-            GLib.idle_add(self._maestro_status.set_label, "sem rede")
+            GLib.idle_add(self._intelligence_status.set_label, "sem rede")
             return
 
         device_code = data.get("device_code", "")
@@ -369,7 +369,7 @@ class Sidebar(Gtk.Box):
         expires_in = data.get("expires_in", 300)
 
         if not device_code:
-            GLib.idle_add(self._maestro_status.set_label, "erro")
+            GLib.idle_add(self._intelligence_status.set_label, "erro")
             return
 
         # Step 2: Show QR code
@@ -397,20 +397,20 @@ class Sidebar(Gtk.Box):
                     user_data = status_data["user"]
                     intelligence.save_auth(token, user_data)
                     name = user_data.get("name", "online")
-                    GLib.idle_add(self._maestro_status.set_label, name)
+                    GLib.idle_add(self._intelligence_status.set_label, name)
                     GLib.idle_add(self._ai_metric["value"].set_label, "on")
                     if self._artifact_panel:
                         GLib.idle_add(self._artifact_panel.close)
                     return
 
                 if status_data.get("status") == "expired":
-                    GLib.idle_add(self._maestro_status.set_label, "expirado")
+                    GLib.idle_add(self._intelligence_status.set_label, "expirado")
                     return
 
             except Exception:
                 continue
 
-        GLib.idle_add(self._maestro_status.set_label, "expirado")
+        GLib.idle_add(self._intelligence_status.set_label, "expirado")
 
     def _show_qr_in_artifact(self, url: str):
         """Generate QR code and show it in the artifact panel."""
@@ -440,12 +440,12 @@ class Sidebar(Gtk.Box):
             )
 
             if self._artifact_panel:
-                self._artifact_panel.show_artifact(content, title="Login Maestro")
+                self._artifact_panel.show_artifact(content, title="Login Intelligence")
 
         except ImportError:
             content = f"Abra no celular:\n\n{url}\n\nAguardando confirmação…"
             if self._artifact_panel:
-                self._artifact_panel.show_artifact(content, title="Login Maestro")
+                self._artifact_panel.show_artifact(content, title="Login Intelligence")
 
     @staticmethod
     def get_css() -> str:
@@ -540,27 +540,27 @@ class Sidebar(Gtk.Box):
                 color: {FG_DIM};
                 font-size: 10px;
             }}
-            .maestro-card {{
+            .intelligence-card {{
                 background-color: {BG_CARD};
                 border: 1px solid rgba(0,229,255,0.15);
                 border-radius: 8px;
                 box-shadow: 0 0 10px rgba(0,229,255,0.05);
                 transition: all 200ms ease;
             }}
-            .maestro-card:hover {{
+            .intelligence-card:hover {{
                 border-color: rgba(0,229,255,0.4);
                 box-shadow: 0 0 18px rgba(0,229,255,0.12);
             }}
-            .maestro-icon {{
+            .intelligence-icon {{
                 color: {ACCENT};
                 font-size: 18px;
             }}
-            .maestro-label {{
+            .intelligence-label {{
                 color: {FG};
                 font-size: 12px;
                 font-weight: bold;
             }}
-            .maestro-status {{
+            .intelligence-status {{
                 color: {FG_DIM};
                 font-size: 10px;
             }}

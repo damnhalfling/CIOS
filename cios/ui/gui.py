@@ -1349,7 +1349,7 @@ class CIOSApp:
         """Handle upgrade button click — open browser to pricing page."""
         import webbrowser
 
-        webbrowser.open("https://cios-ia.com/upgrade")
+        webbrowser.open("https://cios-ai.com/upgrade")
 
     def _refresh_sidebar_threads(self) -> None:
         """Refresh the sidebar thread history panel."""

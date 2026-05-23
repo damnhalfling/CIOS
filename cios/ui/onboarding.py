@@ -240,7 +240,7 @@ class OnboardingWizard:
         ext_var = tk.StringVar(value="cios_api")
 
         ext_options = [
-            ("CIOS Intelligence (grátis, Bedrock)", "cios_api"),
+            ("CIOS Intelligence (grátis)", "cios_api"),
             ("OpenAI (sua chave)", "openai"),
             ("Anthropic (sua chave)", "anthropic"),
         ]

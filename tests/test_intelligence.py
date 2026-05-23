@@ -110,7 +110,7 @@ class TestQuery:
             {
                 "response": "As notícias de hoje incluem...",
                 "intent": "news",
-                "model": "deepseek-r1",
+                "model": "cios-cloud",
                 "tokens_input": 45,
                 "tokens_output": 120,
                 "conversation_id": 789,
@@ -138,7 +138,7 @@ class TestQuery:
         assert result.success
         assert "notícias" in result.text
         assert result.intent == "news"
-        assert result.model == "deepseek-r1"
+        assert result.model == "cios-cloud"
         assert result.tokens_input == 45
         assert result.tokens_output == 120
         assert result.conversation_id == 789
@@ -229,7 +229,7 @@ class TestStreaming:
 
         # Simulate SSE stream
         sse_data = (
-            b'data: {"type":"start","conversation_id":100,"model":"deepseek-r1"}\n\n'
+            b'data: {"type":"start","conversation_id":100,"model":"cios-cloud"}\n\n'
             b'data: {"type":"token","token":"Ol\\u00e1"}\n\n'
             b'data: {"type":"token","token":" mundo"}\n\n'
             b'data: {"type":"done","metadata":{"cognitive_state":{"emotional_tone":0.7,"attention_focus":"greeting","memory_used":false,"memory_sources":[],"honesty_check":false},"tokens_input":10,"tokens_output":2}}\n\n'
@@ -312,7 +312,7 @@ class TestConversationContinuity:
             {
                 "response": "Resposta 1",
                 "intent": "chat",
-                "model": "deepseek-r1",
+                "model": "cios-cloud",
                 "tokens_input": 10,
                 "tokens_output": 5,
                 "conversation_id": 555,

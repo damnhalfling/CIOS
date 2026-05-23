@@ -69,7 +69,7 @@ class CIOSDaemon:
         # Initialize bridge
         self._bridge = CIOSBridge()
 
-        # Start command poller (cross-device commands from Puccini/Web)
+        # Start command poller (cross-device commands from mobile/web)
         try:
             from cios.core.command_poller import CommandPoller
 

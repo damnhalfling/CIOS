@@ -5,7 +5,7 @@ Resolution chain (intent-first, IA-first):
 2. Ollama (local LLM, REQUIRED) — classifies intent + resolves local commands
 3. External API (only when local can't resolve) — generates execution plans
    - Uses the user's preferred provider (configured once, used always)
-   - Fallback order: preferred → other configured → CIOS API (Maestro/Bedrock)
+   - Fallback order: preferred → other configured → CIOS Cloud API
 
 The external API is ONLY called when:
 - The intent requires knowledge the local model doesn't have
@@ -15,7 +15,7 @@ Design decisions:
 - Ollama is REQUIRED — the system doesn't operate without it
 - User picks ONE preferred external provider (or auto-selects first available)
 - Ollama summarizes context before sending to API (token optimization)
-- CIOS API (Maestro) is always the final fallback (no key needed for basic tier)
+- CIOS Cloud API is always the final fallback (no key needed for basic tier)
 
 Retry with exponential backoff on transient failures.
 Circuit breaker prevents hammering dead providers.
@@ -275,7 +275,7 @@ def _call_anthropic(prompt: str, system: str = "") -> str | None:
 
 
 def _call_cios_api(prompt: str, system: str = "") -> str | None:
-    """Call CIOS Intelligence API (Maestro — powered by Bedrock/DeepSeek).
+    """Call CIOS Intelligence API (cloud).
 
     This is the official CIOS cloud API. Always available as final fallback.
     Users with a subscription get higher limits. Free tier has basic access.
@@ -376,7 +376,7 @@ def _get_system_context() -> dict:
 def has_external_provider() -> bool:
     """Check if any external API provider is available.
 
-    Always returns True because CIOS API (Maestro) is always available
+    Always returns True because CIOS Cloud API is always available
     as the final fallback (free tier, no key required for basic usage).
     """
     return True
@@ -487,7 +487,7 @@ def _call_external(prompt: str, system: str = "") -> str | None:
     """Call external API provider (only when local can't resolve).
 
     Uses the user's preferred provider first, then falls back to others.
-    CIOS API (Maestro/Bedrock) is always the final fallback.
+    CIOS Cloud API is always the final fallback.
 
     Priority:
     1. User's preferred_external_provider (if configured)

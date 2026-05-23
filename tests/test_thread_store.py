@@ -171,7 +171,7 @@ class TestSyncSuccess:
             # Verify the request was constructed correctly
             call_args = mock_urlopen.call_args
             request = call_args[0][0]
-            assert request.full_url == "https://api.cios-ia.com/v1/sync"
+            assert request.full_url == "https://api.cios-ai.com/v1/sync"
             assert request.get_header("Authorization") == "Bearer test-token-abc123"
             assert request.get_header("Content-type") == "application/json"
             assert request.get_method() == "POST"
@@ -325,7 +325,7 @@ class TestSyncFailureSilentlyCaught:
             patch(
                 "urllib.request.urlopen",
                 side_effect=urllib.error.HTTPError(
-                    url="https://api.cios-ia.com/threads",
+                    url="https://api.cios-ai.com/threads",
                     code=500,
                     msg="Internal Server Error",
                     hdrs={},
