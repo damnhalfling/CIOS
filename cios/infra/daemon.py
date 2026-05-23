@@ -50,6 +50,7 @@ class CIOSDaemon:
         self._running = False
         self._start_time = 0.0
         self._clients: list[threading.Thread] = []
+        self._command_poller = None
 
     def start(self) -> None:
         """Start the daemon. Blocks until shutdown."""
@@ -67,6 +68,15 @@ class CIOSDaemon:
 
         # Initialize bridge
         self._bridge = CIOSBridge()
+
+        # Start command poller (cross-device commands from Puccini/Web)
+        try:
+            from cios.core.command_poller import CommandPoller
+
+            self._command_poller = CommandPoller(bridge=self._bridge)
+            self._command_poller.start()
+        except Exception as e:
+            logger.warning("Failed to start command poller: %s", e)
 
         # Create Unix socket
         self._server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -187,6 +197,8 @@ class CIOSDaemon:
 
     def _cleanup(self) -> None:
         """Clean up resources."""
+        if self._command_poller:
+            self._command_poller.stop()
         if self._bridge:
             self._bridge.close()
         if self._server:

@@ -1119,13 +1119,13 @@ class CIOSBridge:
             action = intent.params.get("action", "")
             package = intent.params.get("package", "")
             if action == "install":
-                action_desc = f"Para instalar '{package}', "
+                action_desc = f"Pra instalar o {package}, "
             elif action == "remove":
-                action_desc = f"Para remover '{package}', "
+                action_desc = f"Pra remover o {package}, "
             elif action in ("update", "upgrade"):
-                action_desc = "Para atualizar os pacotes, "
+                action_desc = "Pra atualizar os pacotes, "
         elif intent.type == IntentType.SELF_UPDATE:
-            action_desc = "Para atualizar o CIOS, "
+            action_desc = "Pra atualizar o CIOS, "
 
         self._thread_manager.set_pending_question(
             PendingQuestion(
@@ -1136,7 +1136,7 @@ class CIOSBridge:
         )
         return {
             "steps": [],
-            "result": f"{action_desc}digite a senha de administrador:",
+            "result": f"{action_desc}preciso da tua senha:",
             "status": "success",
             "confirm": None,
             "voice_mode": "full",

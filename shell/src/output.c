@@ -23,7 +23,7 @@
 #include "server.h"
 
 /* Topbar exclusive zone height in pixels */
-#define TOPBAR_HEIGHT 32
+#define TOPBAR_HEIGHT 0
 
 /*
  * Recalculate usable area for an output.

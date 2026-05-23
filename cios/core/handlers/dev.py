@@ -398,3 +398,134 @@ def handle_continue_project(intent: Intent, executor: Executor, memory: Memory) 
             outcome="success",
             summary=f"Workspace restored: {session.project_name}. Server restarted.",
         )
+
+
+def handle_close_project(intent: Intent, executor: Executor, memory: Memory) -> PlanResult:
+    """Close a project: kill server processes, close related windows.
+
+    Looks up the SessionContext for the project (or latest session),
+    kills the server process, and closes editor/browser windows.
+    """
+    import psutil
+
+    from cios.skills.window_control import close_window, list_windows
+
+    project_name = intent.params.get("project", "")
+    plan_steps = []
+
+    # Find the session
+    if project_name:
+        session = memory.get_session(project_name)
+        if session is None:
+            # Fuzzy match
+            all_sessions = memory.list_sessions()
+            for s in all_sessions:
+                if project_name.lower() in s.project_name.lower():
+                    session = s
+                    break
+    else:
+        session = memory.get_latest_session()
+
+    if session is None:
+        return PlanResult(
+            plan_steps=["Buscando projeto ativo"],
+            results=[],
+            outcome="failure",
+            summary="Nenhum projeto ativo encontrado.",
+        )
+
+    plan_steps.append(f"Fechando projeto: {session.project_name}")
+
+    # 1. Kill server process (by PID first, then by port)
+    server_killed = False
+
+    if session.server_pid:
+        try:
+            proc = psutil.Process(session.server_pid)
+            # Kill the process tree (server + child processes)
+            children = proc.children(recursive=True)
+            for child in children:
+                try:
+                    child.terminate()
+                except psutil.NoSuchProcess:
+                    pass
+            proc.terminate()
+
+            # Wait briefly for graceful shutdown
+            gone, alive = psutil.wait_procs([proc] + children, timeout=3)
+            for p in alive:
+                try:
+                    p.kill()
+                except psutil.NoSuchProcess:
+                    pass
+
+            plan_steps.append(f"Servidor encerrado (PID {session.server_pid})")
+            server_killed = True
+        except psutil.NoSuchProcess:
+            plan_steps.append("Servidor já não estava rodando")
+            server_killed = True
+        except psutil.AccessDenied:
+            plan_steps.append("Sem permissão para encerrar servidor")
+
+    # Fallback: kill by port if PID didn't work
+    if not server_killed and session.server_port > 0:
+        if _is_port_in_use(session.server_port):
+            kill_plan, kill_result = kill_process_on_port(executor, session.server_port)
+            plan_steps.extend(kill_plan)
+            if kill_result.success:
+                server_killed = True
+        else:
+            plan_steps.append(f"Porta {session.server_port} já livre")
+            server_killed = True
+
+    # 2. Close related windows (editor, browser)
+    windows_closed = 0
+
+    # Close editor window (by project path in title)
+    project_basename = os.path.basename(session.project_path)
+    try:
+        all_windows = list_windows()
+        for win in all_windows:
+            title_lower = win.title.lower()
+            wm_lower = win.wm_class.lower()
+
+            # Match editor windows (VS Code, Zed, etc. show project name in title)
+            is_editor = any(
+                ed in wm_lower or ed in title_lower
+                for ed in ("code", "vscodium", "zed", "sublime", "atom", "editor")
+            )
+            has_project = project_basename.lower() in title_lower
+
+            # Match browser windows with localhost:port
+            is_browser = any(
+                br in wm_lower or br in title_lower
+                for br in ("firefox", "chrome", "chromium", "brave", "browser")
+            )
+            has_port = session.server_port > 0 and f"localhost:{session.server_port}" in title_lower
+
+            should_close = (is_editor and has_project) or (is_browser and has_port)
+
+            if should_close:
+                close_window(win)
+                windows_closed += 1
+                plan_steps.append(f"Janela fechada: {win.title[:40]}")
+
+    except Exception as e:
+        logger.debug("Failed to close windows: %s", e)
+
+    if windows_closed == 0:
+        plan_steps.append("Nenhuma janela do projeto encontrada")
+
+    # Build summary
+    parts = [f"Projeto '{session.project_name}' encerrado."]
+    if server_killed:
+        parts.append("Servidor parado.")
+    if windows_closed > 0:
+        parts.append(f"{windows_closed} janela(s) fechada(s).")
+
+    return PlanResult(
+        plan_steps=plan_steps,
+        results=[],
+        outcome="success",
+        summary=" ".join(parts),
+    )

@@ -281,6 +281,17 @@ class Sidebar(Gtk.Box):
         except Exception:
             pass
 
+        # AI card — check intelligence login state
+        try:
+            from cios.core.intelligence import intelligence
+
+            if intelligence.is_logged_in:
+                self._ai_metric["value"].set_label("on")
+            else:
+                self._ai_metric["value"].set_label("off")
+        except Exception:
+            pass
+
         return True
 
     def _apply_card_state(self, frame: Gtk.Frame, pct: int):
@@ -297,13 +308,17 @@ class Sidebar(Gtk.Box):
             frame.add_css_class("metric-card-warn")
 
     def _check_login_state(self):
-        """Check if already logged into Maestro."""
+        """Check if already logged into Maestro and update AI card."""
         try:
             from cios.core.intelligence import intelligence
 
             if intelligence.is_logged_in:
                 name = intelligence.user.name if intelligence.user else "online"
                 self._maestro_status.set_label(name or "online")
+                self._ai_metric["value"].set_label("on")
+                self._ai_metric["frame"].remove_css_class("metric-card-warn")
+            else:
+                self._ai_metric["value"].set_label("off")
         except Exception:
             pass
 
@@ -383,6 +398,7 @@ class Sidebar(Gtk.Box):
                     intelligence.save_auth(token, user_data)
                     name = user_data.get("name", "online")
                     GLib.idle_add(self._maestro_status.set_label, name)
+                    GLib.idle_add(self._ai_metric["value"].set_label, "on")
                     if self._artifact_panel:
                         GLib.idle_add(self._artifact_panel.close)
                     return

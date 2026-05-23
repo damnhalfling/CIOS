@@ -18,6 +18,7 @@ from cios.core.handlers.audio import handle_audio
 from cios.core.handlers.dev import (  # noqa: F401
     _find_project,
     _scan_project_dirs,
+    handle_close_project,
     handle_continue_project,
     handle_dev_start,
     handle_workflow_start,
@@ -33,6 +34,7 @@ from cios.core.handlers.packages import handle_package
 from cios.core.handlers.peripherals import handle_bluetooth, handle_clipboard, handle_window
 from cios.core.handlers.process import handle_process_control, handle_status
 from cios.core.handlers.screen_capture import handle_screen_capture
+from cios.core.handlers.spreadsheet import handle_spreadsheet
 from cios.core.handlers.system import handle_power, handle_session, handle_system_health
 from cios.core.intent_parser import Intent, IntentType
 from cios.core.mcp import context as mcp
@@ -109,6 +111,7 @@ _HANDLER_MAP = {
     IntentType.LIST_APPS: handle_list_apps,
     IntentType.WORKFLOW_START: handle_workflow_start,
     IntentType.CONTINUE_PROJECT: handle_continue_project,
+    IntentType.CLOSE_PROJECT: handle_close_project,
     IntentType.INTENT_MEDIA: handle_intent_media,
     IntentType.INTENT_BROWSE: handle_intent_browse,
     IntentType.INTENT_WRITE: handle_intent_write,
@@ -117,6 +120,7 @@ _HANDLER_MAP = {
     IntentType.INTELLIGENCE: handle_intelligence,
     IntentType.GALLERY_MANAGE: handle_gallery_manage,
     IntentType.SCREEN_CAPTURE: handle_screen_capture,
+    IntentType.SPREADSHEET: handle_spreadsheet,
     IntentType.HISTORY_SEARCH: None,  # Handled directly in bridge
 }
 

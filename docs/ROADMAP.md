@@ -1,7 +1,7 @@
 # CIOS — Roadmap
 
 > Substituindo apps por intenção.
-> Atualizado: Maio 2026 — v2.0.0-rc17
+> Atualizado: Maio 2026 — v2.0.0-rc18
 
 ---
 
@@ -132,6 +132,19 @@ Se não for 100% confiável → fluxo guiado. Se for confiável → automático.
 - ✅ Notificação de conclusão (sucesso/erro)
 - ✅ Bridge: `get_active_tasks()`, `get_task_result()` para UI consultar
 
+### Cross-Device Continuity ✅ (v2.0.0-rc18)
+- ✅ Command Poller: OS recebe e executa comandos remotos (Puccini/Web → Maestro → OS)
+- ✅ Polling thread no daemon + GUI (5s interval, graceful shutdown)
+- ✅ Status reporting: delivered → executed/failed com resultado
+- ✅ Skill spreadsheet.py: leitura, busca e edição de planilhas (CSV, XLSX, ODS)
+- ✅ Handler spreadsheet: find_spreadsheet (fuzzy), search_value, update_cell, get_column_value
+- ✅ 7 intent patterns PT/EN para planilhas ("busque a planilha X", "atualize valor", etc.)
+- ✅ Maestro OS Orchestrator: detecta quando chat de Puccini/Web precisa de ação no OS
+- ✅ Enfileiramento automático de commands (file_read, file_update, dev_start, package, system)
+- ✅ Handler close_project: mata servidor (PID + tree kill), fecha janelas (editor + browser)
+- ✅ 5 intent patterns PT/EN para fechar projeto ("fecha o projeto", "chega por hoje", etc.)
+- ✅ Ciclo completo: abre projeto → opera → fecha projeto (lifecycle)
+
 ### Compositor Hardening ✅ (v2.0.0-rc8→rc14)
 - ✅ Server-side decorations: titlebar 28px com close/minimize/maximize
 - ✅ VT switching (Ctrl+Alt+F1-F12) via ioctl
@@ -153,8 +166,9 @@ Se não for 100% confiável → fluxo guiado. Se for confiável → automático.
 
 | Fase | Objetivo | Quando |
 |------|----------|--------|
-| Intelligence Client (P4) | Client no OS que consome api.harmoni-ia.com | AGORA |
-| Módulo de Voz (P6) | STT/TTS como I/O agnóstico (mic → texto → pipeline → TTS) | Após P4 |
+| Intelligence Client (P4) | Client no OS que consome api.harmoni-ia.com | ✅ CONCLUÍDO |
+| Cross-Device (P5) | Command Poller + OS Orchestrator + Spreadsheet skill | ✅ CONCLUÍDO |
+| Módulo de Voz (P6) | STT/TTS como I/O agnóstico (mic → texto → pipeline → TTS) | Após P5 |
 | ~~Wayland compositor~~ | ~~Compositor próprio (wlroots-based)~~ | ✅ CONCLUÍDO |
 | ~~Distribuição base~~ | ~~greetd + Plymouth + .deb funcional~~ | ✅ CONCLUÍDO |
 | ~~Greeter gráfico~~ | ~~GTK4 Wayland-native login screen~~ | ✅ CONCLUÍDO |
@@ -198,24 +212,25 @@ GRUB (0s) → Plymouth → greetd (login) → cios-session → cios-shell (Wayla
 
 ---
 
-## Números (v2.0.0-rc17)
+## Números (v2.0.0-rc18)
 
 | Métrica | Valor |
 |---------|-------|
-| Skills | 26 |
-| Intent patterns | 176 (PT/EN) |
+| Skills | 27 (+spreadsheet) |
+| Intent patterns | 189 (PT/EN) |
 | Traduções humanizer | 260+ (PT/EN) |
 | Conversational tone rules | 30+ (PT/EN) |
 | Tipos de erro | 19 |
 | Testes | 635 |
 | Property tests (Hypothesis) | 22 |
 | Modos de execução | 6 |
-| Itens concluídos | 210+ |
+| Itens concluídos | 220+ |
 | Compositor | cios-shell (wlroots 0.18, C) + SSD |
 | Display Manager | greetd (bundlado) |
 | Boot splash | Plymouth (tema custom, 15s timeout) |
 | UI | GTK4 Wayland-native (chat feed + streaming) |
 | Background tasks | TaskQueue (por contexto) |
+| Cross-device | Command Poller + OS Orchestrator |
 | Terminal | foot (Wayland-native) |
 | Ollama timeout | 30s (tolerante a hardware lento) |
 | X11 code | zero (removido) |
@@ -246,4 +261,4 @@ Ver `docs/BRANCHING.md` para detalhes.
 
 ---
 
-*Atualizado: Maio 2026 — v2.0.0-rc17*
+*Atualizado: Maio 2026 — v2.0.0-rc18*

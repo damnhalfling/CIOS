@@ -687,59 +687,101 @@ def humanize_result(result: PlanResult) -> tuple[list[str], str, str, str]:
 
 # Formal → conversational rewrites (PT-BR)
 _CONVERSATIONAL_PT: list[tuple[re.Pattern, str]] = [
-    # Success confirmations — short and warm
-    (re.compile(r"^Pronto, instalado ✓$"), "Instalei."),
-    (re.compile(r"^(.+?) pronto, instalado ✓$"), "Pronto, {0} instalado."),
-    (re.compile(r"^(.+?) removido ✓$"), "Removido."),
+    # ── Package management ──
+    (re.compile(r"^Pronto, instalado ✓$"), "Instalei. Tá pronto pra usar."),
+    (re.compile(r"^(.+?) pronto, instalado ✓$"), "Pronto, {0} instalado. Pode usar."),
+    (re.compile(r"^(.+?) instalado com sucesso\.?$"), "{0} instalado. Tá pronto."),
+    (re.compile(r"^Pacote (.+?) instalado\.?$"), "Instalei o {0}."),
+    (re.compile(r"^(.+?) já está instalado\.?$"), "{0} já tá instalado."),
+    (re.compile(r"^(.+?) removido ✓$"), "Removi o {0}."),
+    (re.compile(r"^(.+?) removido com sucesso\.?$"), "Removi o {0}."),
     (re.compile(r"^Listas atualizadas ✓$"), "Atualizado."),
-    (re.compile(r"^Sistema atualizado ✓$"), "Sistema atualizado."),
+    (re.compile(r"^Sistema atualizado ✓$"), "Sistema atualizado. Tudo em dia."),
+    (re.compile(r"^Pacote (.+?) não encontrado\.?$"), "Não achei o pacote {0}. Confere o nome?"),
+    # ── Audio ──
     (re.compile(r"^Silenciado ✓$"), "Silenciei."),
     (re.compile(r"^Som ligado ✓$"), "Pronto, som ligado."),
-    # Connection
-    (re.compile(r"^Conectado em (.+)$"), "Conectei em {0}."),
-    (re.compile(r"^Já conectado em (.+)$"), "Já tá conectado em {0}."),
+    (re.compile(r"^Volume: (\d+)%$"), "Volume em {0}%."),
+    (re.compile(r"^Volume ajustado para (\d+)%\.?$"), "Volume em {0}%."),
+    # ── Network ──
+    (re.compile(r"^Conectado em (.+)$"), "Conectei na {0}."),
+    (re.compile(r"^Conectado na rede (.+)$"), "Conectei na {0}."),
+    (re.compile(r"^Já conectado em (.+)$"), "Já tá na {0}."),
     (re.compile(r"^Desconectado de (.+)$"), "Desconectei de {0}."),
-    # Apps
+    (re.compile(r"^Nenhuma rede encontrada\.?$"), "Não achei nenhuma rede por perto."),
+    # ── Apps ──
     (re.compile(r"^(.+?) is open$"), "{0} aberto."),
     (re.compile(r"^(.+?) está pronto$"), "{0} aberto."),
     (re.compile(r"^(.+?) is ready$"), "{0} pronto."),
-    (re.compile(r"^Não encontrei um app chamado \"(.+?)\"$"), 'Não achei "{0}".'),
-    # Volume
-    (re.compile(r"^Volume: (\d+)%$"), "Volume tá em {0}%."),
-    # Disk
+    (re.compile(r"^(.+?) aberto\.?$"), "{0} aberto."),
+    (re.compile(r"^Abrindo (.+?)\.{0,3}$"), "Abrindo {0}…"),
+    (re.compile(r"^Não encontrei um app chamado \"(.+?)\"$"), 'Não achei "{0}". Tá instalado?'),
+    (re.compile(r"^App (.+?) não encontrado\.?$"), "Não achei o {0}. Quer que eu instale?"),
+    # ── Disk ──
     (re.compile(r"^Disco está (.+)$"), "Disco tá {0}."),
-    # Errors — empathetic but direct
-    (re.compile(r"^Não entendi o que você quer\.$"), "Não entendi. Tenta de outro jeito?"),
-    (re.compile(r"^Algo deu errado$"), "Deu ruim. Quer tentar de novo?"),
-    (re.compile(r"^Demorou demais — parado$"), "Demorou demais, parei."),
-    (re.compile(r"^Bloqueado por segurança$"), "Bloqueei por segurança."),
-    # Bluetooth
+    (re.compile(r"^Espaço livre: (.+)$"), "Tem {0} livre."),
+    # ── Bluetooth ──
     (re.compile(r"^Bluetooth ligado$"), "Bluetooth ligado."),
     (re.compile(r"^Bluetooth desligado$"), "Bluetooth desligado."),
     (re.compile(r"^Bluetooth já está ligado$"), "Já tá ligado."),
     (re.compile(r"^Bluetooth já está desligado$"), "Já tá desligado."),
-    # Power
+    # ── Power ──
     (re.compile(r"^Modo economia ativado$"), "Modo economia ativado."),
-    # Window
+    (re.compile(r"^Bateria: (\d+)%(.*)$"), "Bateria em {0}%{1}."),
+    # ── Window ──
     (re.compile(r"^Nenhuma janela aberta$"), "Nenhuma janela aberta."),
-    # Generic
+    (re.compile(r"^Janela (.+?) fechada\.?$"), "Fechei {0}."),
+    # ── Brightness ──
+    (re.compile(r"^Brilho: (\d+)%$"), "Brilho em {0}%."),
+    (re.compile(r"^Brilho ajustado para (\d+)%\.?$"), "Brilho em {0}%."),
+    # ── Files ──
+    (re.compile(r"^Arquivo (.+?) criado\.?$"), "Criei {0}."),
+    (re.compile(r"^Pasta (.+?) criada\.?$"), "Criei a pasta {0}."),
+    (re.compile(r"^(.+?) copiado para (.+)$"), "Copiei {0} pra {1}."),
+    (re.compile(r"^(.+?) movido para (.+)$"), "Movi {0} pra {1}."),
+    # ── Errors — empathetic but direct ──
+    (re.compile(r"^Não entendi o que você quer\.$"), "Não entendi. Tenta de outro jeito?"),
+    (re.compile(r"^Algo deu errado$"), "Deu ruim. Quer tentar de novo?"),
+    (re.compile(r"^Demorou demais — parado$"), "Demorou demais, parei."),
+    (re.compile(r"^Bloqueado por segurança$"), "Bloqueei isso por segurança."),
+    (re.compile(r"^Permissão negada\.?$"), "Sem permissão pra isso."),
+    (re.compile(r"^Erro de autenticação\.?$"), "Senha incorreta."),
+    # ── Self-update ──
+    (re.compile(r"^CIOS atualizado para (.+)$"), "Atualizei pra versão {0}. Reinicia pra aplicar."),
+    (re.compile(r"^Já está na versão mais recente\.?$"), "Já tá na última versão."),
+    # ── Generic ──
     (re.compile(r"^Pronto$"), "Pronto."),
-    (re.compile(r"^Concluído\.$"), "Pronto."),
+    (re.compile(r"^Concluído\.$"), "Feito."),
+    (re.compile(r"^Operação concluída\.?$"), "Feito."),
+    (re.compile(r"^Cancelado\.?$"), "Cancelei."),
 ]
 
 # Formal → conversational rewrites (EN)
 _CONVERSATIONAL_EN: list[tuple[re.Pattern, str]] = [
     (re.compile(r"^installed successfully$"), "Done, installed."),
-    (re.compile(r"^(.+?) installed successfully$"), "Done, {0} installed."),
+    (re.compile(r"^(.+?) installed successfully$"), "Done, {0} is installed."),
+    (re.compile(r"^(.+?) is already installed\.?$"), "{0} is already installed."),
     (re.compile(r"^removed successfully$"), "Removed."),
-    (re.compile(r"^is already installed$"), "Already installed."),
+    (re.compile(r"^(.+?) removed successfully$"), "Removed {0}."),
     (re.compile(r"^Connected to (.+)$"), "Connected to {0}."),
     (re.compile(r"^Already connected to (.+)$"), "Already on {0}."),
+    (re.compile(r"^Disconnected from (.+)$"), "Disconnected from {0}."),
     (re.compile(r"^(.+?) is open$"), "{0} is open."),
-    (re.compile(r"^I couldn't find an app called \"(.+?)\"$"), 'Can\'t find "{0}".'),
+    (re.compile(r"^(.+?) is ready$"), "{0} is ready."),
+    (
+        re.compile(r"^I couldn't find an app called \"(.+?)\"$"),
+        'Can\'t find "{0}". Is it installed?',
+    ),
+    (re.compile(r"^Volume: (\d+)%$"), "Volume at {0}%."),
+    (re.compile(r"^Muted$"), "Muted."),
+    (re.compile(r"^Unmuted$"), "Unmuted."),
     (re.compile(r"^Everything looks good — no recent issues$"), "All good, no issues."),
     (re.compile(r"^Something went wrong$"), "Something went wrong. Retry?"),
     (re.compile(r"^Took too long — stopped$"), "Took too long, stopped."),
+    (re.compile(r"^Permission denied\.?$"), "No permission for that."),
+    (re.compile(r"^Done$"), "Done."),
+    (re.compile(r"^Completed\.$"), "Done."),
+    (re.compile(r"^Cancelled\.?$"), "Cancelled."),
 ]
 
 
@@ -763,10 +805,29 @@ def conversational_tone(text: str) -> str:
                 result = result.replace(f"{{{i}}}", g)
             return result
 
-    # No rule matched — apply light cleanup
-    # Remove trailing "…" from completed actions
-    if text.endswith("…") and not text.endswith("…\n"):
-        # Only if it looks like a completed step, not an in-progress one
-        pass
+    # No rule matched — apply light conversational cleanup
+    result = text
 
-    return text
+    # Remove formal checkmarks (✓, ✔) — the tone should convey success, not symbols
+    result = result.replace(" ✓", "").replace(" ✔", "").replace("✓ ", "").replace("✔ ", "")
+
+    # Remove trailing ellipsis from completed actions
+    if result.endswith("…") and len(result) > 20:
+        result = result[:-1] + "."
+
+    # Soften overly formal language (PT)
+    if _LANG == "pt":
+        result = result.replace("Operação concluída com sucesso", "Feito")
+        result = result.replace("Executado com sucesso", "Feito")
+        result = result.replace("com sucesso", "")
+        result = result.replace("foi realizado", "feito")
+        result = result.replace("Processo finalizado", "Pronto")
+
+    # Remove double spaces and trailing whitespace
+    result = re.sub(r"  +", " ", result).strip()
+
+    # Ensure it ends with punctuation
+    if result and result[-1] not in ".!?…:":
+        result += "."
+
+    return result

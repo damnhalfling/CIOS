@@ -103,9 +103,9 @@ No wasted steps. No wrong guesses.
 
 ### Skills
 
-Real system execution. 26 skills, zero abstraction.
+Real system execution. 27 skills, zero abstraction.
 
-Wi-Fi (nmcli) · Audio (pactl) · Files · Processes · Packages (apt) · Windows (compositor IPC) · Clipboard (wl-clipboard) · Battery · Brightness · Dev environments · Disk analysis · Auto-learning · File search · Workflow start · Explore system · Gallery management · Favorites & albums · Duplicate detection · Face clustering · Screen capture · Image editing
+Wi-Fi (nmcli) · Audio (pactl) · Files · Processes · Packages (apt) · Windows (compositor IPC) · Clipboard (wl-clipboard) · Battery · Brightness · Dev environments · Disk analysis · Auto-learning · File search · Workflow start · Explore system · Gallery management · Favorites & albums · Duplicate detection · Face clustering · Screen capture · Image editing · Spreadsheets (CSV/XLSX)
 
 **No LLM for critical actions.** Pattern matching handles 80%+ of intents. Hybrid classifier (regex → cache → LLM) ensures natural language works while keeping latency low.
 
@@ -174,6 +174,22 @@ CIOS: "I can look that up with CIOS Intelligence."
 
 Everything local stays local. Intelligence is opt-in.
 
+## Cross-device continuity
+
+Conversations and actions flow between OS, web, and mobile — same user, same memory, same context.
+
+```
+Phone: "check the AWS costs spreadsheet, how much did we spend?"
+→ OS finds the file, reads the value
+→ "R$ 1.500 last month"
+
+Phone: "correct it to 1.750"
+→ OS updates the spreadsheet
+→ Next time you open it, the value is already there
+```
+
+The OS polls for remote commands every 5 seconds. When another device (Puccini mobile, Intelligence Web) needs something executed locally, it happens automatically.
+
 ## What you can say
 
 | Input | What happens |
@@ -195,7 +211,10 @@ Everything local stays local. Intelligence is opt-in.
 | `shutdown` | Shuts down (asks confirmation) |
 | `what can you do` | Lists all 14 capability categories |
 | `I want to work on project X` | Opens editor + backend + browser for the project |
+| `close the project` | Kills server, closes editor and browser windows |
 | `where is the contract?` | Searches files by name and content |
+| `check spreadsheet costs` | Reads and searches spreadsheet files |
+| `update value in spreadsheet` | Edits cell values in CSV/XLSX files |
 | `I want to watch a video` | Opens the right media player |
 | `update cios` | Checks for updates and installs |
 | `favoritar` | Adds current photo to favorites |
