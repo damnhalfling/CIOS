@@ -352,7 +352,7 @@ apt-get autoremove -y 2>/dev/null || true
 
 # Create greeter user
 if ! id greeter &>/dev/null; then
-    useradd -r -s /usr/sbin/nologin -d /dev/null greeter 2>/dev/null || true
+    useradd -r -s /usr/sbin/nologin -d /tmp greeter 2>/dev/null || true
 fi
 usermod -aG video,render greeter 2>/dev/null || true
 
