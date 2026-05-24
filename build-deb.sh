@@ -599,9 +599,9 @@ TimeoutStartSec=15
 PLYTIMEOUT
 
 echo "→ Bundling runtime libraries..."
-# Exclude base system libs AND GPU/EGL libs (must use system Mesa for hardware acceleration)
+# Exclude base system libs AND GPU/EGL/Wayland libs (must use system versions for hardware compatibility)
 BASE_LIBS="linux-vdso|ld-linux|libc\.so|libm\.so|libdl\.so|libpthread|librt\.so|libstdc\+\+|libgcc_s|libX11\.so|libxcb\.so|libglib-2\.0|libgio-2\.0|libgobject-2\.0|libgmodule-2\.0|libffi\.so|libpcre2|libsystemd|libudev|libcap\.so|libgpg-error|libgcrypt|liblz4|liblzma|libzstd|libexpat"
-GPU_LIBS="libEGL|libGLESv2|libGLdispatch|libgbm|libGL\.so|libGLX|libOpenGL|libvulkan|libdrm\.so"
+GPU_LIBS="libEGL|libGLESv2|libGLdispatch|libgbm|libGL\.so|libGLX|libOpenGL|libvulkan|libdrm\.so|libwayland-server|libwayland-client"
 
 ldd "${PKG_DIR}/usr/bin/cios-shell" | grep "=> /" | awk '{print $3}' | while read -r lib; do
     libname=$(basename "$lib")
