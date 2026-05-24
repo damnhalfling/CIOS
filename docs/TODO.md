@@ -1,6 +1,6 @@
 # CIOS — TODO
 
-> v2.0.0-rc18 — Maio 2026
+> v2.0.0-rc30 — Maio 2026
 
 ---
 
@@ -27,7 +27,61 @@
 
 ---
 
-## 📋 Próximo (Fase 1 — Fechar o loop)
+## 📋 Próximo (Fase 0.5 — Desktop Completude)
+
+> Fechar gaps com desktop Linux padrão. Sem isso, uso diário tem fricção.
+
+### 🔴 Prioridade Alta — Bloqueiam uso diário
+
+| # | Task | Tipo | Skill/Módulo |
+|---|------|------|--------------|
+| 500 | Notifications system (eventos, apps, timers, progresso) | Infra | `infra/notifications.py` + handler |
+| 501 | Notification center (histórico, dismiss, actions) | UI | GTK4 panel |
+| 502 | Scheduled tasks / timers ("lembra-me às 17h") | Skill | `skills/scheduler.py` + cron/systemd-timer |
+| 503 | Deferred intents ("depois do almoço", "amanhã cedo") | Core | `core/deferred.py` |
+| 504 | Automount USB/SD/drives externos | Skill | `skills/automount.py` + udisks2 |
+| 505 | Notificação de device plugado ("USB detectado. Abrir?") | UX | notification + automount |
+| 506 | Theming: dark/light mode | UI | GTK4 + compositor CSS |
+| 507 | Theming: configuração via intent ("modo escuro") | Handler | planner handler |
+| 508 | Display settings: resolução/scaling via intent | Skill | `skills/display.py` + wlr-randr |
+| 509 | Display settings: arranjo de monitores | Skill | compositor IPC |
+
+### 🟡 Prioridade Média — Networking + Segurança
+
+| # | Task | Tipo | Skill/Módulo |
+|---|------|------|--------------|
+| 510 | VPN via intent ("conecta VPN") | Skill | `skills/vpn.py` + nmcli/wg |
+| 511 | Firewall via intent ("bloqueia porta 8080") | Skill | `skills/firewall.py` + ufw |
+| 512 | Keyring / secrets management | Infra | libsecret / gnome-keyring integration |
+| 513 | Trash / recycle bin (soft-delete) | Skill | `skills/trash.py` + XDG Trash spec |
+| 514 | Proxy config via intent | Skill | network.py extension |
+
+### 🟢 Prioridade Baixa — Polimento
+
+| # | Task | Tipo | Skill/Módulo |
+|---|------|------|--------------|
+| 520 | Printer support ("imprime este documento") | Skill | `skills/printer.py` + CUPS |
+| 521 | Timezone / locale config via intent | Skill | `skills/locale.py` + timedatectl |
+| 522 | Night light (gamma/color temperature) | Skill | `skills/night_light.py` + wlr-gamma |
+| 523 | Do Not Disturb mode | Infra | notifications filter |
+| 524 | Touchpad gestures no compositor | Shell | `shell/src/gestures.c` + libinput |
+| 525 | App store integration (Flatpak/Snap via intent) | Skill | `skills/app_store.py` |
+| 526 | Backup/restore via intent | Skill | `skills/backup.py` + rsync/timeshift |
+| 527 | Multi-user switching (fast user switch) | Session | greetd integration |
+
+### ♿ Acessibilidade
+
+| # | Task | Tipo | Skill/Módulo |
+|---|------|------|--------------|
+| 530 | Screen reader integration (Orca/AT-SPI) | Infra | GTK4 a11y + compositor |
+| 531 | Zoom / magnifier | Shell | compositor shader |
+| 532 | High contrast mode | UI | theming variant |
+| 533 | Keyboard-only navigation completa | UI | focus management |
+| 534 | Reduced motion mode | UI | animation toggle |
+
+---
+
+## 📋 Fase 1 — Fechar o loop
 
 | # | Task | Tipo |
 |---|------|------|

@@ -1,7 +1,7 @@
 # CIOS — Roadmap
 
 > Substituindo apps por intenção.
-> v2.0.0-rc18 — Maio 2026
+> v2.0.0-rc30 — Maio 2026
 
 ---
 
@@ -50,6 +50,37 @@ Escopo TRAVADO. NÃO adicionar features. Fechar o loop.
 ---
 
 ## Visão futura
+
+### FASE 0.5 — Desktop Completude
+> Fechar gaps com desktop Linux padrão. Sem isso, uso diário tem fricção.
+
+**Prioridade Alta (bloqueiam uso diário):**
+- Notifications system (eventos do sistema, apps, timers, progresso de tasks)
+- Scheduled tasks / timers ("lembra-me às 17h", "backup toda noite")
+- Automount (USB, SD card, drives externos — detectar e montar)
+- Theming básico (dark/light mode, fontes, cores)
+- Display settings via intent (resolução, scaling, refresh rate, arranjo de monitores)
+
+**Prioridade Média (networking + segurança):**
+- VPN via intent ("conecta VPN" → WireGuard/OpenVPN)
+- Firewall via intent ("bloqueia porta 8080" → ufw/iptables)
+- Keyring / secrets management (gnome-keyring equivalente, apps dependem disso)
+- Trash / recycle bin (soft-delete antes de rm permanente)
+
+**Prioridade Baixa (polimento):**
+- Printer support (CUPS integration, "imprime este documento")
+- Timezone / locale config via intent
+- Night light (gamma/color temperature)
+- Do Not Disturb mode (silencia notificações)
+- Touchpad gestures no compositor
+- App store integration (Flatpak/Snap via intent)
+- Backup/restore via intent (Timeshift/rsync)
+
+**Acessibilidade (obrigatório para público amplo):**
+- Screen reader integration (Orca)
+- Zoom / magnifier
+- High contrast mode
+- Keyboard-only navigation completa
 
 ### FASE 1 — Fechar o loop
 > CIOS confiável e inevitável no uso diário.
@@ -117,3 +148,5 @@ Escopo TRAVADO. NÃO adicionar features. Fechar o loop.
 - **Atenção humana.** O CIOS gerencia atenção computacional, não só executa.
 - **Invisibilidade.** Menos UI, mais fluxo. iPhone venceu por fluidez, não features.
 - **Local-first.** Privacidade, offline, determinismo. Cloud é extensão, não dependência.
+- **Desktop-complete antes de futurista.** Gaps básicos (notifications, theming, automount) antes de features avançadas (intent graph, zero-click).
+- **Acessibilidade não é opcional.** Screen reader, zoom, high contrast são requisitos, não nice-to-have.

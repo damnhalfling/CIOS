@@ -1,6 +1,6 @@
 # CIOS — Arquitetura
 
-> v2.0.0-rc18 — Maio 2026
+> v2.0.0-rc30 — Maio 2026
 
 ---
 
@@ -174,3 +174,42 @@ cios-os/
 ├── scripts/                 # Build/install scripts
 └── pyproject.toml           # Project config
 ```
+
+---
+
+## Completude vs. Desktop Linux
+
+CIOS é um **desktop environment cognitivo** sobre Linux (Debian). Kernel, drivers, init, e networking stack são delegados intencionalmente.
+
+### Cobertura atual (~60% de um desktop completo)
+
+| Área | Cobertura | Notas |
+|------|-----------|-------|
+| Display/Compositor | ~80% | Falta gestures, scaling config |
+| Interface/Shell | ~90% | 6 modos, intent-driven |
+| System Management | ~70% | Falta notifications, scheduled tasks, keyring |
+| Hardware Integration | ~60% | Wi-Fi, BT, audio, battery OK. Falta printer, automount, display config |
+| Networking | ~50% | Wi-Fi OK. Falta VPN, firewall, proxy |
+| Acessibilidade | 0% | Blocker para público amplo |
+| Personalização | ~10% | Sem theming, sem appearance settings |
+
+### Gaps críticos (ver TODO.md #500-534)
+
+| Gap | Impacto | Solução |
+|-----|---------|---------|
+| Notifications | Sistema mudo, eventos perdidos | `infra/notifications.py` + GTK4 panel |
+| Scheduled tasks | Sem timers, sem "lembra-me" | `skills/scheduler.py` + systemd-timer |
+| Automount | USB plugado = nada acontece | `skills/automount.py` + udisks2 |
+| Theming | Parece inacabado | GTK4 CSS + compositor |
+| VPN/Firewall | Networking incompleto | `skills/vpn.py` + `skills/firewall.py` |
+| Keyring | Apps não guardam secrets | libsecret integration |
+| Accessibility | Exclui usuários | AT-SPI + Orca + compositor |
+
+### Decisão arquitetural
+
+Cada gap é resolvível como:
+1. **Novo skill** (Python module em `skills/`)
+2. **Novo handler** no planner (intent routing)
+3. **Extensão do compositor** (C, para gestures/zoom)
+
+A arquitetura já suporta. É trabalho incremental, não rewrite.

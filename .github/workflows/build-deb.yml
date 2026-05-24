@@ -141,7 +141,8 @@ jobs:
           WAYLAND_MINOR=$(echo "$SYSTEM_WAYLAND" | cut -d. -f2)
           if [ "${WAYLAND_MINOR:-0}" -lt 23 ]; then
             echo "System wayland is $SYSTEM_WAYLAND, building 1.23..."
-            git clone --depth=1 --branch 1.23.0 https://gitlab.freedesktop.org/wayland/wayland.git /tmp/wayland
+            git clone --depth=1 --branch 1.23.0 https://gitlab.freedesktop.org/wayland/wayland.git /tmp/wayland \
+              || git clone --depth=1 --branch 1.23.0 https://github.com/AquaOS-Project/wayland.git /tmp/wayland
             cd /tmp/wayland
             meson setup build --prefix=/usr --libdir=lib/x86_64-linux-gnu -Ddocumentation=false -Dtests=false -Ddtd_validation=false
             ninja -C build
@@ -157,7 +158,8 @@ jobs:
           WP_MINOR=$(echo "$SYSTEM_WP" | cut -d. -f2)
           if [ "${WP_MINOR:-0}" -lt 35 ]; then
             echo "System wayland-protocols is $SYSTEM_WP, building 1.36..."
-            git clone --depth=1 --branch 1.36 https://gitlab.freedesktop.org/wayland/wayland-protocols.git /tmp/wayland-protocols
+            git clone --depth=1 --branch 1.36 https://gitlab.freedesktop.org/wayland/wayland-protocols.git /tmp/wayland-protocols \
+              || git clone --depth=1 --branch 1.36 https://github.com/AquaOS-Project/wayland-protocols.git /tmp/wayland-protocols
             cd /tmp/wayland-protocols
             meson setup build --prefix=/usr
             ninja -C build
@@ -179,7 +181,8 @@ jobs:
           fi
           if [ "$NEED_BUILD" = "true" ]; then
             echo "System libdrm is $SYSTEM_DRM, building 2.4.122..."
-            git clone --depth=1 --branch libdrm-2.4.122 https://gitlab.freedesktop.org/mesa/drm.git /tmp/libdrm
+            git clone --depth=1 --branch libdrm-2.4.122 https://gitlab.freedesktop.org/mesa/drm.git /tmp/libdrm \
+              || git clone --depth=1 --branch libdrm-2.4.122 https://github.com/AquaOS-Project/drm.git /tmp/libdrm
             cd /tmp/libdrm
             meson setup build --prefix=/usr --libdir=lib/x86_64-linux-gnu -Dtests=false -Dman-pages=disabled
             ninja -C build
@@ -192,7 +195,8 @@ jobs:
       - name: Build and install libdisplay-info (if needed)
         run: |
           if ! pkg-config --exists libdisplay-info; then
-            git clone --depth=1 --branch 0.2.0 https://gitlab.freedesktop.org/emersion/libdisplay-info.git /tmp/libdisplay-info
+            git clone --depth=1 --branch 0.2.0 https://gitlab.freedesktop.org/emersion/libdisplay-info.git /tmp/libdisplay-info \
+              || git clone --depth=1 --branch 0.2.0 https://github.com/emersion/libdisplay-info.git /tmp/libdisplay-info
             cd /tmp/libdisplay-info
             meson setup build --prefix=/usr --libdir=lib/x86_64-linux-gnu
             ninja -C build
@@ -203,7 +207,8 @@ jobs:
       - name: Build and install libliftoff (if needed)
         run: |
           if ! pkg-config --exists libliftoff; then
-            git clone --depth=1 --branch v0.5.0 https://gitlab.freedesktop.org/emersion/libliftoff.git /tmp/libliftoff
+            git clone --depth=1 --branch v0.5.0 https://gitlab.freedesktop.org/emersion/libliftoff.git /tmp/libliftoff \
+              || git clone --depth=1 --branch v0.5.0 https://github.com/emersion/libliftoff.git /tmp/libliftoff
             cd /tmp/libliftoff
             meson setup build --prefix=/usr --libdir=lib/x86_64-linux-gnu
             ninja -C build
@@ -213,7 +218,8 @@ jobs:
 
       - name: Build and install wlroots 0.18.1
         run: |
-          git clone --depth=1 --branch 0.18.1 https://gitlab.freedesktop.org/wlroots/wlroots.git /tmp/wlroots
+          git clone --depth=1 --branch 0.18.1 https://gitlab.freedesktop.org/wlroots/wlroots.git /tmp/wlroots \
+            || git clone --depth=1 --branch 0.18.1 https://github.com/AquaOS-Project/wlroots.git /tmp/wlroots
           cd /tmp/wlroots
           meson setup build --prefix=/usr --libdir=lib/x86_64-linux-gnu -Dxwayland=enabled
           ninja -C build
