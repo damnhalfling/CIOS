@@ -1378,6 +1378,15 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
         lambda m: {"action": "status"},
         0.85,
     ),
+    (
+        re.compile(
+            r"(?:(?:qual|meu|ver|mostrar?|show)\s+)?(?:ip|endere[cç]o\s+ip|ip\s+(?:da\s+)?(?:m[aá]quina|rede|local))",
+            re.IGNORECASE,
+        ),
+        IntentType.NETWORK,
+        lambda m: {"action": "status"},
+        0.90,
+    ),
     # --- audio / volume (PT + EN) ---
     (
         re.compile(

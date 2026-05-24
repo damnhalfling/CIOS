@@ -218,7 +218,8 @@ CHAT_FEED_CSS = f"""
 }}
 
 .msg-bubble.msg-user {{
-    background: {ACCENT};
+    background: rgba(0,229,255,0.12);
+    border: 1px solid rgba(0,229,255,0.3);
     border-radius: 16px 16px 4px 16px;
 }}
 

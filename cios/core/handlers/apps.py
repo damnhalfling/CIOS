@@ -43,8 +43,32 @@ def handle_app_launch(intent: Intent, executor: Executor, memory: Memory) -> Pla
 
 
 def handle_explore_system(intent: Intent, executor: Executor, memory: Memory) -> PlanResult:
-    """Show what CIOS can do."""
+    """Show what CIOS can do, or respond to greetings conversationally."""
     from cios.core.humanizer import _LANG
+
+    # Greetings get a conversational response, not a capability list
+    if intent.params is None or not intent.params:
+        import random
+
+        greetings_pt = [
+            "Olá! No que posso ajudar?",
+            "Oi! O que quer fazer?",
+            "Fala! Como posso ajudar?",
+            "E aí! O que precisa?",
+        ]
+        greetings_en = [
+            "Hey! What can I do for you?",
+            "Hi! How can I help?",
+            "Hello! What do you need?",
+        ]
+        responses = greetings_pt if _LANG == "pt" else greetings_en
+        return PlanResult(
+            plan_steps=["Greeting"],
+            results=[],
+            outcome="success",
+            summary=random.choice(responses),
+            voice_mode="full",
+        )
 
     steps, summary = format_capabilities(_LANG)
     return PlanResult(

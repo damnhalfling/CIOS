@@ -153,11 +153,27 @@ class Planner:
         handler = _HANDLER_MAP.get(intent.type)
 
         if handler is None:
+            # Unknown intent — try Intelligence (cloud) for knowledge questions
+            from cios.core.intelligence import intelligence
+
+            if intelligence.is_logged_in:
+                try:
+                    result = intelligence.query(intent.raw_input, intent="chat")
+                    if result.success and result.text:
+                        return PlanResult(
+                            plan_steps=["Consultando inteligência"],
+                            results=[],
+                            outcome="success",
+                            summary=result.text,
+                        )
+                except Exception:
+                    pass
+
             return PlanResult(
                 plan_steps=["Unknown intent"],
                 results=[],
                 outcome="failure",
-                summary="I don't understand that request.",
+                summary="Não entendi. Tenta reformular?",
                 error="Unknown intent type",
             )
 

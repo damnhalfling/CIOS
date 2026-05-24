@@ -422,11 +422,31 @@ class CIOSApplication(Gtk.Application):
         """Show status line with current processing phase."""
         self._status_label.set_label(phase)
         self._status_line.set_visible(True)
+        # Start pulse animation
+        if not hasattr(self, "_pulse_timer") or self._pulse_timer is None:
+            self._pulse_state = False
+            self._pulse_timer = GLib.timeout_add(1500, self._pulse_status_bar)
+
+    def _pulse_status_bar(self):
+        """Toggle pulse class for animated glow bar."""
+        if not self._status_line.get_visible():
+            self._pulse_timer = None
+            return False
+        self._pulse_state = not self._pulse_state
+        if self._pulse_state:
+            self._status_bar.add_css_class("pulse")
+        else:
+            self._status_bar.remove_css_class("pulse")
+        return True
 
     def _hide_status(self):
         """Hide the status line."""
         self._status_line.set_visible(False)
         self._status_label.set_label("")
+        self._status_bar.remove_css_class("pulse")
+        if hasattr(self, "_pulse_timer") and self._pulse_timer:
+            GLib.source_remove(self._pulse_timer)
+            self._pulse_timer = None
 
     def _finish_streaming_show(self, result: str, status: str | None):
         """Show final result in chat."""
@@ -858,10 +878,14 @@ class CIOSApplication(Gtk.Application):
                 letter-spacing: 0.5px;
             }}
             .status-glow-bar {{
-                min-height: 1px;
-                background: linear-gradient(90deg, {ACCENT}, transparent);
-                opacity: 0.3;
+                min-height: 2px;
+                background: linear-gradient(90deg, transparent, {ACCENT}, transparent);
+                opacity: 0.5;
                 border-radius: 1px;
+                transition: all 1.5s ease-in-out;
+            }}
+            .status-glow-bar.pulse {{
+                opacity: 0.15;
             }}
             .prompt-input {{
                 background: {BG_INPUT};

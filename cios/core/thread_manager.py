@@ -187,6 +187,12 @@ class ThreadStore:
                 )
                 # Insert all turns
                 for idx, turn in enumerate(thread.turns):
+                    # Sanitize sensitive params before persisting
+                    safe_params = {
+                        k: v
+                        for k, v in turn.params.items()
+                        if k not in ("sudo_password", "password", "token", "secret")
+                    }
                     self._conn.execute(
                         """INSERT INTO thread_turns
                            (thread_id, turn_index, user_input, intent_type,
@@ -197,7 +203,7 @@ class ThreadStore:
                             idx,
                             turn.user_input,
                             turn.intent_type,
-                            json.dumps(turn.params),
+                            json.dumps(safe_params),
                             turn.result_summary,
                             turn.outcome,
                             turn.timestamp,

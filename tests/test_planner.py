@@ -35,7 +35,7 @@ class TestPlannerRouting:
         intent = Intent(type=IntentType.UNKNOWN, confidence=0.0, raw_input="gibberish")
         result = planner.execute(intent)
         assert result.outcome == "failure"
-        assert "don't understand" in result.summary.lower()
+        assert "don't understand" in result.summary.lower() or "não entendi" in result.summary.lower()
 
     def test_session_missing_action(self, planner):
         intent = Intent(type=IntentType.SESSION, confidence=0.9, params={})
