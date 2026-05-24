@@ -383,6 +383,12 @@ class CIOSApplication(Gtk.Application):
                     result = data.get("result", "Concluído.")
                     status = data.get("status", "success")
 
+                    # Lock screen action
+                    if data.get("action") == "lock_screen":
+                        GLib.idle_add(self._hide_status)
+                        GLib.idle_add(self._do_lock_screen)
+                        return
+
                     # Password needed
                     if data.get("password_prompt"):
                         GLib.idle_add(self._hide_status)
@@ -791,6 +797,12 @@ class CIOSApplication(Gtk.Application):
             self._stack.remove(self._active_viewer)
             self._active_viewer = None
         self._stack.set_visible_child_name("main")
+
+    def _do_lock_screen(self):
+        """Show the lock screen overlay."""
+        from cios.ui.gtk.lock_screen import show_lock_screen
+
+        show_lock_screen(self._win)
 
     def _send_ipc_ready(self):
         """Send 'ready' command to compositor via IPC socket to dismiss splash."""

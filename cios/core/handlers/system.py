@@ -39,6 +39,16 @@ def handle_session(intent: Intent, executor: Executor, memory: Memory) -> PlanRe
             error="Missing session action",
         )
 
+    # Lock screen — handled by GTK4 lock screen (not external command)
+    if action_name == "lock":
+        return PlanResult(
+            plan_steps=["Bloqueando tela"],
+            results=[],
+            outcome="success",
+            summary="Tela bloqueada",
+            data={"action": "lock_screen"},
+        )
+
     action = get_session_action(action_name)
     if not action:
         return PlanResult(
