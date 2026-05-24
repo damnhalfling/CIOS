@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 # ═══════════════════════════════════════════════════════════════════════════
 
 _MAX_RETRIES = 0
-_RETRY_BACKOFF = []  # no retries
+_RETRY_BACKOFF: list[float] = []  # no retries
 _PROVIDER_TIMEOUTS = {
     "ollama": 8,  # 8s max — if model isn't loaded, fail fast and escalate
     "openai": 15,
