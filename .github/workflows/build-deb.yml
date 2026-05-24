@@ -113,9 +113,13 @@ jobs:
             libegl1-mesa-dev libgles2-mesa-dev libcairo2-dev \
             patchelf libpam0g-dev build-essential
           # Upgrade meson if too old (wlroots 0.18 needs >= 1.5)
-          MESON_VER=$(meson --version 2>/dev/null || echo "0")
-          if dpkg --compare-versions "$MESON_VER" lt "1.5.0"; then
-            pip3 install --break-system-packages meson>=1.5.0 || pip3 install meson>=1.5.0
+          MESON_VER=$(meson --version 2>/dev/null || echo "0.0.0")
+          MESON_MAJOR=$(echo "$MESON_VER" | cut -d. -f1)
+          MESON_MINOR=$(echo "$MESON_VER" | cut -d. -f2)
+          if [ "$MESON_MAJOR" -lt 1 ] || ([ "$MESON_MAJOR" -eq 1 ] && [ "$MESON_MINOR" -lt 5 ]); then
+            echo "Meson $MESON_VER is too old, upgrading..."
+            pip3 install --break-system-packages "meson>=1.5.0" 2>/dev/null || pip3 install "meson>=1.5.0"
+            hash -r
           fi
           # Optional deps (may not exist in all distros)
           apt-get install -y libdisplay-info-dev libliftoff-dev 2>/dev/null || true
@@ -133,8 +137,9 @@ jobs:
 
       - name: Build and install wayland 1.23 (if needed)
         run: |
-          SYSTEM_WAYLAND=$(pkg-config --modversion wayland-server 2>/dev/null || echo "0")
-          if dpkg --compare-versions "$SYSTEM_WAYLAND" lt "1.23.0"; then
+          SYSTEM_WAYLAND=$(pkg-config --modversion wayland-server 2>/dev/null || echo "0.0.0")
+          WAYLAND_MINOR=$(echo "$SYSTEM_WAYLAND" | cut -d. -f2)
+          if [ "${WAYLAND_MINOR:-0}" -lt 23 ]; then
             echo "System wayland is $SYSTEM_WAYLAND, building 1.23..."
             git clone --depth=1 --branch 1.23.0 https://gitlab.freedesktop.org/wayland/wayland.git /tmp/wayland
             cd /tmp/wayland
@@ -144,6 +149,29 @@ jobs:
             ldconfig
           else
             echo "System wayland $SYSTEM_WAYLAND is sufficient"
+          fi
+
+      - name: Build and install libdrm (if needed)
+        run: |
+          SYSTEM_DRM=$(pkg-config --modversion libdrm 2>/dev/null || echo "0.0.0")
+          DRM_MINOR=$(echo "$SYSTEM_DRM" | cut -d. -f2)
+          DRM_PATCH=$(echo "$SYSTEM_DRM" | cut -d. -f3)
+          NEED_BUILD=false
+          if [ "${DRM_MINOR:-0}" -lt 4 ]; then
+            NEED_BUILD=true
+          elif [ "${DRM_MINOR:-0}" -eq 4 ] && [ "${DRM_PATCH:-0}" -lt 122 ]; then
+            NEED_BUILD=true
+          fi
+          if [ "$NEED_BUILD" = "true" ]; then
+            echo "System libdrm is $SYSTEM_DRM, building 2.4.122..."
+            git clone --depth=1 --branch libdrm-2.4.122 https://gitlab.freedesktop.org/mesa/drm.git /tmp/libdrm
+            cd /tmp/libdrm
+            meson setup build --prefix=/usr --libdir=lib/x86_64-linux-gnu -Dtests=false -Dman-pages=disabled
+            ninja -C build
+            meson install -C build
+            ldconfig
+          else
+            echo "System libdrm $SYSTEM_DRM is sufficient"
           fi
 
       - name: Build and install libdisplay-info (if needed)
