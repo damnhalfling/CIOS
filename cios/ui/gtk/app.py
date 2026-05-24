@@ -389,6 +389,17 @@ class CIOSApplication(Gtk.Application):
                         GLib.idle_add(self._do_lock_screen)
                         return
 
+                    # Confirmation needed (destructive action)
+                    if data.get("confirm"):
+                        confirm_msg = data["confirm"]
+                        GLib.idle_add(self._hide_status)
+                        GLib.idle_add(
+                            self._chat_feed.add_assistant_message,
+                            f"{confirm_msg}\n\nDiga 'sim' para confirmar.",
+                        )
+                        GLib.idle_add(self._finish_execution)
+                        return
+
                     # Password needed
                     if data.get("password_prompt"):
                         GLib.idle_add(self._hide_status)

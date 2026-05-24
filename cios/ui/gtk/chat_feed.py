@@ -5,6 +5,7 @@ User messages appear on the right, system responses on the left.
 Supports streaming (token-by-token), progress updates, and metadata.
 """
 
+import re
 import time
 
 import gi
@@ -13,6 +14,24 @@ gi.require_version("Gtk", "4.0")
 from gi.repository import GLib, Gtk, Pango  # noqa: E402
 
 from cios.ui.theme import ACCENT, BG_CARD, BORDER, FG, FG_DIM, FG_SEC  # noqa: E402
+
+
+def _md_to_pango(text: str) -> str:
+    """Convert basic markdown to Pango markup for GTK labels.
+
+    Handles: **bold**, *italic*, `code`, and escapes XML entities.
+    """
+    # Escape XML entities first (& must be first)
+    text = text.replace("&", "&amp;")
+    text = text.replace("<", "&lt;")
+    text = text.replace(">", "&gt;")
+    # Bold: **text** → <b>text</b>
+    text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text)
+    # Italic: *text* → <i>text</i>
+    text = re.sub(r"\*(.+?)\*", r"<i>\1</i>", text)
+    # Code: `text` → <tt>text</tt>
+    text = re.sub(r"`(.+?)`", r"<tt>\1</tt>", text)
+    return text
 
 
 class MessageBubble(Gtk.Box):
@@ -39,8 +58,9 @@ class MessageBubble(Gtk.Box):
         bubble.add_css_class(css_class)
         self.append(bubble)
 
-        # Content label
-        self._label = Gtk.Label(label=content)
+        # Content label (with markdown rendering)
+        self._label = Gtk.Label()
+        self._label.set_markup(_md_to_pango(content))
         self._label.set_wrap(True)
         self._label.set_wrap_mode(Pango.WrapMode.WORD_CHAR)
         self._label.set_halign(Gtk.Align.START)
@@ -62,12 +82,12 @@ class MessageBubble(Gtk.Box):
     def set_content(self, text: str) -> None:
         """Update the message content (used for streaming)."""
         self._content = text
-        self._label.set_label(text)
+        self._label.set_markup(_md_to_pango(text))
 
     def append_text(self, text: str) -> None:
         """Append text to the message (streaming token-by-token)."""
         self._content += text
-        self._label.set_label(self._content)
+        self._label.set_markup(_md_to_pango(self._content))
 
     def add_metadata(self, metadata: dict) -> None:
         """Add cognitive indicator metadata below the message."""

@@ -375,6 +375,15 @@ class CIOSBridge:
             confirm_msg = self._needs_confirmation(intent)
             if confirm_msg:
                 signal_topbar_idle()
+                # Set pending question so "sim" re-executes with confirmed=True
+                self._thread_manager.set_pending_question(
+                    PendingQuestion(
+                        intent=intent,
+                        question_type="confirm_action",
+                        options=["sim", "não"],
+                        timestamp=time.time(),
+                    )
+                )
                 return self._confirm_response(confirm_msg)
 
         # Execute
@@ -482,6 +491,14 @@ class CIOSBridge:
             confirm_msg = self._needs_confirmation(intent)
             if confirm_msg:
                 signal_topbar_idle()
+                self._thread_manager.set_pending_question(
+                    PendingQuestion(
+                        intent=intent,
+                        question_type="confirm_action",
+                        options=["sim", "não"],
+                        timestamp=time.time(),
+                    )
+                )
                 return self._confirm_response(confirm_msg)
 
         if on_step:

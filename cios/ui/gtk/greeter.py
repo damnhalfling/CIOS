@@ -222,6 +222,8 @@ class CIOSGreeter(Gtk.Application):
                 resp = _greetd_post_auth(password)
 
                 if resp.get("type") == "error":
+                    # Cancel the failed session so we can try again
+                    _greetd_cancel_session()
                     self._show_error("Usuário ou senha incorretos")
                     self._password_entry.set_text("")
                     self._password_entry.grab_focus()
@@ -236,10 +238,16 @@ class CIOSGreeter(Gtk.Application):
                     self.quit()
                     return
                 else:
+                    _greetd_cancel_session()
                     self._show_error("Falha ao iniciar sessão")
                     self._login_btn.set_sensitive(True)
 
         except Exception as e:
+            # Cancel any pending session on error
+            try:
+                _greetd_cancel_session()
+            except Exception:
+                pass
             self._show_error(f"Erro: {e}")
             self._login_btn.set_sensitive(True)
 
