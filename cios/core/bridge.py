@@ -425,9 +425,27 @@ class CIOSBridge:
 
         # LLM fallback — hybrid model (same as _process)
         if intent.type == IntentType.UNKNOWN:
+            # Priority 1: If Intelligence is logged in, ask cloud directly
+            from cios.core.intelligence import intelligence
             from cios.core.model_router import is_any_provider_available
 
-            # Try classifier first
+            if intelligence.is_logged_in:
+                if on_step:
+                    on_step("Consultando inteligência…", 1, 0)
+                try:
+                    intel_result = intelligence.query(resolved_input, intent="chat")
+                    if intel_result.success and intel_result.text:
+                        signal_topbar_idle()
+                        return {
+                            "steps": ["Consultando inteligência"],
+                            "result": intel_result.text,
+                            "status": "success",
+                            "confirm": None,
+                        }
+                except Exception as e:
+                    logger.debug("Intelligence query failed in streaming: %s", e)
+
+            # Priority 2: Try classifier (cache + Ollama)
             if on_step:
                 on_step("Classificando…", 1, 0)
             classified = classify_intent(resolved_input)
