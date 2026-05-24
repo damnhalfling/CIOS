@@ -46,6 +46,7 @@ class IntentType(Enum):
     SCREEN_CAPTURE = "screen_capture"
     HISTORY_SEARCH = "history_search"
     SPREADSHEET = "spreadsheet"
+    MONITOR = "monitor"
     UNKNOWN = "unknown"
 
 
@@ -315,6 +316,70 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
         IntentType.BLUETOOTH,
         lambda m: {"action": "status"},
         0.95,
+    ),
+    # --- monitor configuration (PT + EN) ---
+    (
+        re.compile(
+            r"(?:configurar?|config|ajustar?|configure|setup)\s+(?:o?\s+)?(?:monitor(?:es)?|tela(?:s)?|display(?:s)?)",
+            re.IGNORECASE,
+        ),
+        IntentType.MONITOR,
+        lambda m: {"action": "list"},
+        0.95,
+    ),
+    (
+        re.compile(
+            r"(?:monitor|tela|display)\s+(?:acima|em\s*cima|above|over)",
+            re.IGNORECASE,
+        ),
+        IntentType.MONITOR,
+        lambda m: {"action": "position", "position": "above"},
+        0.95,
+    ),
+    (
+        re.compile(
+            r"(?:monitor|tela|display)\s+(?:abaixo|embaixo|below|under)",
+            re.IGNORECASE,
+        ),
+        IntentType.MONITOR,
+        lambda m: {"action": "position", "position": "below"},
+        0.95,
+    ),
+    (
+        re.compile(
+            r"(?:monitor|tela|display)\s+(?:(?:[àa]\s*)?(?:esquerda|left))",
+            re.IGNORECASE,
+        ),
+        IntentType.MONITOR,
+        lambda m: {"action": "position", "position": "left"},
+        0.95,
+    ),
+    (
+        re.compile(
+            r"(?:monitor|tela|display)\s+(?:(?:[àa]\s*)?(?:direita|right)|ao\s*lado)",
+            re.IGNORECASE,
+        ),
+        IntentType.MONITOR,
+        lambda m: {"action": "position", "position": "right"},
+        0.95,
+    ),
+    (
+        re.compile(
+            r"(?:espelhar?|mirror|duplicar?|mesma\s+imagem|clone)\s+(?:a?\s+)?(?:tela|monitor|display|screen)?",
+            re.IGNORECASE,
+        ),
+        IntentType.MONITOR,
+        lambda m: {"action": "mirror"},
+        0.95,
+    ),
+    (
+        re.compile(
+            r"(?:quais?|quantos?|listar?|list)\s+(?:os?\s+)?(?:monitor(?:es)?|tela(?:s)?|display(?:s)?)",
+            re.IGNORECASE,
+        ),
+        IntentType.MONITOR,
+        lambda m: {"action": "list"},
+        0.90,
     ),
     # --- explore system (PT + EN) — MUST be before app_launch ---
     (

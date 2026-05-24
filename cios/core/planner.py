@@ -31,7 +31,12 @@ from cios.core.handlers.media import handle_intent_browse, handle_intent_media, 
 from cios.core.handlers.misc import handle_command_exec, handle_intelligence, handle_self_update
 from cios.core.handlers.network import handle_network
 from cios.core.handlers.packages import handle_package
-from cios.core.handlers.peripherals import handle_bluetooth, handle_clipboard, handle_window
+from cios.core.handlers.peripherals import (
+    handle_bluetooth,
+    handle_clipboard,
+    handle_monitor,
+    handle_window,
+)
 from cios.core.handlers.process import handle_process_control, handle_status
 from cios.core.handlers.screen_capture import handle_screen_capture
 from cios.core.handlers.spreadsheet import handle_spreadsheet
@@ -106,6 +111,7 @@ _HANDLER_MAP = {
     IntentType.CLIPBOARD: handle_clipboard,
     IntentType.WINDOW: handle_window,
     IntentType.BLUETOOTH: handle_bluetooth,
+    IntentType.MONITOR: handle_monitor,
     IntentType.SELF_UPDATE: handle_self_update,
     IntentType.EXPLORE_SYSTEM: handle_explore_system,
     IntentType.LIST_APPS: handle_list_apps,
@@ -313,6 +319,9 @@ class Planner:
 
     def _handle_bluetooth(self, intent: Intent) -> PlanResult:
         return handle_bluetooth(intent, self.executor, self.memory)
+
+    def _handle_monitor(self, intent: Intent) -> PlanResult:
+        return handle_monitor(intent, self.executor, self.memory)
 
     def _handle_self_update(self, intent: Intent) -> PlanResult:
         return handle_self_update(intent, self.executor, self.memory)

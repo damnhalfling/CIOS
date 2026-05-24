@@ -233,3 +233,53 @@ void output_init(struct CiosServer *server) {
 struct CiosOutput *output_get_primary(struct CiosServer *server) {
     return server->primary_output;
 }
+
+/*
+ * Find an output by name (e.g. "eDP-1", "HDMI-A-1").
+ */
+struct CiosOutput *output_find_by_name(struct CiosServer *server, const char *name) {
+    struct CiosOutput *output;
+    wl_list_for_each(output, &server->outputs, link) {
+        if (output->wlr_output && output->wlr_output->name &&
+            strcmp(output->wlr_output->name, name) == 0) {
+            return output;
+        }
+    }
+    return NULL;
+}
+
+/*
+ * Position an output at specific coordinates in the layout.
+ * Used by IPC configure_output command.
+ */
+bool output_set_position(struct CiosOutput *output, int x, int y) {
+    if (!output || !output->wlr_output) return false;
+
+    struct CiosServer *server = output->server;
+    wlr_output_layout_add(server->output_layout, output->wlr_output, x, y);
+    output_update_usable_area(output);
+
+    LOG_INFO("output repositioned: %s at (%d, %d)", output->wlr_output->name, x, y);
+    return true;
+}
+
+/*
+ * Mirror an output to show the same content as another.
+ * Positions both at (0,0) in the layout.
+ */
+bool output_set_mirror(struct CiosOutput *output, struct CiosOutput *mirror_of) {
+    if (!output || !mirror_of) return false;
+
+    struct CiosServer *server = output->server;
+
+    /* Position both at origin — wlroots will render same content */
+    wlr_output_layout_add(server->output_layout, mirror_of->wlr_output, 0, 0);
+    wlr_output_layout_add(server->output_layout, output->wlr_output, 0, 0);
+
+    output_update_usable_area(output);
+    output_update_usable_area(mirror_of);
+
+    LOG_INFO("output mirrored: %s mirrors %s",
+        output->wlr_output->name, mirror_of->wlr_output->name);
+    return true;
+}

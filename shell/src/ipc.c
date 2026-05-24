@@ -583,6 +583,54 @@ static void handle_get_outputs(struct CiosIpc *ipc, const char *json, const char
     ipc_send_response(ipc, id, buf);
 }
 
+static void handle_configure_output(struct CiosIpc *ipc, const char *json, const char *id) {
+    struct CiosServer *server = ipc->server;
+
+    char *name = json_get_string(json, "name");
+    if (!name) {
+        ipc_send_response(ipc, id, "{\"response\":\"error\",\"reason\":\"missing name\"}");
+        return;
+    }
+
+    struct CiosOutput *output = output_find_by_name(server, name);
+    if (!output) {
+        char buf[256];
+        snprintf(buf, sizeof(buf),
+                 "{\"response\":\"error\",\"reason\":\"output not found: %s\"}", name);
+        ipc_send_response(ipc, id, buf);
+        free(name);
+        return;
+    }
+
+    /* Check for mirror mode */
+    char *mirror_of = json_get_string(json, "mirror_of");
+    if (mirror_of) {
+        struct CiosOutput *primary = output_find_by_name(server, mirror_of);
+        if (primary) {
+            output_set_mirror(output, primary);
+            ipc_send_response(ipc, id, "{\"response\":\"ok\"}");
+        } else {
+            char buf[256];
+            snprintf(buf, sizeof(buf),
+                     "{\"response\":\"error\",\"reason\":\"mirror target not found: %s\"}", mirror_of);
+            ipc_send_response(ipc, id, buf);
+        }
+        free(mirror_of);
+        free(name);
+        return;
+    }
+
+    /* Position mode */
+    int x = json_get_int(json, "x", 0);
+    int y = json_get_int(json, "y", 0);
+
+    output_set_position(output, x, y);
+
+    LOG_INFO("ipc: configure_output %s at (%d, %d) id=%s", name, x, y, id);
+    ipc_send_response(ipc, id, "{\"response\":\"ok\"}");
+    free(name);
+}
+
 static void handle_ready(struct CiosIpc *ipc, const char *json, const char *id) {
     (void)json;
     LOG_INFO("ipc: ready command received id=%s", id);
@@ -654,6 +702,8 @@ static void ipc_route_command(struct CiosIpc *ipc, const char *json) {
         handle_list_surfaces(ipc, json, id);
     } else if (strcmp(command, "get_outputs") == 0) {
         handle_get_outputs(ipc, json, id);
+    } else if (strcmp(command, "configure_output") == 0) {
+        handle_configure_output(ipc, json, id);
     } else if (strcmp(command, "ready") == 0) {
         handle_ready(ipc, json, id);
     } else if (strcmp(command, "logout") == 0) {

@@ -347,3 +347,103 @@ def handle_window(intent: Intent, executor: Executor, memory: Memory) -> PlanRes
         outcome="failure",
         summary="Unknown window action",
     )
+
+
+def handle_monitor(intent: Intent, executor: Executor, memory: Memory) -> PlanResult:
+    """Handle monitor configuration: list, position, mirror."""
+    from cios.skills.monitor import configure_mirror, configure_position, get_monitors
+
+    action = intent.params.get("action", "list")
+
+    if action == "list":
+        monitors = get_monitors()
+        if not monitors:
+            return PlanResult(
+                plan_steps=["Detectando monitores"],
+                results=[],
+                outcome="success",
+                summary="Nenhum monitor detectado via compositor",
+            )
+
+        lines = []
+        for m in monitors:
+            primary_tag = " (principal)" if m.primary else ""
+            lines.append(f"  {m.name} — {m.width}x{m.height} em ({m.x},{m.y}){primary_tag}")
+
+        summary = f"{len(monitors)} monitor(es) conectado(s):\n" + "\n".join(lines)
+
+        if len(monitors) >= 2:
+            summary += "\n\nComo quer usar?\n"
+            summary += "  Diga: 'monitor acima', 'monitor ao lado', ou 'espelhar tela'"
+
+        return PlanResult(
+            plan_steps=["Detectando monitores"],
+            results=[],
+            outcome="success",
+            summary=summary,
+        )
+
+    if action == "position":
+        target = intent.params.get("target", "")
+        position = intent.params.get("position", "above")
+        reference = intent.params.get("reference", "")
+
+        # Auto-detect if not specified
+        if not target or not reference:
+            monitors = get_monitors()
+            if len(monitors) < 2:
+                return PlanResult(
+                    plan_steps=["Configurando monitor"],
+                    results=[],
+                    outcome="failure",
+                    summary="Preciso de 2 monitores conectados para posicionar",
+                )
+            # Primary is reference, other is target
+            primary = next((m for m in monitors if m.primary), monitors[0])
+            other = next((m for m in monitors if m.name != primary.name), monitors[1])
+            reference = primary.name
+            target = other.name
+
+        steps, ok, err = configure_position(target, position, reference)
+        pos_names = {"above": "acima", "below": "abaixo", "left": "à esquerda", "right": "à direita"}
+        pos_label = pos_names.get(position, position)
+
+        return PlanResult(
+            plan_steps=steps,
+            results=[],
+            outcome="success" if ok else "failure",
+            summary=f"Monitor {target} posicionado {pos_label}" if ok else f"Falhou: {err}",
+        )
+
+    if action == "mirror":
+        target = intent.params.get("target", "")
+        mirror_of = intent.params.get("mirror_of", "")
+
+        if not target or not mirror_of:
+            monitors = get_monitors()
+            if len(monitors) < 2:
+                return PlanResult(
+                    plan_steps=["Espelhando monitor"],
+                    results=[],
+                    outcome="failure",
+                    summary="Preciso de 2 monitores conectados para espelhar",
+                )
+            primary = next((m for m in monitors if m.primary), monitors[0])
+            other = next((m for m in monitors if m.name != primary.name), monitors[1])
+            mirror_of = primary.name
+            target = other.name
+
+        steps, ok, err = configure_mirror(target, mirror_of)
+        return PlanResult(
+            plan_steps=steps,
+            results=[],
+            outcome="success" if ok else "failure",
+            summary=f"Monitores espelhados ({target} = {mirror_of})" if ok else f"Falhou: {err}",
+        )
+
+    return PlanResult(
+        plan_steps=["Configurando monitor"],
+        results=[],
+        outcome="failure",
+        summary=f"Ação de monitor desconhecida: {action}",
+    )

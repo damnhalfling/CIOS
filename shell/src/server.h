@@ -189,6 +189,9 @@ void server_reveal_surfaces(struct CiosServer *server);
 /* output.c */
 void output_init(struct CiosServer *server);
 struct CiosOutput *output_get_primary(struct CiosServer *server);
+struct CiosOutput *output_find_by_name(struct CiosServer *server, const char *name);
+bool output_set_position(struct CiosOutput *output, int x, int y);
+bool output_set_mirror(struct CiosOutput *output, struct CiosOutput *mirror_of);
 
 /* input.c */
 void input_init(struct CiosServer *server);
