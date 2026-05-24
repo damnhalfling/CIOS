@@ -151,6 +151,21 @@ jobs:
             echo "System wayland $SYSTEM_WAYLAND is sufficient"
           fi
 
+      - name: Build and install wayland-protocols (if needed)
+        run: |
+          SYSTEM_WP=$(pkg-config --modversion wayland-protocols 2>/dev/null || echo "0.0")
+          WP_MINOR=$(echo "$SYSTEM_WP" | cut -d. -f2)
+          if [ "${WP_MINOR:-0}" -lt 35 ]; then
+            echo "System wayland-protocols is $SYSTEM_WP, building 1.36..."
+            git clone --depth=1 --branch 1.36 https://gitlab.freedesktop.org/wayland/wayland-protocols.git /tmp/wayland-protocols
+            cd /tmp/wayland-protocols
+            meson setup build --prefix=/usr
+            ninja -C build
+            meson install -C build
+          else
+            echo "System wayland-protocols $SYSTEM_WP is sufficient"
+          fi
+
       - name: Build and install libdrm (if needed)
         run: |
           SYSTEM_DRM=$(pkg-config --modversion libdrm 2>/dev/null || echo "0.0.0")
