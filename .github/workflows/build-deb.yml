@@ -48,8 +48,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: |
-          pip install -e ".[test]"
+        run: pip install -e ".[test]"
 
       - name: Run tests
         run: pytest --cov=cios --cov-report=term-missing --cov-report=xml
@@ -62,8 +61,16 @@ jobs:
         if: always()
 
   build:
-    runs-on: ubuntu-latest
     needs: test
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            label: ubuntu2404
+          - os: ubuntu-latest
+            label: ubuntu2604
+
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout
@@ -72,15 +79,21 @@ jobs:
       - name: Extract version from tag
         id: version
         run: |
-          # Strip 'v' prefix: v1.2.0-rc1 → 1.2.0-rc1
           VERSION="${GITHUB_REF_NAME#v}"
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
-          # Detect if this is an RC release
           if [[ "$VERSION" == *"-rc"* ]]; then
             echo "IS_RC=true" >> "$GITHUB_OUTPUT"
           else
             echo "IS_RC=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Detect distro info
+        id: distro
+        run: |
+          DISTRO_ID=$(lsb_release -is | tr '[:upper:]' '[:lower:]')
+          DISTRO_VERSION=$(lsb_release -rs | tr -d '.')
+          echo "SUFFIX=${DISTRO_ID}${DISTRO_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Building for: ${DISTRO_ID} ${DISTRO_VERSION}"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -101,9 +114,7 @@ jobs:
             libffi-dev libxml2-dev libexpat1-dev \
             libegl1-mesa-dev libgles2-mesa-dev libcairo2-dev \
             patchelf libpam0g-dev
-          # Install newer Meson (wlroots 0.18 requires c23 support → Meson 1.5+)
           sudo pip install meson>=1.5.0
-          # These may not be in default repos — install if available
           sudo apt-get install -y libdisplay-info-dev libliftoff-dev 2>/dev/null || true
 
       - name: Build and install greetd
@@ -117,14 +128,20 @@ jobs:
           sudo cp target/release/agreety /usr/bin/agreety
           sudo chmod 755 /usr/bin/greetd /usr/bin/agreety
 
-      - name: Build and install wayland 1.23 (system has 1.22)
+      - name: Build and install wayland 1.23
         run: |
-          git clone --depth=1 --branch 1.23.0 https://gitlab.freedesktop.org/wayland/wayland.git /tmp/wayland
-          cd /tmp/wayland
-          meson setup build --prefix=/usr --libdir=lib/x86_64-linux-gnu -Ddocumentation=false -Dtests=false -Ddtd_validation=false
-          ninja -C build
-          sudo meson install -C build
-          sudo ldconfig
+          SYSTEM_WAYLAND=$(pkg-config --modversion wayland-server 2>/dev/null || echo "0")
+          if dpkg --compare-versions "$SYSTEM_WAYLAND" lt "1.23.0"; then
+            echo "System wayland is $SYSTEM_WAYLAND, building 1.23..."
+            git clone --depth=1 --branch 1.23.0 https://gitlab.freedesktop.org/wayland/wayland.git /tmp/wayland
+            cd /tmp/wayland
+            meson setup build --prefix=/usr --libdir=lib/x86_64-linux-gnu -Ddocumentation=false -Dtests=false -Ddtd_validation=false
+            ninja -C build
+            sudo meson install -C build
+            sudo ldconfig
+          else
+            echo "System wayland $SYSTEM_WAYLAND is sufficient, skipping build"
+          fi
 
       - name: Build and install libdisplay-info
         run: |
@@ -161,16 +178,56 @@ jobs:
           meson setup build --prefix=/usr --libdir=lib/x86_64-linux-gnu -Dxwayland=enabled
           ninja -C build
           sudo meson install -C build
-          # Protocol headers are generated in build dir — copy them to include dir
           sudo find build -name "*-protocol.h" -exec cp {} /usr/include/wlroots-0.18/ \;
           sudo ldconfig
-          # Verify wlroots is findable
-          pkg-config --modversion wlroots-0.18 || { echo "wlroots-0.18.pc not found, searching..."; find /usr -name "wlroots*.pc" 2>/dev/null; exit 1; }
+          pkg-config --modversion wlroots-0.18 || { echo "wlroots-0.18.pc not found"; find /usr -name "wlroots*.pc" 2>/dev/null; exit 1; }
 
       - name: Build .deb package
         run: bash build-deb.sh "${{ steps.version.outputs.VERSION }}"
         env:
           PKG_CONFIG_PATH: /usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig
+
+      - name: Rename .deb with distro suffix
+        run: |
+          ORIGINAL="cios_${{ steps.version.outputs.VERSION }}_amd64.deb"
+          TARGET="cios_${{ steps.version.outputs.VERSION }}_${{ steps.distro.outputs.SUFFIX }}_amd64.deb"
+          mv "$ORIGINAL" "$TARGET"
+          echo "DEB_FILE=$TARGET" >> "$GITHUB_ENV"
+
+      - name: Upload .deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-${{ matrix.label }}
+          path: ${{ env.DEB_FILE }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          if [[ "$VERSION" == *"-rc"* ]]; then
+            echo "IS_RC=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "IS_RC=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download all .deb artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: debs/
+          pattern: deb-*
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -la debs/
 
       - name: Delete previous RC releases (RC only)
         if: steps.version.outputs.IS_RC == 'true'
@@ -197,7 +254,6 @@ jobs:
             echo "Deleting release $TAG..."
             gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
           done
-          echo "All previous releases deleted."
 
       - name: Delete old tags from remote (stable only)
         if: steps.version.outputs.IS_RC == 'false'
@@ -213,7 +269,16 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: cios_${{ steps.version.outputs.VERSION }}_amd64.deb
+          files: debs/*
           generate_release_notes: true
           draft: false
           prerelease: ${{ steps.version.outputs.IS_RC == 'true' }}
+          body: |
+            ## Downloads
+
+            | File | Target |
+            |------|--------|
+            | `cios_*_ubuntu2404_amd64.deb` | Ubuntu 24.04 / Debian 12 |
+            | `cios_*_ubuntu2604_amd64.deb` | Ubuntu 26.04 / Debian 13+ |
+
+            Install: `sudo apt install ./cios_<version>_<distro>_amd64.deb`
