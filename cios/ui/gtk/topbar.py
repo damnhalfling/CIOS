@@ -56,39 +56,12 @@ class Topbar(Gtk.Box):
         self._user_label.add_css_class("topbar-user")
         self.append(self._user_label)
 
-        # Power dropdown (conventional dropdown menu)
-        self._power_dropdown = Gtk.DropDown()
-        self._power_dropdown.add_css_class("topbar-power")
-
-        # Options
-        power_options = Gtk.StringList.new(
-            ["⏻", "🔒 Bloquear", "↩ Deslogar", "🔄 Reiniciar", "⏻ Desligar"]
-        )
-        self._power_dropdown.set_model(power_options)
-        self._power_dropdown.set_selected(0)  # Show ⏻ as default
-        self._power_dropdown.connect("notify::selected", self._on_power_selected)
-        self.append(self._power_dropdown)
+        # Power actions available via intent: "desligar", "reiniciar", "bloquear", "deslogar"
+        # No visual button — popover/dropdown breaks Wayland input
 
         # Start polling
         GLib.timeout_add(10000, self._update)
         self._update()
-
-    def _on_power_selected(self, dropdown, _pspec):
-        """Handle power dropdown selection."""
-        selected = dropdown.get_selected()
-        if selected == 0:
-            return  # ⏻ icon itself, no action
-        # Reset to icon after action
-        GLib.idle_add(dropdown.set_selected, 0)
-
-        if selected == 1:
-            self._lock_screen()
-        elif selected == 2:
-            self._do_logout()
-        elif selected == 3:
-            self._do_reboot()
-        elif selected == 4:
-            self._do_shutdown()
 
     def _lock_screen(self):
         """Show lock screen with clock (Apple-style)."""

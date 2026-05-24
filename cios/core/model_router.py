@@ -36,8 +36,8 @@ logger = logging.getLogger(__name__)
 #  RETRY / TIMEOUT CONFIG
 # ═══════════════════════════════════════════════════════════════════════════
 
-_MAX_RETRIES = 1
-_RETRY_BACKOFF = [1.0]  # seconds between retries
+_MAX_RETRIES = 0
+_RETRY_BACKOFF = []  # no retries
 _PROVIDER_TIMEOUTS = {
     "ollama": 8,  # 8s max — if model isn't loaded, fail fast and escalate
     "openai": 15,

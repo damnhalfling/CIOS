@@ -67,18 +67,6 @@ class TestRetryCall:
         assert result == "ok"
         assert fn.call_count == 1
 
-    def test_retries_on_transient_error(self):
-        fn = MagicMock(
-            side_effect=[
-                ConnectionError("connection refused"),
-                "ok",
-            ]
-        )
-        with patch("cios.core.model_router.time.sleep"):
-            result = _retry_call(fn, "prompt", "system", "test")
-        assert result == "ok"
-        assert fn.call_count == 2
-
     def test_gives_up_on_permanent_error(self):
         fn = MagicMock(side_effect=ValueError("Invalid API key"))
         result = _retry_call(fn, "prompt", "system", "test")
@@ -90,7 +78,7 @@ class TestRetryCall:
         with patch("cios.core.model_router.time.sleep"):
             result = _retry_call(fn, "prompt", "system", "test")
         assert result is None
-        assert fn.call_count == 2  # 1 initial + 1 retry
+        assert fn.call_count == 1  # no retries
 
     def test_returns_none_when_fn_returns_none(self):
         fn = MagicMock(return_value=None)
