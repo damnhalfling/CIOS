@@ -1,3 +1,3 @@
 """CIOS — AI-first system interface."""
 
-__version__ = "2.0.0rc26"
+__version__ = "2.0.0rc27"
