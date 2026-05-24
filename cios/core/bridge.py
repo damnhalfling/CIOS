@@ -315,40 +315,49 @@ class CIOSBridge:
             classified = classify_intent(resolved_input)
             if classified:
                 intent = classified
-            elif is_any_provider_available():
-                if self._cancelled:
-                    raise _CancelledError()
-                # Full LLM fallback as last resort
-                signal_topbar_processing("Consultando IA…")
-                resolved = resolve_unknown_intent(resolved_input)
-                if self._cancelled:
-                    raise _CancelledError()
-                if resolved:
-                    intent = resolved
-                else:
-                    # Ollama couldn't resolve — try external API for execution plan
-                    if has_external_provider():
-                        signal_topbar_processing("Gerando plano…")
-                        plan = request_execution_plan(resolved_input)
-                        if self._cancelled:
-                            raise _CancelledError()
-                        if plan:
-                            signal_topbar_idle()
-                            return self._execution_plan_response(plan)
-                    signal_topbar_idle()
-                    return self._unknown_intent_response()
             else:
-                # No local LLM available — check if external API can help
-                if has_external_provider():
-                    signal_topbar_processing("Gerando plano…")
-                    plan = request_execution_plan(resolved_input)
+                # Classification failed — try Intelligence (cloud) directly
+                from cios.core.intelligence import intelligence
+
+                if intelligence.is_logged_in:
+                    signal_topbar_processing("Consultando inteligência…")
+                    try:
+                        intel_result = intelligence.query(resolved_input, intent="chat")
+                        if intel_result.success and intel_result.text:
+                            signal_topbar_idle()
+                            return {
+                                "steps": ["Consultando inteligência"],
+                                "result": intel_result.text,
+                                "status": "success",
+                                "confirm": None,
+                            }
+                    except Exception as e:
+                        logger.debug("Intelligence query failed: %s", e)
+
+                # Intelligence also failed or not logged in — try execution plan
+                if is_any_provider_available():
                     if self._cancelled:
                         raise _CancelledError()
-                    if plan:
+                    signal_topbar_processing("Consultando IA…")
+                    resolved = resolve_unknown_intent(resolved_input)
+                    if self._cancelled:
+                        raise _CancelledError()
+                    if resolved:
+                        intent = resolved
+                    else:
+                        if has_external_provider():
+                            signal_topbar_processing("Gerando plano…")
+                            plan = request_execution_plan(resolved_input)
+                            if self._cancelled:
+                                raise _CancelledError()
+                            if plan:
+                                signal_topbar_idle()
+                                return self._execution_plan_response(plan)
                         signal_topbar_idle()
-                        return self._execution_plan_response(plan)
-                signal_topbar_idle()
-                return self._no_provider_response()
+                        return self._unknown_intent_response()
+                else:
+                    signal_topbar_idle()
+                    return self._unknown_intent_response()
 
         # (#75) Check if intent needs clarification
         clarification = self._needs_clarification(intent)
