@@ -56,9 +56,87 @@ class Topbar(Gtk.Box):
         self._user_label.add_css_class("topbar-user")
         self.append(self._user_label)
 
+        # Power menu button
+        self._power_btn = Gtk.MenuButton(label="⏻")
+        self._power_btn.add_css_class("topbar-power")
+        self._power_btn.set_has_frame(False)
+
+        # Popover with power options
+        popover = Gtk.Popover()
+        pop_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        pop_box.set_margin_start(8)
+        pop_box.set_margin_end(8)
+        pop_box.set_margin_top(8)
+        pop_box.set_margin_bottom(8)
+
+        for label, action in [
+            ("🔒  Bloquear", "lock"),
+            ("↩  Deslogar", "logout"),
+            ("🔄  Reiniciar", "reboot"),
+            ("⏻  Desligar", "shutdown"),
+        ]:
+            btn = Gtk.Button(label=label)
+            btn.add_css_class("power-option")
+            btn.set_has_frame(False)
+            btn.connect("clicked", self._on_power_action, action, popover)
+            pop_box.append(btn)
+
+        popover.set_child(pop_box)
+        self._power_btn.set_popover(popover)
+        self.append(self._power_btn)
+
         # Start polling
         GLib.timeout_add(10000, self._update)
         self._update()
+
+    def _on_power_action(self, btn, action, popover):
+        """Handle power menu action."""
+        popover.popdown()
+
+        if action == "lock":
+            self._lock_screen()
+        elif action == "logout":
+            self._do_logout()
+        elif action == "reboot":
+            self._do_reboot()
+        elif action == "shutdown":
+            self._do_shutdown()
+
+    def _lock_screen(self):
+        """Show lock screen with clock (Apple-style)."""
+        from cios.ui.gtk.lock_screen import show_lock_screen
+
+        win = self.get_root()
+        if win:
+            show_lock_screen(win)
+
+    def _do_logout(self):
+        """Logout — send IPC logout to compositor."""
+        import json
+        import socket
+
+        runtime_dir = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+        sock_path = os.path.join(runtime_dir, "cios-shell.sock")
+        try:
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+                sock.settimeout(3)
+                sock.connect(sock_path)
+                msg = json.dumps({"v": 1, "id": "logout-1", "command": "logout"}) + "\n"
+                sock.sendall(msg.encode())
+        except OSError:
+            pass
+
+    def _do_reboot(self):
+        """Reboot the system."""
+        import subprocess
+
+        subprocess.Popen(["systemctl", "reboot"])
+
+    def _do_shutdown(self):
+        """Shutdown the system."""
+        import subprocess
+
+        subprocess.Popen(["systemctl", "poweroff"])
 
     def _update(self):
         """Update time and date."""
@@ -108,5 +186,26 @@ class Topbar(Gtk.Box):
             .topbar-user {{
                 color: {FG_SEC};
                 font-size: 11px;
+            }}
+            .topbar-power {{
+                color: {FG_DIM};
+                font-size: 12px;
+                min-width: 24px;
+                min-height: 24px;
+                padding: 0 4px;
+                border-radius: 4px;
+            }}
+            .topbar-power:hover {{
+                color: {FG};
+                background-color: rgba(255,255,255,0.05);
+            }}
+            .power-option {{
+                font-size: 12px;
+                padding: 6px 12px;
+                border-radius: 4px;
+                min-width: 120px;
+            }}
+            .power-option:hover {{
+                background-color: rgba(255,255,255,0.08);
             }}
         """
