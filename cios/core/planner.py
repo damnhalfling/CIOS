@@ -158,13 +158,13 @@ class Planner:
 
             if intelligence.is_logged_in:
                 try:
-                    result = intelligence.query(intent.raw_input, intent="chat")
-                    if result.success and result.text:
+                    intel_result = intelligence.query(intent.raw_input, intent="chat")
+                    if intel_result.success and intel_result.text:
                         return PlanResult(
                             plan_steps=["Consultando inteligência"],
                             results=[],
                             outcome="success",
-                            summary=result.text,
+                            summary=intel_result.text,
                         )
                 except Exception:
                     pass
