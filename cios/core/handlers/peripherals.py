@@ -405,7 +405,12 @@ def handle_monitor(intent: Intent, executor: Executor, memory: Memory) -> PlanRe
             target = other.name
 
         steps, ok, err = configure_position(target, position, reference)
-        pos_names = {"above": "acima", "below": "abaixo", "left": "à esquerda", "right": "à direita"}
+        pos_names = {
+            "above": "acima",
+            "below": "abaixo",
+            "left": "à esquerda",
+            "right": "à direita",
+        }
         pos_label = pos_names.get(position, position)
 
         return PlanResult(

@@ -72,14 +72,16 @@ def get_monitors() -> list[MonitorInfo]:
 
     monitors = []
     for out in resp["outputs"]:
-        monitors.append(MonitorInfo(
-            name=out.get("name", "unknown"),
-            width=out.get("width", 0),
-            height=out.get("height", 0),
-            x=out.get("x", 0),
-            y=out.get("y", 0),
-            primary=out.get("primary", False),
-        ))
+        monitors.append(
+            MonitorInfo(
+                name=out.get("name", "unknown"),
+                width=out.get("width", 0),
+                height=out.get("height", 0),
+                x=out.get("x", 0),
+                y=out.get("y", 0),
+                primary=out.get("primary", False),
+            )
+        )
     return monitors
 
 
@@ -121,7 +123,11 @@ def configure_position(target: str, position: str, reference: str) -> tuple[list
     if resp and resp.get("response") == "ok":
         _save_config(monitors, target, x, y)
         return [f"Monitor {target} posicionado {position} de {reference}"], True, ""
-    return [f"Posicionando {target}"], False, resp.get("reason", "IPC failed") if resp else "Sem resposta"
+    return (
+        [f"Posicionando {target}"],
+        False,
+        resp.get("reason", "IPC failed") if resp else "Sem resposta",
+    )
 
 
 def configure_mirror(target: str, mirror_of: str) -> tuple[list[str], bool, str]:
@@ -130,7 +136,11 @@ def configure_mirror(target: str, mirror_of: str) -> tuple[list[str], bool, str]
     if resp and resp.get("response") == "ok":
         _save_mirror_config(target, mirror_of)
         return [f"Monitor {target} espelhando {mirror_of}"], True, ""
-    return [f"Espelhando {target}"], False, resp.get("reason", "IPC failed") if resp else "Sem resposta"
+    return (
+        [f"Espelhando {target}"],
+        False,
+        resp.get("reason", "IPC failed") if resp else "Sem resposta",
+    )
 
 
 def _save_config(monitors: list[MonitorInfo], moved_name: str, new_x: int, new_y: int) -> None:

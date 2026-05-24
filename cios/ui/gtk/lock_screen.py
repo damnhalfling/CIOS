@@ -177,8 +177,19 @@ class LockScreen(Gtk.Window):
 
         # Date: "domingo, 24 de maio"
         months_pt = [
-            "", "janeiro", "fevereiro", "março", "abril", "maio", "junho",
-            "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+            "",
+            "janeiro",
+            "fevereiro",
+            "março",
+            "abril",
+            "maio",
+            "junho",
+            "julho",
+            "agosto",
+            "setembro",
+            "outubro",
+            "novembro",
+            "dezembro",
         ]
         days_pt = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"]
         day_name = days_pt[now.tm_wday]
