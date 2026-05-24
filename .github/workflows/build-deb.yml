@@ -62,17 +62,27 @@ jobs:
 
   build:
     needs: test
+    runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - os: ubuntu-24.04
+          - container: debian:bookworm
+            label: debian12
+          - container: ubuntu:24.04
             label: ubuntu2404
-          - os: ubuntu-latest
-            label: ubuntu2604
+          - container: ubuntu:25.04
+            label: ubuntu2504
 
-    runs-on: ${{ matrix.os }}
+    container:
+      image: ${{ matrix.container }}
 
     steps:
+      - name: Install base tools
+        run: |
+          apt-get update
+          apt-get install -y git curl ca-certificates lsb-release sudo
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -81,29 +91,17 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
-          if [[ "$VERSION" == *"-rc"* ]]; then
+          if echo "$VERSION" | grep -q "\-rc"; then
             echo "IS_RC=true" >> "$GITHUB_OUTPUT"
           else
             echo "IS_RC=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Detect distro info
-        id: distro
-        run: |
-          DISTRO_ID=$(lsb_release -is | tr '[:upper:]' '[:lower:]')
-          DISTRO_VERSION=$(lsb_release -rs | tr -d '.')
-          echo "SUFFIX=${DISTRO_ID}${DISTRO_VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Building for: ${DISTRO_ID} ${DISTRO_VERSION}"
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
       - name: Install build dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build pkg-config git \
+          apt-get install -y \
+            python3 python3-pip python3-venv python3-dev \
+            ninja-build pkg-config meson \
             libwayland-dev wayland-protocols libxkbcommon-dev \
             libinput-dev libpixman-1-dev libdrm-dev libseat-dev \
             libxcb1-dev xwayland libgbm-dev libvulkan-dev \
@@ -113,22 +111,27 @@ jobs:
             libxcb-res0-dev libxcb-shm0-dev hwdata libxcb-ewmh-dev \
             libffi-dev libxml2-dev libexpat1-dev \
             libegl1-mesa-dev libgles2-mesa-dev libcairo2-dev \
-            patchelf libpam0g-dev
-          sudo pip install meson>=1.5.0
-          sudo apt-get install -y libdisplay-info-dev libliftoff-dev 2>/dev/null || true
+            patchelf libpam0g-dev build-essential
+          # Upgrade meson if too old (wlroots 0.18 needs >= 1.5)
+          MESON_VER=$(meson --version 2>/dev/null || echo "0")
+          if dpkg --compare-versions "$MESON_VER" lt "1.5.0"; then
+            pip3 install --break-system-packages meson>=1.5.0 || pip3 install meson>=1.5.0
+          fi
+          # Optional deps (may not exist in all distros)
+          apt-get install -y libdisplay-info-dev libliftoff-dev 2>/dev/null || true
 
       - name: Build and install greetd
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-          source "$HOME/.cargo/env"
+          export PATH="$HOME/.cargo/bin:$PATH"
           git clone --depth=1 --branch 0.10.3 https://git.sr.ht/~kennylevinsen/greetd /tmp/greetd
           cd /tmp/greetd
           cargo build --release
-          sudo cp target/release/greetd /usr/bin/greetd
-          sudo cp target/release/agreety /usr/bin/agreety
-          sudo chmod 755 /usr/bin/greetd /usr/bin/agreety
+          cp target/release/greetd /usr/bin/greetd
+          cp target/release/agreety /usr/bin/agreety
+          chmod 755 /usr/bin/greetd /usr/bin/agreety
 
-      - name: Build and install wayland 1.23
+      - name: Build and install wayland 1.23 (if needed)
         run: |
           SYSTEM_WAYLAND=$(pkg-config --modversion wayland-server 2>/dev/null || echo "0")
           if dpkg --compare-versions "$SYSTEM_WAYLAND" lt "1.23.0"; then
@@ -137,38 +140,32 @@ jobs:
             cd /tmp/wayland
             meson setup build --prefix=/usr --libdir=lib/x86_64-linux-gnu -Ddocumentation=false -Dtests=false -Ddtd_validation=false
             ninja -C build
-            sudo meson install -C build
-            sudo ldconfig
+            meson install -C build
+            ldconfig
           else
-            echo "System wayland $SYSTEM_WAYLAND is sufficient, skipping build"
+            echo "System wayland $SYSTEM_WAYLAND is sufficient"
           fi
 
-      - name: Build and install libdisplay-info
+      - name: Build and install libdisplay-info (if needed)
         run: |
           if ! pkg-config --exists libdisplay-info; then
-            echo "Building libdisplay-info from source..."
             git clone --depth=1 --branch 0.2.0 https://gitlab.freedesktop.org/emersion/libdisplay-info.git /tmp/libdisplay-info
             cd /tmp/libdisplay-info
             meson setup build --prefix=/usr --libdir=lib/x86_64-linux-gnu
             ninja -C build
-            sudo meson install -C build
-            sudo ldconfig
-          else
-            echo "libdisplay-info already available via apt"
+            meson install -C build
+            ldconfig
           fi
 
-      - name: Build and install libliftoff
+      - name: Build and install libliftoff (if needed)
         run: |
           if ! pkg-config --exists libliftoff; then
-            echo "Building libliftoff from source..."
             git clone --depth=1 --branch v0.5.0 https://gitlab.freedesktop.org/emersion/libliftoff.git /tmp/libliftoff
             cd /tmp/libliftoff
             meson setup build --prefix=/usr --libdir=lib/x86_64-linux-gnu
             ninja -C build
-            sudo meson install -C build
-            sudo ldconfig
-          else
-            echo "libliftoff already available via apt"
+            meson install -C build
+            ldconfig
           fi
 
       - name: Build and install wlroots 0.18.1
@@ -177,10 +174,10 @@ jobs:
           cd /tmp/wlroots
           meson setup build --prefix=/usr --libdir=lib/x86_64-linux-gnu -Dxwayland=enabled
           ninja -C build
-          sudo meson install -C build
-          sudo find build -name "*-protocol.h" -exec cp {} /usr/include/wlroots-0.18/ \;
-          sudo ldconfig
-          pkg-config --modversion wlroots-0.18 || { echo "wlroots-0.18.pc not found"; find /usr -name "wlroots*.pc" 2>/dev/null; exit 1; }
+          meson install -C build
+          find build -name "*-protocol.h" -exec cp {} /usr/include/wlroots-0.18/ \;
+          ldconfig
+          pkg-config --modversion wlroots-0.18
 
       - name: Build .deb package
         run: bash build-deb.sh "${{ steps.version.outputs.VERSION }}"
@@ -190,7 +187,7 @@ jobs:
       - name: Rename .deb with distro suffix
         run: |
           ORIGINAL="cios_${{ steps.version.outputs.VERSION }}_amd64.deb"
-          TARGET="cios_${{ steps.version.outputs.VERSION }}_${{ steps.distro.outputs.SUFFIX }}_amd64.deb"
+          TARGET="cios_${{ steps.version.outputs.VERSION }}_${{ matrix.label }}_amd64.deb"
           mv "$ORIGINAL" "$TARGET"
           echo "DEB_FILE=$TARGET" >> "$GITHUB_ENV"
 
@@ -238,7 +235,6 @@ jobs:
           RELEASES=$(gh release list --limit 100 --json tagName -q '.[].tagName')
           for TAG in $RELEASES; do
             if [[ "$TAG" == *"-rc"* ]]; then
-              echo "Deleting RC release $TAG..."
               gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
             fi
           done
@@ -248,10 +244,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Fetching all releases..."
           RELEASES=$(gh release list --limit 100 --json tagName -q '.[].tagName')
           for TAG in $RELEASES; do
-            echo "Deleting release $TAG..."
             gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
           done
 
@@ -261,7 +255,6 @@ jobs:
           CURRENT_TAG="${GITHUB_REF_NAME}"
           for TAG in $(git tag -l); do
             if [ "$TAG" != "$CURRENT_TAG" ]; then
-              echo "Deleting remote tag $TAG..."
               git push origin --delete "$TAG" 2>/dev/null || true
             fi
           done
@@ -278,7 +271,8 @@ jobs:
 
             | File | Target |
             |------|--------|
-            | `cios_*_ubuntu2404_amd64.deb` | Ubuntu 24.04 / Debian 12 |
-            | `cios_*_ubuntu2604_amd64.deb` | Ubuntu 26.04 / Debian 13+ |
+            | `*_debian12_amd64.deb` | Debian 12 (Bookworm) |
+            | `*_ubuntu2404_amd64.deb` | Ubuntu 24.04 (Noble) |
+            | `*_ubuntu2504_amd64.deb` | Ubuntu 25.04+ (Plucky / 26.04) |
 
             Install: `sudo apt install ./cios_<version>_<distro>_amd64.deb`
