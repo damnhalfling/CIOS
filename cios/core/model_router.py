@@ -36,10 +36,10 @@ logger = logging.getLogger(__name__)
 #  RETRY / TIMEOUT CONFIG
 # ═══════════════════════════════════════════════════════════════════════════
 
-_MAX_RETRIES = 2
-_RETRY_BACKOFF = [1.0, 2.0]  # seconds between retries
+_MAX_RETRIES = 1
+_RETRY_BACKOFF = [1.0]  # seconds between retries
 _PROVIDER_TIMEOUTS = {
-    "ollama": 30,  # cold start on low-end hardware can take 20s+
+    "ollama": 8,  # 8s max — if model isn't loaded, fail fast and escalate
     "openai": 15,
     "anthropic": 15,
     "cios_api": 15,
@@ -62,8 +62,8 @@ _TRANSIENT_ERRORS = (
 #  CIRCUIT BREAKER — avoid hammering dead providers
 # ═══════════════════════════════════════════════════════════════════════════
 
-_CIRCUIT_BREAKER_THRESHOLD = 3  # failures before opening circuit
-_CIRCUIT_BREAKER_RESET_TIME = 60  # seconds before retrying a broken provider
+_CIRCUIT_BREAKER_THRESHOLD = 1  # single failure opens circuit (fail fast)
+_CIRCUIT_BREAKER_RESET_TIME = 30  # seconds before retrying a broken provider
 
 # State: {provider_name: {"failures": int, "last_failure": float, "open": bool}}
 _circuit_state: dict[str, dict] = {}

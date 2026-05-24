@@ -90,7 +90,7 @@ class TestRetryCall:
         with patch("cios.core.model_router.time.sleep"):
             result = _retry_call(fn, "prompt", "system", "test")
         assert result is None
-        assert fn.call_count == 3  # 1 initial + 2 retries
+        assert fn.call_count == 2  # 1 initial + 1 retry
 
     def test_returns_none_when_fn_returns_none(self):
         fn = MagicMock(return_value=None)
@@ -203,13 +203,10 @@ class TestCircuitBreaker:
         assert _circuit_is_open("ollama") is False
 
     def test_circuit_opens_after_threshold(self):
-        for _ in range(3):
-            _circuit_record_failure("ollama")
+        _circuit_record_failure("ollama")
         assert _circuit_is_open("ollama") is True
 
-    def test_circuit_stays_closed_below_threshold(self):
-        _circuit_record_failure("ollama")
-        _circuit_record_failure("ollama")
+    def test_circuit_stays_closed_before_failure(self):
         assert _circuit_is_open("ollama") is False
 
     def test_success_resets_circuit(self):

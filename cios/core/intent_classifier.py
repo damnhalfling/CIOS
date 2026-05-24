@@ -248,16 +248,42 @@ def _get_cache() -> IntentCache:
     return _cache
 
 
+_KNOWLEDGE_PATTERNS = re.compile(
+    r"^(?:"
+    r"o\s+que\s+[eé sã]|"  # "o que é", "o que são"
+    r"quem\s+[eé]|"  # "quem é"
+    r"como\s+funciona|"  # "como funciona"
+    r"por\s*que\s|"  # "por que", "porque"
+    r"qual\s+[eé a]|"  # "qual é", "qual a"
+    r"quando\s+|"  # "quando foi"
+    r"onde\s+|"  # "onde fica"
+    r"what\s+(?:is|are|was|were)|"  # "what is", "what are"
+    r"who\s+(?:is|was|were)|"  # "who is"
+    r"how\s+(?:does|do|did|to)|"  # "how does", "how to"
+    r"why\s+|"  # "why"
+    r"when\s+(?:did|was|is)|"  # "when did"
+    r"where\s+(?:is|are|was)"  # "where is"
+    r")",
+    re.IGNORECASE,
+)
+
+
+def _is_knowledge_question(user_input: str) -> bool:
+    """Detect knowledge/factual questions that should go to Intelligence, not Ollama."""
+    return bool(_KNOWLEDGE_PATTERNS.search(user_input))
+
+
 def classify_intent(user_input: str) -> Intent | None:
     """Classify user input using cache + LLM fallback.
 
     Flow:
         1. Exact cache match → instant (<1ms)
         2. Fuzzy cache match → instant (<5ms)
-        3. LLM classification → ~200-500ms
-        4. Cache the result
+        3. Knowledge question detection → skip LLM, return None (escalates to Intelligence)
+        4. LLM classification → ~200-500ms
+        5. Cache the result
 
-    Returns None if classification fails entirely.
+    Returns None if classification fails entirely (triggers Intelligence escalation).
     """
     cache = _get_cache()
 
@@ -271,10 +297,17 @@ def classify_intent(user_input: str) -> Intent | None:
     if fuzzy:
         return fuzzy
 
-    # 3. LLM classification
+    # 3. Knowledge question detection — skip Ollama, let Intelligence handle
+    if _is_knowledge_question(user_input):
+        logger.debug(
+            "Knowledge question detected, skipping LLM classification: %s", user_input[:50]
+        )
+        return None
+
+    # 4. LLM classification
     intent = _classify_via_llm(user_input)
     if intent and intent.type != IntentType.UNKNOWN:
-        # 4. Cache successful classification
+        # 5. Cache successful classification
         cache.store(user_input, intent, source="llm")
         return intent
 
@@ -283,7 +316,12 @@ def classify_intent(user_input: str) -> Intent | None:
 
 def _classify_via_llm(user_input: str) -> Intent | None:
     """Call LLM with the lightweight classification prompt."""
-    from cios.core.model_router import _call_local
+    from cios.core.model_router import _call_local, _circuit_is_open
+
+    # Skip Ollama entirely if circuit breaker is open (already failing)
+    if _circuit_is_open("ollama"):
+        logger.debug("Ollama circuit breaker open — skipping LLM classification")
+        return None
 
     prompt = f'Classify this user request: "{user_input}"'
 

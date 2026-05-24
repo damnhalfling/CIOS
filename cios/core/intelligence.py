@@ -2,7 +2,6 @@
 
 Handles:
 - Authentication state (stored locally)
-- Token optimization (compress input via Ollama before sending)
 - SSE streaming from /v1/chat/stream
 - Conversation continuity (persists conversation_id per session)
 - Cognitive state tracking (mood, attention, memory usage)
@@ -112,61 +111,6 @@ class StreamChunk:
 # ═══════════════════════════════════════════════════════════════════════════
 #  TOKEN OPTIMIZER
 # ═══════════════════════════════════════════════════════════════════════════
-
-
-def _compress_input(text: str) -> str:
-    """Compress verbose user input using local Ollama.
-
-    Reduces ~300 tokens to ~50 tokens before sending to cloud API.
-    If Ollama is unavailable, returns original text (graceful degradation).
-    """
-    from cios.core.config import get
-    from cios.core.ollama_manager import is_ollama_healthy
-
-    if not is_ollama_healthy():
-        return text
-
-    # Short inputs don't need compression
-    if len(text.split()) <= 15:
-        return text
-
-    url = get("ollama_url")
-    model = get("ollama_model")
-
-    prompt = (
-        f"Compress this user request into a minimal, clear instruction. "
-        f"Keep the core intent and key details. Remove filler words. "
-        f"Output ONLY the compressed version, nothing else.\n\n"
-        f"Input: {text}\n"
-        f"Compressed:"
-    )
-
-    payload = json.dumps(
-        {
-            "model": model,
-            "prompt": prompt,
-            "stream": False,
-            "options": {"temperature": 0.1, "num_predict": 60},
-        }
-    ).encode()
-
-    try:
-        req = urllib.request.Request(
-            f"{url}/api/generate",
-            data=payload,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            data = json.loads(resp.read())
-            compressed = data.get("response", "").strip()
-            if compressed and len(compressed) < len(text):
-                logger.debug("Token Optimizer: %d→%d chars", len(text), len(compressed))
-                return compressed
-    except Exception as e:
-        logger.debug("Token Optimizer failed (using original): %s", e)
-
-    return text
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -326,8 +270,7 @@ class IntelligenceClient:
         Flow:
         1. Check auth
         2. Check rate limit (local)
-        3. Compress input (Token Optimizer)
-        4. Call /v1/chat with intent, client, conversation_id
+        3. Call /v1/chat with intent, client, conversation_id
         5. Parse cognitive_state + memory_sources
         6. Update usage and session
         """
@@ -346,8 +289,7 @@ class IntelligenceClient:
                 f"Renova amanhã ou faça upgrade.",
             )
 
-        compressed = _compress_input(text)
-        result = self._call_chat(compressed, intent)
+        result = self._call_chat(text, intent)
 
         if result.success:
             self._usage.used_today += 1
@@ -447,11 +389,9 @@ class IntelligenceClient:
             yield StreamChunk(type="error", metadata={"message": "rate_limited"})
             return
 
-        compressed = _compress_input(text)
-
         payload = json.dumps(
             {
-                "message": compressed,
+                "message": text,
                 "intent": intent,
                 "client": "os",
                 "conversation_id": self._conversation_id,

@@ -131,7 +131,6 @@ class TestQuery:
 
         with (
             patch("urllib.request.urlopen", return_value=mock_response),
-            patch("cios.core.intelligence._compress_input", side_effect=lambda x: x),
         ):
             result = intelligence_client.query("resuma as notícias", intent="news")
 
@@ -161,7 +160,6 @@ class TestQuery:
                 "urllib.request.urlopen",
                 side_effect=urllib.error.URLError("Connection refused"),
             ),
-            patch("cios.core.intelligence._compress_input", side_effect=lambda x: x),
         ):
             result = intelligence_client.query("test")
 
@@ -188,7 +186,6 @@ class TestQuery:
 
         with (
             patch("urllib.request.urlopen", side_effect=mock_error),
-            patch("cios.core.intelligence._compress_input", side_effect=lambda x: x),
         ):
             result = intelligence_client.query("test")
 
@@ -244,7 +241,6 @@ class TestStreaming:
 
         with (
             patch("urllib.request.urlopen", return_value=mock_response),
-            patch("cios.core.intelligence._compress_input", side_effect=lambda x: x),
         ):
             chunks = list(intelligence_client.stream("olá", intent="chat"))
 
@@ -261,27 +257,6 @@ class TestStreaming:
         assert intelligence_client._usage.used_today == 1
         # Conversation ID should be set
         assert intelligence_client._conversation_id == 100
-
-
-class TestTokenOptimizer:
-    """Test input compression via Ollama."""
-
-    def test_short_input_not_compressed(self):
-        from cios.core.intelligence import _compress_input
-
-        with patch("cios.core.ollama_manager.is_ollama_healthy", return_value=True):
-            result = _compress_input("abrir terminal")
-            # Short inputs (<=15 words) pass through unchanged
-            assert result == "abrir terminal"
-
-    def test_compression_when_ollama_unavailable(self):
-        from cios.core.intelligence import _compress_input
-
-        long_text = "eu gostaria que você por favor pudesse me ajudar a entender como funciona o sistema de arquivos do linux incluindo permissões e ownership"
-        with patch("cios.core.ollama_manager.is_ollama_healthy", return_value=False):
-            result = _compress_input(long_text)
-            # Returns original when Ollama is down
-            assert result == long_text
 
 
 class TestConversationContinuity:
@@ -327,7 +302,6 @@ class TestConversationContinuity:
 
         with (
             patch("urllib.request.urlopen", return_value=mock_response),
-            patch("cios.core.intelligence._compress_input", side_effect=lambda x: x),
         ):
             intelligence_client.query("primeira pergunta")
 

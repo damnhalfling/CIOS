@@ -56,50 +56,38 @@ class Topbar(Gtk.Box):
         self._user_label.add_css_class("topbar-user")
         self.append(self._user_label)
 
-        # Power menu button
-        self._power_btn = Gtk.MenuButton(label="⏻")
-        self._power_btn.add_css_class("topbar-power")
-        self._power_btn.set_has_frame(False)
+        # Power dropdown (conventional dropdown menu)
+        self._power_dropdown = Gtk.DropDown()
+        self._power_dropdown.add_css_class("topbar-power")
 
-        # Popover with power options
-        popover = Gtk.Popover()
-        pop_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        pop_box.set_margin_start(8)
-        pop_box.set_margin_end(8)
-        pop_box.set_margin_top(8)
-        pop_box.set_margin_bottom(8)
-
-        for label, action in [
-            ("🔒  Bloquear", "lock"),
-            ("↩  Deslogar", "logout"),
-            ("🔄  Reiniciar", "reboot"),
-            ("⏻  Desligar", "shutdown"),
-        ]:
-            btn = Gtk.Button(label=label)
-            btn.add_css_class("power-option")
-            btn.set_has_frame(False)
-            btn.connect("clicked", self._on_power_action, action, popover)
-            pop_box.append(btn)
-
-        popover.set_child(pop_box)
-        self._power_btn.set_popover(popover)
-        self.append(self._power_btn)
+        # Options
+        power_options = Gtk.StringList.new(
+            ["⏻", "🔒 Bloquear", "↩ Deslogar", "🔄 Reiniciar", "⏻ Desligar"]
+        )
+        self._power_dropdown.set_model(power_options)
+        self._power_dropdown.set_selected(0)  # Show ⏻ as default
+        self._power_dropdown.connect("notify::selected", self._on_power_selected)
+        self.append(self._power_dropdown)
 
         # Start polling
         GLib.timeout_add(10000, self._update)
         self._update()
 
-    def _on_power_action(self, btn, action, popover):
-        """Handle power menu action."""
-        popover.popdown()
+    def _on_power_selected(self, dropdown, _pspec):
+        """Handle power dropdown selection."""
+        selected = dropdown.get_selected()
+        if selected == 0:
+            return  # ⏻ icon itself, no action
+        # Reset to icon after action
+        GLib.idle_add(dropdown.set_selected, 0)
 
-        if action == "lock":
+        if selected == 1:
             self._lock_screen()
-        elif action == "logout":
+        elif selected == 2:
             self._do_logout()
-        elif action == "reboot":
+        elif selected == 3:
             self._do_reboot()
-        elif action == "shutdown":
+        elif selected == 4:
             self._do_shutdown()
 
     def _lock_screen(self):
