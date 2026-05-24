@@ -135,8 +135,35 @@ def ensure_ollama_running() -> bool:
 
     Called during bridge boot. Returns True if Ollama is healthy.
     Returns True immediately if provider is not ollama (not needed).
+
+    On low-RAM machines (<6GB total), skips Ollama entirely and switches
+    to cloud-only mode (CIOS Cloud API handles classification).
     """
+    import psutil
+
     provider = config.get("llm_provider")
+
+    # RAM gate: if machine has less than 6GB, skip Ollama entirely
+    total_ram_gb = psutil.virtual_memory().total / (1024**3)
+    if total_ram_gb < 6.0:
+        logger.info(
+            "Low RAM detected (%.1fGB). Skipping Ollama — using online intelligence.",
+            total_ram_gb,
+        )
+        _ollama_status.update(
+            installed=_is_ollama_installed(),
+            running=False,
+            model_available=False,
+            started_by_cios=False,
+            error="RAM insuficiente — usando inteligência online",
+        )
+        # Switch to online intelligence (prefers user's configured provider, falls back to CIOS Cloud)
+        # Don't override if user already has openai/anthropic configured
+        if not config.get("openai_api_key") and not config.get("anthropic_api_key"):
+            config.set("llm_provider", "cios_api")
+        else:
+            config.set("llm_provider", "external")
+        return True  # System is healthy, just using online intelligence
 
     # If not using Ollama, skip entirely
     if provider != "ollama":
