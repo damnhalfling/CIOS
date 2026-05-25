@@ -1548,7 +1548,7 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
     # --- app launcher (PT + EN) ---
     (
         re.compile(
-            r"(?:abr[aei]r?|open|launch|iniciar|rodar|executar|abre)\s+"
+            r"(?:abr[aei]r?|open|launch|iniciar?|inici[ea]|rodar?|rod[ea]|executar?|execut[ea]|abre|start)\s+"
             r"(?:o\s+|a\s+|the\s+)?(.+)",
             re.IGNORECASE,
         ),
@@ -1573,7 +1573,7 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
     # --- package management (PT + EN) ---
     (
         re.compile(
-            r"(?:instalar?|install)\s+(?:o\s+)?(?:pacote\s+|package\s+)?(.+)",
+            r"(?:instalar?|instal[ea]|install)\s+(?:o\s+|a\s+)?(?:pacote\s+|package\s+)?(.+?)(?:\s+(?:para|pra|por favor|please).*)?$",
             re.IGNORECASE,
         ),
         IntentType.PACKAGE,
