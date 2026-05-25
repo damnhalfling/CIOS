@@ -22,11 +22,22 @@ def handle_app_launch(intent: Intent, executor: Executor, memory: Memory) -> Pla
 
     app = find_app(app_name)
     if not app:
+        # Check if it's a known installable package
+        from cios.skills.package_manager import is_installable
+
+        if is_installable(app_name):
+            return PlanResult(
+                plan_steps=[f"Buscando {app_name}"],
+                results=[],
+                outcome="failure",
+                summary=f"{app_name} não está instalado. Quer que eu instale? Diga: instalar {app_name}",
+                error=f"Could not find application matching '{app_name}'",
+            )
         return PlanResult(
-            plan_steps=[f"Searching for {app_name}"],
+            plan_steps=[f"Buscando {app_name}"],
             results=[],
             outcome="failure",
-            summary=f"App not found: {app_name}",
+            summary=f"Não encontrei {app_name}. Verifique se está instalado.",
             error=f"Could not find application matching '{app_name}'",
         )
 

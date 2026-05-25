@@ -224,6 +224,17 @@ _SPECIAL_PACKAGES: dict[str, dict] = {
 }
 
 
+def is_installable(name: str) -> bool:
+    """Check if a package name is known/installable (special or via apt)."""
+    lower = name.lower().strip()
+    # Known special packages
+    if lower in _SPECIAL_PACKAGES:
+        return True
+    # Common packages that are always in apt
+    common = {"firefox", "htop", "vim", "nano", "git", "curl", "wget", "vlc", "gimp", "libreoffice"}
+    return lower in common
+
+
 def _install_special(spec: dict, password: str = "") -> PackageResult:
     """Install a package by downloading its .deb from a known URL."""
     name = spec["name"]
