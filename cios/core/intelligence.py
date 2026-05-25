@@ -97,6 +97,7 @@ class IntelligenceResult:
     conversation_id: int | None = None
     cognitive_state: CognitiveState | None = None
     cached: bool = False
+    os_command: dict | None = None  # Executable command from Maestro for OS client
 
 
 @dataclass
@@ -345,6 +346,7 @@ class IntelligenceClient:
                     tokens_output=data.get("tokens_output", 0),
                     conversation_id=data.get("conversation_id"),
                     cognitive_state=cognitive_state,
+                    os_command=data.get("os_command"),
                 )
         except urllib.error.HTTPError as e:
             return self._handle_http_error(e)

@@ -319,7 +319,24 @@ class CIOSBridge:
                 signal_topbar_processing("Consultando inteligência…")
                 try:
                     intel_result = intelligence.query(resolved_input, intent="chat")
-                    if intel_result.success and intel_result.text:
+                    # If Maestro returned an OS command, execute it locally
+                    if intel_result.os_command:
+                        signal_topbar_idle()
+                        cmd = intel_result.os_command
+                        # Re-parse as local intent and execute
+
+                        try:
+                            cmd_type = IntentType(cmd["intent"])
+                        except ValueError:
+                            cmd_type = IntentType.UNKNOWN
+                        intent = Intent(
+                            type=cmd_type,
+                            params=cmd.get("params", {}),
+                            raw_input=resolved_input,
+                            confidence=1.0,
+                        )
+                        # Continue to execution below (don't return)
+                    elif intel_result.success and intel_result.text:
                         signal_topbar_idle()
                         return {
                             "steps": ["Consultando inteligência"],
@@ -446,7 +463,22 @@ class CIOSBridge:
                     on_step("Consultando inteligência…", 1, 0)
                 try:
                     intel_result = intelligence.query(resolved_input, intent="chat")
-                    if intel_result.success and intel_result.text:
+                    # If Maestro returned an OS command, execute it locally
+                    if intel_result.os_command:
+                        cmd = intel_result.os_command
+
+                        try:
+                            cmd_type = IntentType(cmd["intent"])
+                        except ValueError:
+                            cmd_type = IntentType.UNKNOWN
+                        intent = Intent(
+                            type=cmd_type,
+                            params=cmd.get("params", {}),
+                            raw_input=resolved_input,
+                            confidence=1.0,
+                        )
+                        # Fall through to execution below
+                    elif intel_result.success and intel_result.text:
                         signal_topbar_idle()
                         return {
                             "steps": ["Consultando inteligência"],
