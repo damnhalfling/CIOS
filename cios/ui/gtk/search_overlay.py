@@ -11,7 +11,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import GLib, Gtk  # noqa: E402
 
-from cios.ui.theme import (
+from cios.ui.theme import (  # noqa: E402
     ACCENT_LT,
     BG_CARD,
     BG_HOVER,

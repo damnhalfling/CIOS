@@ -1,6 +1,6 @@
 [project]
 name = "cios"
-version = "2.0.0rc41"
+version = "2.0.0rc42"
 description = "CIOS — Cognitive Intent-first Operational System. Replaces apps with intent-driven execution on Linux"
 requires-python = ">=3.10"
 dependencies = [
