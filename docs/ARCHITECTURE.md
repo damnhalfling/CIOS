@@ -63,6 +63,68 @@ Camada de decisão:
 
 ---
 
+## Conversation Threading & History Sync
+
+### Thread Manager
+Gerencia estado conversacional com threading determinístico:
+
+```
+User Input → ThreadManager.route_input()
+  → ThreadClassifier (pronoun, continuation, intent, temporal signals)
+  → RoutingDecision: answer_pending | continue_thread | new_thread
+```
+
+- **Thread lifecycle:** active → completed (auto-close após 180s inatividade)
+- **Persistence:** SQLite (threads + turns), max 50 threads locais
+- **Context:** últimos 5 turns disponíveis para pronoun resolution
+
+### History Sync (Web ↔ OS)
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  SYNC ARCHITECTURE                                       │
+├─────────────────────────────────────────────────────────┤
+│                                                           │
+│  CIOS OS ──push──→ /v1/sync ←──push── Web (Maestro)     │
+│     ↑                  │                    ↑             │
+│     └──────pull────────┘────────pull────────┘             │
+│                                                           │
+│  Bidirectional: push unsynced + pull new_from_server      │
+│  Periodic: every 5 minutes (daemon thread)                │
+│  On-demand: after thread close (fire-and-forget)          │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Sanitization pipeline (o que NUNCA é sincronizado):**
+- `params` (credenciais, paths, tokens) — excluídos do payload
+- Absolute paths → `[path]`
+- Passwords/tokens → `[redacted]`
+- sudo commands → `sudo [command]`
+- Threads marcados `local_only` — nunca saem da máquina
+
+**Campos de controle:**
+- `local_only: bool` — thread contém dados sensíveis, fica só local
+- `origin: str` — "os" ou "web", indica onde foi criado
+- `synced: int` — 0 (pendente) ou 1 (sincronizado)
+
+**Auto-detecção de conteúdo sensível:**
+- SSH connections, private keys, .env files, credentials.json
+- Intent type "session" (login/logout operations)
+- Threads detectados são auto-marcados `local_only`
+
+### Search (Ctrl+K)
+
+```
+Ctrl+K → SearchOverlay (GTK4, floating)
+  → debounce 300ms → ThreadStore.search(query)
+  → LIKE match on user_input + result_summary + summary
+  → Results: summary, outcome icon, time, preview
+```
+
+Também acessível via intent: "busca no histórico sobre X"
+
+---
+
 ## Compositor (cios-shell)
 
 Compositor Wayland purpose-built. Não é WM genérico.
@@ -150,15 +212,15 @@ cios-os/
 ├── cios/                    # Python runtime
 │   ├── main.py              # Entry point (6 modos)
 │   ├── core/                # Engine cognitiva
-│   │   ├── bridge.py        # UI ↔ backend (CIOSBridge)
-│   │   ├── intent_parser.py # 189 regex patterns
+│   │   ├── bridge.py        # UI ↔ backend (CIOSBridge) + periodic sync
+│   │   ├── intent_parser.py # 189 regex patterns (incl. HISTORY_SEARCH)
 │   │   ├── intent_classifier.py # Hybrid: regex → cache → Ollama
 │   │   ├── planner.py       # 29 handlers + MCO
 │   │   ├── mcp.py           # Live system state
 │   │   ├── executor.py      # Shell execution (timeout, blocked cmds)
 │   │   ├── humanizer.py     # 260+ translations
 │   │   ├── memory.py        # SQLite history
-│   │   ├── thread_manager.py # Conversation state
+│   │   ├── thread_manager.py # Conversation state + sync + sanitization
 │   │   ├── task_queue.py    # Background execution
 │   │   ├── intelligence.py  # Cloud AI integration
 │   │   ├── model_router.py  # LLM routing + fallback
@@ -166,6 +228,15 @@ cios-os/
 │   │   └── handlers/        # 17 intent handler modules (29 handler methods)
 │   ├── skills/              # 27 system skills
 │   ├── ui/                  # GTK4 + CLI + hotkey + topbar
+│   │   └── gtk/
+│   │       ├── app.py           # Main application (Ctrl+K, overlays)
+│   │       ├── search_overlay.py # History search (Ctrl+K)
+│   │       ├── hotkey_overlay.py # Quick command (Ctrl+Space)
+│   │       ├── ipc_listener.py  # Compositor IPC (hotkeys, logout)
+│   │       ├── sidebar.py       # Metrics + history + origin indicators
+│   │       ├── chat_feed.py     # Streaming chat messages
+│   │       ├── artifact_panel.py # Long content display
+│   │       └── ...
 │   └── infra/               # Daemon, voice, monitors, deps
 ├── shell/                   # Compositor C (wlroots 0.18)
 │   └── src/                 # 13 source files

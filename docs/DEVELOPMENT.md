@@ -1,6 +1,6 @@
 # CIOS — Desenvolvimento
 
-> v2.0.0-rc18 — Maio 2026
+> v2.0.0-rc30 — Maio 2026
 
 ---
 
@@ -57,6 +57,26 @@ Tag push → Lint (ruff + mypy) → Test (pytest) → Build compositor → Build
 - `pytest --cov=cios` — threshold 45%
 - 635 testes, 22 property-based (Hypothesis)
 - Timeout: 30s por teste
+
+---
+
+## Módulos recentes (Sprint 3)
+
+### History Sync (`core/thread_manager.py`)
+- `ThreadStore.full_sync()` — bidirecional (push + pull)
+- `ThreadStore._merge_cloud_thread()` — importa threads do web
+- `ThreadStore._contains_sensitive_content()` — auto-marca local_only
+- Periodic sync: daemon thread no bridge (5 min interval)
+- DB migration automática (`_migrate()`) para colunas novas
+
+### Search Overlay (`ui/gtk/search_overlay.py`)
+- Ctrl+K via compositor IPC ou GTK EventControllerKey (fallback)
+- Debounce 300ms, resultados live, Escape para fechar
+- Integra com `ThreadStore.search()` (LIKE match)
+
+### IPC Events
+- `ipc_listener.py` agora despacha: `ctrl+space`, `ctrl+k`, `logout_requested`
+- Compositor envia `key_intercepted` com key name
 
 ---
 

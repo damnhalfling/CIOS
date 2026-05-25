@@ -194,6 +194,20 @@ class Sidebar(Gtk.Box):
         summary_lbl.add_css_class("history-summary")
         row.append(summary_lbl)
 
+        # Origin indicator (web threads show cloud icon)
+        origin = getattr(thread, "origin", "os")
+        if origin == "web":
+            origin_lbl = Gtk.Label(label="☁")
+            origin_lbl.add_css_class("history-origin-web")
+            row.append(origin_lbl)
+
+        # Local-only indicator
+        local_only = getattr(thread, "local_only", False)
+        if local_only:
+            lock_lbl = Gtk.Label(label="🔒")
+            lock_lbl.add_css_class("history-local-only")
+            row.append(lock_lbl)
+
         created = getattr(thread, "created_at", None)
         if created:
             time_str = self._format_time(created)

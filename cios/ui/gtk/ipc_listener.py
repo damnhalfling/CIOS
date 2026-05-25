@@ -19,9 +19,10 @@ logger = logging.getLogger(__name__)
 class IPCListener:
     """Persistent IPC connection to cios-shell compositor."""
 
-    def __init__(self, on_hotkey=None, on_logout=None):
+    def __init__(self, on_hotkey=None, on_logout=None, on_search=None):
         self._on_hotkey = on_hotkey
         self._on_logout = on_logout
+        self._on_search = on_search
         self._socket = None
         self._running = False
         self._thread = None
@@ -102,6 +103,8 @@ class IPCListener:
             key = msg.get("key", "")
             if "ctrl+space" in key and self._on_hotkey:
                 GLib.idle_add(self._on_hotkey)
+            elif "ctrl+k" in key and self._on_search:
+                GLib.idle_add(self._on_search)
 
         elif event == "logout_requested":
             if self._on_logout:

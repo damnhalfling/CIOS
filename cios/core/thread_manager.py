@@ -84,6 +84,8 @@ class Thread:
     pending_question: PendingQuestion | None = None
     dominant_intent: str = ""
     outcome: str = ""  # "success" | "error" | "incomplete"
+    local_only: bool = False  # If True, never synced to cloud
+    origin: str = "os"  # "os" | "web" — where the thread was created
 
 
 @dataclass
@@ -108,7 +110,9 @@ CREATE TABLE IF NOT EXISTS threads (
     status TEXT NOT NULL DEFAULT 'active',
     dominant_intent TEXT DEFAULT '',
     outcome TEXT DEFAULT '',
-    synced INTEGER DEFAULT 0
+    synced INTEGER DEFAULT 0,
+    local_only INTEGER DEFAULT 0,
+    origin TEXT DEFAULT 'os'
 );
 CREATE INDEX IF NOT EXISTS idx_threads_created ON threads(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_threads_status ON threads(status);
@@ -154,12 +158,31 @@ class ThreadStore:
             self._conn.row_factory = sqlite3.Row
             self._conn.execute("PRAGMA foreign_keys = ON")
             self._conn.executescript(_THREAD_SCHEMA)
+            self._migrate()
         except Exception as e:
             logger.error("ThreadStore: failed to initialize database: %s", e)
             # Create a minimal in-memory fallback so methods don't crash
             self._conn = sqlite3.connect(":memory:", check_same_thread=False)
             self._conn.row_factory = sqlite3.Row
             self._conn.executescript(_THREAD_SCHEMA)
+
+    def _migrate(self) -> None:
+        """Run schema migrations for new columns (safe to call multiple times)."""
+        try:
+            cols = {row[1] for row in self._conn.execute("PRAGMA table_info(threads)").fetchall()}
+            if "local_only" not in cols:
+                self._conn.execute("ALTER TABLE threads ADD COLUMN local_only INTEGER DEFAULT 0")
+                logger.info("ThreadStore: migrated — added local_only column")
+            if "origin" not in cols:
+                self._conn.execute("ALTER TABLE threads ADD COLUMN origin TEXT DEFAULT 'os'")
+                logger.info("ThreadStore: migrated — added origin column")
+            # Create index on local_only (safe after column exists)
+            self._conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_threads_local_only ON threads(local_only)"
+            )
+            self._conn.commit()
+        except Exception as e:
+            logger.debug("ThreadStore: migration check: %s", e)
 
     def save_thread(self, thread: Thread) -> None:
         """Persist a completed thread and its turns. Enforces 50-thread limit."""
@@ -168,8 +191,8 @@ class ThreadStore:
                 self._conn.execute(
                     """INSERT OR REPLACE INTO threads
                        (id, created_at, closed_at, summary, status,
-                        dominant_intent, outcome, synced)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, 0)""",
+                        dominant_intent, outcome, synced, local_only, origin)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)""",
                     (
                         thread.id,
                         thread.created_at,
@@ -178,6 +201,8 @@ class ThreadStore:
                         thread.status,
                         thread.dominant_intent,
                         thread.outcome,
+                        1 if thread.local_only else 0,
+                        thread.origin,
                     ),
                 )
                 # Delete existing turns for this thread (in case of re-save)
@@ -303,6 +328,16 @@ class ThreadStore:
             )
             for tr in turn_rows
         ]
+        # Handle missing columns gracefully (DB migration)
+        try:
+            local_only = bool(row["local_only"])
+        except (IndexError, KeyError):
+            local_only = False
+        try:
+            origin = row["origin"] or "os"
+        except (IndexError, KeyError):
+            origin = "os"
+
         return Thread(
             id=row["id"],
             created_at=row["created_at"],
@@ -312,6 +347,8 @@ class ThreadStore:
             turns=turns,
             dominant_intent=row["dominant_intent"] or "",
             outcome=row["outcome"] or "",
+            local_only=local_only,
+            origin=origin,
         )
 
     def _build_sync_payload(self, thread: Thread) -> dict:
@@ -379,9 +416,22 @@ class ThreadStore:
 
         Uses the bidirectional /v1/sync endpoint.
         Only syncs when the user is logged into CIOS Intelligence.
+        Skips threads marked as local_only.
         Runs in a daemon thread with a 10-second timeout.
         """
         from cios.core.intelligence import intelligence
+
+        # Never sync local_only threads
+        if thread.local_only:
+            logger.debug("ThreadStore: skipping sync for local_only thread %s", thread.id)
+            return
+
+        # Auto-detect sensitive content and mark as local_only
+        if self._contains_sensitive_content(thread):
+            thread.local_only = True
+            self._mark_local_only(thread.id)
+            logger.info("ThreadStore: thread %s auto-marked local_only (sensitive content)", thread.id)
+            return
 
         if not intelligence.is_logged_in:
             return
@@ -417,11 +467,52 @@ class ThreadStore:
         t = threading.Thread(target=_do_sync, daemon=True)
         t.start()
 
-    def pull_from_cloud(self) -> list[dict]:
-        """Pull new conversations from Intelligence API.
+    @staticmethod
+    def _contains_sensitive_content(thread: Thread) -> bool:
+        """Detect if a thread contains sensitive content that should stay local.
 
-        Returns conversations created on the web that the OS doesn't have.
-        Called periodically or on demand.
+        Checks for:
+        - SSH/sudo operations in user input text
+        - Explicit credential mentions in text (not params — those are already stripped)
+        - Private key / env file references
+        """
+        import re
+
+        _SENSITIVE_INTENTS = {"session"}
+        _SENSITIVE_PATTERNS = re.compile(
+            r"(?:ssh\s+\S+@|/etc/shadow|private.key|id_rsa|\.env\b|credentials\.json)",
+            re.IGNORECASE,
+        )
+
+        for turn in thread.turns:
+            # Check intent type (only truly sensitive ones)
+            if turn.intent_type in _SENSITIVE_INTENTS:
+                return True
+            # Check text content for sensitive patterns
+            if _SENSITIVE_PATTERNS.search(turn.user_input):
+                return True
+            if turn.result_summary and _SENSITIVE_PATTERNS.search(turn.result_summary):
+                return True
+        return False
+
+    def _mark_local_only(self, thread_id: str) -> None:
+        """Mark a thread as local_only in the database."""
+        with self._lock:
+            try:
+                self._conn.execute(
+                    "UPDATE threads SET local_only = 1 WHERE id = ?",
+                    (thread_id,),
+                )
+                self._conn.commit()
+            except Exception as e:
+                logger.debug("ThreadStore: failed to mark local_only for %s: %s", thread_id, e)
+
+    def pull_from_cloud(self) -> list[Thread]:
+        """Pull new conversations from Intelligence API and merge locally.
+
+        Returns threads created on the web that the OS didn't have.
+        Called periodically or on demand. Merges into local store with
+        origin='web' marker.
         """
         from cios.core.intelligence import intelligence
 
@@ -459,10 +550,149 @@ class ThreadStore:
             if sync_ts:
                 self._set_last_sync_timestamp(sync_ts)
 
-            return result.get("new_from_server", [])
+            # Merge new threads from server into local store
+            new_threads = []
+            for thread_data in result.get("new_from_server", []):
+                thread = self._merge_cloud_thread(thread_data)
+                if thread:
+                    new_threads.append(thread)
+
+            return new_threads
         except Exception as e:
             logger.debug("ThreadStore: pull from cloud failed: %s", e)
             return []
+
+    def _merge_cloud_thread(self, data: dict) -> Thread | None:
+        """Merge a thread from the cloud into local store.
+
+        Only imports if the thread_id doesn't already exist locally.
+        Marks origin='web' so UI can distinguish.
+        """
+        thread_id = data.get("thread_id", "")
+        if not thread_id:
+            return None
+
+        # Check if already exists locally
+        with self._lock:
+            try:
+                existing = self._conn.execute(
+                    "SELECT id FROM threads WHERE id = ?", (thread_id,)
+                ).fetchone()
+                if existing:
+                    return None  # Already have it
+            except Exception:
+                return None
+
+        # Build Thread from cloud data
+        turns = []
+        for turn_data in data.get("turns", []):
+            turns.append(
+                ConversationTurn(
+                    user_input=turn_data.get("user_input", ""),
+                    intent_type=turn_data.get("intent_type", "chat"),
+                    params={},  # Cloud never sends params (security)
+                    result_summary=turn_data.get("result_summary", ""),
+                    outcome=turn_data.get("outcome", ""),
+                    timestamp=turn_data.get("timestamp", 0),
+                )
+            )
+
+        thread = Thread(
+            id=thread_id,
+            created_at=data.get("created_at", time.time()),
+            closed_at=data.get("closed_at"),
+            summary=data.get("summary", ""),
+            status="completed",
+            turns=turns,
+            dominant_intent=data.get("dominant_intent", ""),
+            outcome=data.get("outcome", ""),
+            local_only=False,
+            origin="web",
+        )
+
+        # Persist to local store (already synced, mark as such)
+        self.save_thread(thread)
+        self._mark_synced(thread_id, 1)
+        logger.info("ThreadStore: merged cloud thread %s (origin=web)", thread_id)
+        return thread
+
+    def full_sync(self) -> dict:
+        """Bidirectional sync: push unsynced local threads, pull new from cloud.
+
+        Returns a summary dict with counts.
+        Called periodically (e.g., every 5 minutes when online) or on demand.
+        """
+        from cios.core.intelligence import intelligence
+
+        if not intelligence.is_logged_in:
+            return {"pushed": 0, "pulled": 0, "error": "not_logged_in"}
+
+        token = intelligence.user.token if intelligence.user else ""
+        if not token:
+            return {"pushed": 0, "pulled": 0, "error": "no_token"}
+
+        # Gather unsynced, non-local_only threads to push
+        threads_to_push = self._get_unsynced_threads()
+        last_sync = self._get_last_sync_timestamp()
+
+        payload = {
+            "threads": [self._build_sync_payload(t) for t in threads_to_push],
+            "last_sync_timestamp": last_sync,
+        }
+
+        try:
+            data = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(
+                "https://api.cios-ai.com/v1/sync",
+                data=data,
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {token}",
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                result = json.loads(resp.read())
+
+            # Update sync timestamp
+            sync_ts = result.get("sync_timestamp", 0)
+            if sync_ts:
+                self._set_last_sync_timestamp(sync_ts)
+
+            # Mark pushed threads as synced
+            for t in threads_to_push:
+                self._mark_synced(t.id, 1)
+
+            # Merge pulled threads
+            pulled = []
+            for thread_data in result.get("new_from_server", []):
+                thread = self._merge_cloud_thread(thread_data)
+                if thread:
+                    pulled.append(thread)
+
+            logger.info(
+                "ThreadStore: full_sync complete — pushed=%d, pulled=%d",
+                len(threads_to_push),
+                len(pulled),
+            )
+            return {"pushed": len(threads_to_push), "pulled": len(pulled), "error": None}
+        except Exception as e:
+            logger.debug("ThreadStore: full_sync failed: %s", e)
+            return {"pushed": 0, "pulled": 0, "error": str(e)}
+
+    def _get_unsynced_threads(self) -> list[Thread]:
+        """Get threads that haven't been synced yet and aren't local_only."""
+        with self._lock:
+            try:
+                rows = self._conn.execute(
+                    """SELECT * FROM threads
+                       WHERE synced = 0 AND local_only = 0 AND status = 'completed'
+                       ORDER BY created_at DESC LIMIT 20"""
+                ).fetchall()
+                return [self._load_thread_with_turns(row) for row in rows]
+            except Exception as e:
+                logger.debug("ThreadStore: failed to get unsynced threads: %s", e)
+                return []
 
     def _get_last_sync_timestamp(self) -> float:
         """Get the last successful sync timestamp from local DB."""

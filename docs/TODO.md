@@ -4,7 +4,7 @@
 
 ---
 
-## 🟡 Em andamento
+## ✅ Concluído
 
 ### UX Conversacional — Sprint 3
 
@@ -12,9 +12,9 @@
 |------|--------|
 | Artifact panel GTK4 (split view, copy, close) | ✅ |
 | Cognitive indicator no bubble (🧠 memória, ⚖️ honesty) | ✅ |
-| Histórico unificado (sync web ↔ OS, timeline única) | 🟡 |
-| Sanitização de sync (local_only marks, sem credenciais) | 🟡 |
-| Busca em histórico (Ctrl+K ou intent "busca conversa sobre X") | 🟡 |
+| Histórico unificado (sync web ↔ OS, timeline única) | ✅ |
+| Sanitização de sync (local_only marks, sem credenciais) | ✅ |
+| Busca em histórico (Ctrl+K ou intent "busca conversa sobre X") | ✅ |
 
 ### Intelligence Client
 
@@ -27,9 +27,48 @@
 
 ---
 
-## 📋 Próximo (Fase 0.5 — Desktop Completude)
+## 📋 Próximo (Fase 0.5 — Google Workspace + Desktop Completude)
 
-> Fechar gaps com desktop Linux padrão. Sem isso, uso diário tem fricção.
+> Integração com Google Workspace via MCP servers oficiais + fechar gaps desktop.
+
+### 🔴🔴 Prioridade Máxima — Google Workspace MCP Integration
+
+> Requisito: usuário logado com Intelligence (plano free mínimo).
+> Google fornece MCP servers remotos (HTTP + OAuth). CIOS consome como client.
+
+| # | Task | Tipo | Módulo | Dep |
+|---|------|------|--------|-----|
+| 550 | Expandir OAuth scopes (Gmail, Drive, Chat, Calendar) | Backend | `maestro/app/api/auth.py` | — |
+| 551 | Guardar Google refresh_token no banco | Backend | `maestro/app/models/user.py` + migration | 550 |
+| 552 | Endpoint `GET /v1/auth/google/token` (access_token fresco) | Backend | `maestro/app/api/auth.py` | 551 |
+| 553 | Google MCP Client genérico (HTTP + token) | Core | `core/google_mcp.py` | 552 |
+| 554 | Skill Gmail (search, read, draft, label) | Skill | `skills/email.py` | 553 |
+| 555 | Skill Drive (search, read, download, create) | Skill | `skills/drive.py` | 553 |
+| 556 | Skill Google Chat (search, list, send) | Skill | `skills/gchat.py` | 553 |
+| 557 | Skill Calendar (list, create, update events) | Skill | `skills/calendar.py` | 553 |
+| 558 | Handler email (planner routing) | Handler | `handlers/email.py` | 554 |
+| 559 | Handler drive (planner routing) | Handler | `handlers/drive.py` | 555 |
+| 560 | Handler gchat (planner routing) | Handler | `handlers/gchat.py` | 556 |
+| 561 | Handler calendar (planner routing) | Handler | `handlers/calendar.py` | 557 |
+| 562 | UI: renderizar emails no artifact panel | UI | `ui/gtk/email_view.py` | 554 |
+| 563 | UI: renderizar docs do Drive no artifact panel | UI | `ui/gtk/drive_view.py` | 555 |
+| 564 | Consent screen UX (primeiro uso pede permissão extra) | UX | onboarding + intelligence | 550 |
+
+**Endpoints MCP do Google:**
+- Gmail: `https://gmailmcp.googleapis.com/mcp/v1`
+- Drive: `https://drivemcp.googleapis.com/mcp/v1`
+- Chat: `https://chatmcp.googleapis.com/mcp/v1`
+- Calendar: `https://calendarmcp.googleapis.com/mcp/v1`
+- People: `https://people.googleapis.com/mcp/v1`
+
+**Ordem de implementação:**
+1. Backend (550→551→552) — habilita o flow
+2. Client genérico (553) — base para todas as skills
+3. Email (554→558→562) — primeiro uso funcional visível
+4. Drive (555→559→563) — segundo mais útil
+5. Chat + Calendar (556→557→560→561) — complementar
+
+---
 
 ### 🔴 Prioridade Alta — Bloqueiam uso diário
 

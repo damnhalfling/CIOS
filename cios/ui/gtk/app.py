@@ -56,6 +56,11 @@ class CIOSApplication(Gtk.Application):
         self._win.set_decorated(False)
         self._win.set_default_size(4096, 4096)
 
+        # Global keyboard shortcuts (fallback when compositor IPC unavailable)
+        key_ctrl = Gtk.EventControllerKey()
+        key_ctrl.connect("key-pressed", self._on_global_key)
+        self._win.add_controller(key_ctrl)
+
         # Apply CSS
         self._apply_css(self._win)
 
@@ -84,6 +89,7 @@ class CIOSApplication(Gtk.Application):
         self._ipc_listener = IPCListener(
             on_hotkey=self._on_hotkey_triggered,
             on_logout=self._on_logout_requested,
+            on_search=self._on_search_triggered,
         )
         self._ipc_listener.start()
 
@@ -92,6 +98,7 @@ class CIOSApplication(Gtk.Application):
     def _build_main_ui(self):
         """Build the main CIOS interface with topbar + sidebar + prompt."""
         from cios.ui.gtk.hotkey_overlay import HotkeyOverlay
+        from cios.ui.gtk.search_overlay import SearchOverlay
         from cios.ui.gtk.sidebar import Sidebar
         from cios.ui.gtk.topbar import Topbar
 
@@ -207,6 +214,10 @@ class CIOSApplication(Gtk.Application):
         self._hotkey_overlay = HotkeyOverlay(on_submit=self._on_hotkey_submit)
         root_overlay.add_overlay(self._hotkey_overlay)
 
+        # ── Search overlay (Ctrl+K) ──
+        self._search_overlay = SearchOverlay()
+        root_overlay.add_overlay(self._search_overlay)
+
         return root_overlay
 
     def _build_onboarding(self):
@@ -282,6 +293,7 @@ class CIOSApplication(Gtk.Application):
         self._input.grab_focus()
         self._sidebar.set_bridge(self._bridge)
         self._sidebar.set_artifact_panel(self._artifact_panel)
+        self._search_overlay.set_bridge(self._bridge)
 
         # Start command poller for cross-device commands
         try:
@@ -344,6 +356,20 @@ class CIOSApplication(Gtk.Application):
             self._hotkey_overlay.hide_overlay()
         else:
             self._hotkey_overlay.show_overlay()
+
+    def _on_search_triggered(self):
+        """Called when Ctrl+K is pressed (via compositor IPC)."""
+        self._search_overlay.toggle()
+
+    def _on_global_key(self, controller, keyval, keycode, state):
+        """Handle global keyboard shortcuts (GTK-level fallback)."""
+        from gi.repository import Gdk
+
+        ctrl = state & Gdk.ModifierType.CONTROL_MASK
+        if ctrl and keyval == ord("k"):
+            self._on_search_triggered()
+            return True
+        return False
 
     def _on_logout_requested(self):
         """Called when Super+Q is pressed (via compositor IPC)."""
@@ -845,6 +871,7 @@ class CIOSApplication(Gtk.Application):
         from cios.ui.gtk.gallery import GalleryComponent as GalleryCSS
         from cios.ui.gtk.hotkey_overlay import HotkeyOverlay
         from cios.ui.gtk.image_viewer import ImageViewer as ViewerCSS
+        from cios.ui.gtk.search_overlay import SearchOverlay
         from cios.ui.gtk.sidebar import Sidebar
         from cios.ui.gtk.thread_panel import ThreadPanel
         from cios.ui.gtk.topbar import Topbar
@@ -942,6 +969,7 @@ class CIOSApplication(Gtk.Application):
             + Sidebar.get_css()
             + ThreadPanel.get_css()
             + HotkeyOverlay.get_css()
+            + SearchOverlay.get_css()
             + GalleryCSS.get_css()
             + ViewerCSS.get_css()
         )

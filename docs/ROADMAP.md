@@ -46,13 +46,24 @@ Escopo TRAVADO. NÃO adicionar features. Fechar o loop.
 | — | UX Conversacional (chat feed GTK4, streaming, tom, follow-up, artifact panel) |
 | — | Compositor Hardening (SSD, VT switch, IPC nativo, Wayland-only) |
 | — | Distribuição (greetd, Plymouth, greeter GTK4, ISO, first-boot wizard) |
+| — | History Sync + Sanitization + Search (Sprint 3: sync bidirecional, local_only, Ctrl+K) |
 
 ---
 
 ## Visão futura
 
-### FASE 0.5 — Desktop Completude
-> Fechar gaps com desktop Linux padrão. Sem isso, uso diário tem fricção.
+### FASE 0.5 — Google Workspace + Desktop Completude
+> Integração com Google Workspace via MCP servers oficiais + fechar gaps desktop.
+
+**Prioridade Máxima — Google Workspace MCP Integration:**
+- Expandir OAuth scopes (Gmail, Drive, Chat, Calendar) no login existente
+- Guardar Google refresh_token no banco (maestro)
+- Endpoint para access_token fresco (`GET /v1/auth/google/token`)
+- Google MCP Client genérico (`core/google_mcp.py`)
+- Skills: email, drive, gchat, calendar
+- Handlers: routing de intents Google
+- UI: renderizar emails e docs no artifact panel
+- Requisito: plano free mínimo (login Intelligence)
 
 **Prioridade Alta (bloqueiam uso diário):**
 - Notifications system (eventos do sistema, apps, timers, progresso de tasks)

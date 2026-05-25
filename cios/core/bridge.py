@@ -195,6 +195,9 @@ class CIOSBridge:
             self._boot_times["mcp_start"],
         )
 
+        # Start periodic history sync (every 5 minutes, background)
+        self._start_periodic_sync()
+
     @property
     def _pending_question(self) -> PendingQuestion | None:
         """Proxy to ThreadManager's pending question for backward compatibility.
@@ -1442,6 +1445,29 @@ class CIOSBridge:
     # ═══════════════════════════════════════════════════════════════════
     #  LIFECYCLE & STATUS
     # ═══════════════════════════════════════════════════════════════════
+
+    def _start_periodic_sync(self) -> None:
+        """Start background thread that syncs history every 5 minutes."""
+        import threading
+
+        def _sync_loop():
+            while True:
+                time.sleep(300)  # 5 minutes
+                try:
+                    result = self._thread_store.full_sync()
+                    if result.get("error"):
+                        logger.debug("Periodic sync: %s", result["error"])
+                    elif result["pushed"] or result["pulled"]:
+                        logger.info(
+                            "Periodic sync: pushed=%d, pulled=%d",
+                            result["pushed"],
+                            result["pulled"],
+                        )
+                except Exception as e:
+                    logger.debug("Periodic sync failed: %s", e)
+
+        t = threading.Thread(target=_sync_loop, daemon=True, name="history-sync")
+        t.start()
 
     def close(self) -> None:
         from cios.core.mcp import context
