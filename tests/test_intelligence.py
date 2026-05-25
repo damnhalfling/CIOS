@@ -255,8 +255,8 @@ class TestStreaming:
 
         # Usage should be incremented
         assert intelligence_client._usage.used_today == 1
-        # Conversation ID should be set
-        assert intelligence_client._conversation_id == 100
+        # OS: conversation_id is NOT persisted between queries
+        assert intelligence_client._conversation_id is None
 
 
 class TestConversationContinuity:
@@ -272,7 +272,8 @@ class TestConversationContinuity:
 
         assert intelligence_client._conversation_id is None
 
-    def test_conversation_id_persists_across_queries(self, intelligence_client, tmp_path):
+    def test_conversation_id_not_persisted_on_os(self, intelligence_client, tmp_path):
+        """OS doesn't persist conversation_id between queries (fresh each time)."""
         cios_home = tmp_path / ".cios"
         with (
             patch("cios.core.intelligence.AUTH_FILE", cios_home / "intelligence.json"),
@@ -305,7 +306,8 @@ class TestConversationContinuity:
         ):
             intelligence_client.query("primeira pergunta")
 
-        assert intelligence_client._conversation_id == 555
+        # OS: conversation_id is NOT persisted (each query is independent)
+        assert intelligence_client._conversation_id is None
 
 
 class TestUsageLimits:

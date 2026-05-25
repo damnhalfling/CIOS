@@ -291,9 +291,8 @@ class IntelligenceClient:
 
         if result.success:
             self._usage.used_today += 1
-            if result.conversation_id:
-                self._conversation_id = result.conversation_id
-                self._save_session()
+            # OS: don't persist conversation_id between queries
+            # Each query is independent (no stale context)
             if result.cognitive_state:
                 self._last_cognitive_state = result.cognitive_state
 
@@ -427,10 +426,8 @@ class IntelligenceClient:
 
                             # Handle metadata updates
                             if chunk.type == "start":
-                                conv_id = chunk.metadata.get("conversation_id")
-                                if conv_id:
-                                    self._conversation_id = conv_id
-                                    self._save_session()
+                                # OS: don't persist conversation_id
+                                pass
                             elif chunk.type == "done":
                                 self._usage.used_today += 1
                                 cog = chunk.metadata.get("cognitive_state", {})
