@@ -430,7 +430,9 @@ class ThreadStore:
         if self._contains_sensitive_content(thread):
             thread.local_only = True
             self._mark_local_only(thread.id)
-            logger.info("ThreadStore: thread %s auto-marked local_only (sensitive content)", thread.id)
+            logger.info(
+                "ThreadStore: thread %s auto-marked local_only (sensitive content)", thread.id
+            )
             return
 
         if not intelligence.is_logged_in:

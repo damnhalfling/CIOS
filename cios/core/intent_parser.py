@@ -393,7 +393,7 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
             re.IGNORECASE,
         ),
         IntentType.EXPLORE_SYSTEM,
-        None,
+        lambda m: {"action": "list"},
         0.95,
     ),
     (
@@ -404,7 +404,7 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
             re.IGNORECASE,
         ),
         IntentType.EXPLORE_SYSTEM,
-        None,
+        lambda m: {"action": "list"},
         0.95,
     ),
     # --- list apps (PT + EN) — MUST be before app_launch ---

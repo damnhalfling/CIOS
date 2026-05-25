@@ -47,7 +47,7 @@ def handle_explore_system(intent: Intent, executor: Executor, memory: Memory) ->
     from cios.core.humanizer import _LANG
 
     # Greetings get a conversational response, not a capability list
-    if intent.params is None or not intent.params:
+    if not intent.params or intent.params.get("action") != "list":
         import random
 
         greetings_pt = [

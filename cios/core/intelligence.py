@@ -173,15 +173,13 @@ class IntelligenceClient:
             logger.warning("Failed to load intelligence auth: %s", e)
 
     def _load_session(self) -> None:
-        """Load conversation session from disk (continuity across restarts)."""
-        if not SESSION_FILE.exists():
-            return
-        try:
-            data = json.loads(SESSION_FILE.read_text())
-            self._conversation_id = data.get("conversation_id")
-            logger.debug("Session loaded: conversation_id=%s", self._conversation_id)
-        except Exception:
-            pass
+        """Start fresh conversation on each OS boot.
+
+        Unlike the web client, the OS starts a new conversation each session.
+        This prevents stale context (e.g. previous topic) from polluting responses.
+        """
+        self._conversation_id = None
+        logger.debug("Session: new conversation (OS always starts fresh)")
 
     def _save_session(self) -> None:
         """Persist conversation session to disk."""
