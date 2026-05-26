@@ -628,98 +628,23 @@ class CIOSApplication(Gtk.Application):
         self._show_result(result, status)
 
     def _show_password_dialog(self, prompt_text: str):
-        """Show a modal password dialog with red accent, centered, with dark overlay."""
-        # ── Overlay (blocks interaction with the rest of the UI) ──
-        overlay = Gtk.Window(modal=True)
-        overlay.set_transient_for(self._win)
-        overlay.set_hide_on_close(True)
-        overlay.set_decorated(False)
-        overlay.fullscreen()
+        """Show a password dialog as an overlay inside the main window (not a separate window)."""
+        import threading
 
-        css = Gtk.CssProvider()
-        css.load_from_string(f"""
-            .sudo-overlay {{
-                background-color: rgba(0, 0, 0, 0.75);
-            }}
-            .sudo-dialog {{
-                background-color: {BG_CARD};
-                border: 2px solid {ERROR};
-                border-radius: 16px;
-                padding: 32px;
-                box-shadow: 0 0 40px rgba(255, 23, 68, 0.3);
-                min-width: 380px;
-            }}
-            .sudo-icon {{
-                color: {ERROR};
-                font-size: 36px;
-                margin-bottom: 8px;
-            }}
-            .sudo-title {{
-                color: {ERROR};
-                font-size: 16px;
-                font-weight: bold;
-                margin-bottom: 4px;
-            }}
-            .sudo-label {{
-                color: {FG};
-                font-size: 14px;
-                margin-bottom: 16px;
-            }}
-            .sudo-entry {{
-                background: {BG_INPUT};
-                color: {FG};
-                border: 1px solid {ERROR};
-                border-radius: 8px;
-                padding: 12px 16px;
-                font-size: 15px;
-                min-height: 20px;
-            }}
-            .sudo-entry:focus {{
-                border-color: #ff5252;
-                box-shadow: 0 0 8px rgba(255, 23, 68, 0.3);
-            }}
-            .sudo-btn {{
-                background: {ERROR};
-                color: white;
-                border-radius: 8px;
-                padding: 10px 24px;
-                font-size: 14px;
-                font-weight: bold;
-                border: none;
-                margin-top: 16px;
-            }}
-            .sudo-btn:hover {{
-                background: #ff5252;
-            }}
-            .sudo-cancel {{
-                background: transparent;
-                color: {FG_DIM};
-                border: 1px solid {BORDER};
-                border-radius: 8px;
-                padding: 10px 24px;
-                font-size: 14px;
-                margin-top: 16px;
-            }}
-        """)
-        Gtk.StyleContext.add_provider_for_display(
-            overlay.get_display(), css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-        )
-
-        # Full-screen overlay container
-        overlay_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        overlay_box.add_css_class("sudo-overlay")
-        overlay_box.set_valign(Gtk.Align.FILL)
-        overlay_box.set_halign(Gtk.Align.FILL)
-        overlay_box.set_vexpand(True)
-        overlay_box.set_hexpand(True)
-        overlay.set_child(overlay_box)
+        # Create overlay container that covers the main content
+        overlay_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        overlay_container.add_css_class("sudo-overlay")
+        overlay_container.set_valign(Gtk.Align.FILL)
+        overlay_container.set_halign(Gtk.Align.FILL)
+        overlay_container.set_vexpand(True)
+        overlay_container.set_hexpand(True)
 
         # Center the dialog
         center = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         center.set_valign(Gtk.Align.CENTER)
         center.set_halign(Gtk.Align.CENTER)
         center.set_vexpand(True)
-        overlay_box.append(center)
+        overlay_container.append(center)
 
         # Dialog card
         dialog_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
@@ -766,11 +691,17 @@ class CIOSApplication(Gtk.Application):
         ok_btn.add_css_class("sudo-btn")
         btn_box.append(ok_btn)
 
+        # Get the root overlay of the main window to add this on top
+        root_overlay = self._win.get_child()  # The Gtk.Overlay
+        root_overlay.add_overlay(overlay_container)
+
+        def dismiss():
+            root_overlay.remove_overlay(overlay_container)
+
         def on_submit(*args):
             password = entry.get_text()
-            overlay.set_visible(False)
+            dismiss()
             if password:
-                # Send password to bridge in background
                 progress = self._chat_feed.add_progress_message("Executando…")
 
                 def execute_with_password():
@@ -788,14 +719,14 @@ class CIOSApplication(Gtk.Application):
                 self._finish_execution()
 
         def on_cancel(*args):
-            overlay.set_visible(False)
+            dismiss()
             self._finish_execution()
 
-        entry.connect("activate", on_submit)
         ok_btn.connect("clicked", on_submit)
         cancel_btn.connect("clicked", on_cancel)
+        entry.connect("activate", on_submit)
 
-        overlay.present()
+        # Focus the entry
         entry.grab_focus()
         self._busy = False  # Allow interaction with dialog
 
