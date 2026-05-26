@@ -104,6 +104,7 @@ class CIOSApplication(Gtk.Application):
 
         # Root: overlay for floating prompt + hotkey popup
         root_overlay = Gtk.Overlay()
+        self._root_overlay = root_overlay
 
         # Main vertical layout
         outer_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -692,11 +693,10 @@ class CIOSApplication(Gtk.Application):
         btn_box.append(ok_btn)
 
         # Get the root overlay of the main window to add this on top
-        root_overlay = self._win.get_child()  # The Gtk.Overlay
-        root_overlay.add_overlay(overlay_container)
+        self._root_overlay.add_overlay(overlay_container)
 
         def dismiss():
-            root_overlay.remove_overlay(overlay_container)
+            self._root_overlay.remove_overlay(overlay_container)
 
         def on_submit(*args):
             password = entry.get_text()
@@ -896,6 +896,68 @@ class CIOSApplication(Gtk.Application):
             }}
             .send-btn:hover {{
                 background: {ACCENT_LT};
+            }}
+            .sudo-overlay {{
+                background-color: rgba(0, 0, 0, 0.75);
+            }}
+            .sudo-dialog {{
+                background-color: {BG_CARD};
+                border: 2px solid {ERROR};
+                border-radius: 16px;
+                padding: 32px;
+                box-shadow: 0 0 40px rgba(255, 23, 68, 0.3);
+                min-width: 380px;
+            }}
+            .sudo-icon {{
+                color: {ERROR};
+                font-size: 36px;
+                margin-bottom: 8px;
+            }}
+            .sudo-title {{
+                color: {ERROR};
+                font-size: 16px;
+                font-weight: bold;
+                margin-bottom: 4px;
+            }}
+            .sudo-label {{
+                color: {FG};
+                font-size: 14px;
+                margin-bottom: 16px;
+            }}
+            .sudo-entry {{
+                background: {BG_INPUT};
+                color: {FG};
+                border: 1px solid {ERROR};
+                border-radius: 8px;
+                padding: 12px 16px;
+                font-size: 15px;
+                min-height: 20px;
+            }}
+            .sudo-entry:focus {{
+                border-color: #ff5252;
+                box-shadow: 0 0 8px rgba(255, 23, 68, 0.3);
+            }}
+            .sudo-btn {{
+                background: {ERROR};
+                color: white;
+                border-radius: 8px;
+                padding: 10px 24px;
+                font-size: 14px;
+                font-weight: bold;
+                border: none;
+                margin-top: 16px;
+            }}
+            .sudo-btn:hover {{
+                background: #ff5252;
+            }}
+            .sudo-cancel {{
+                background: transparent;
+                color: {FG_DIM};
+                border: 1px solid {BORDER};
+                border-radius: 8px;
+                padding: 10px 24px;
+                font-size: 14px;
+                margin-top: 16px;
             }}
             """
             + Topbar.get_css()
