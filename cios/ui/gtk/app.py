@@ -631,6 +631,8 @@ class CIOSApplication(Gtk.Application):
         """Show a modal password dialog with red accent, centered, with dark overlay."""
         # ── Overlay (blocks interaction with the rest of the UI) ──
         overlay = Gtk.Window(modal=True)
+        overlay.set_transient_for(self._win)
+        overlay.set_hide_on_close(True)
         overlay.set_decorated(False)
         overlay.fullscreen()
 
@@ -766,7 +768,7 @@ class CIOSApplication(Gtk.Application):
 
         def on_submit(*args):
             password = entry.get_text()
-            overlay.close()
+            overlay.set_visible(False)
             if password:
                 # Send password to bridge in background
                 progress = self._chat_feed.add_progress_message("Executando…")
@@ -786,7 +788,7 @@ class CIOSApplication(Gtk.Application):
                 self._finish_execution()
 
         def on_cancel(*args):
-            overlay.close()
+            overlay.set_visible(False)
             self._finish_execution()
 
         entry.connect("activate", on_submit)
