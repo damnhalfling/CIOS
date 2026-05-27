@@ -166,9 +166,15 @@ class LockScreenOverlay(Gtk.Box):
         GLib.timeout_add(3000, lambda: self._error.set_visible(False) or False)
 
     def _unlock(self):
-        """Remove lock screen overlay."""
+        """Remove lock screen overlay and restore focus to prompt."""
         self._unlocked = True
         self._root_overlay.remove_overlay(self)
+        # Restore focus to the main input
+        app = self._root_overlay.get_root()
+        if app and hasattr(app, "get_application"):
+            cios_app = app.get_application()
+            if hasattr(cios_app, "_input"):
+                cios_app._input.grab_focus()
 
     def _update_clock(self):
         """Update the clock display."""
