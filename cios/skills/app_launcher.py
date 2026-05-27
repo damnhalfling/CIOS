@@ -28,6 +28,13 @@ _app_cache: list[AppInfo] = []
 _cache_loaded: bool = False
 
 
+def invalidate_app_cache() -> None:
+    """Invalidate the app cache (call after installing/removing packages)."""
+    global _app_cache, _cache_loaded
+    _app_cache = []
+    _cache_loaded = False
+
+
 # Aliases comuns: o que o usuário diz → nome real do .desktop
 _ALIASES: dict[str, list[str]] = {
     "chrome": ["google-chrome", "google-chrome-stable", "chromium", "chromium-browser"],

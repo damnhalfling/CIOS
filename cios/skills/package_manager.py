@@ -322,6 +322,10 @@ def install_package(package: str, password: str = "") -> PackageResult:
         )
         if result.returncode == 0:
             steps.append(f"{package} installed successfully")
+            # Invalidate app cache so newly installed apps are found
+            from cios.skills.app_launcher import invalidate_app_cache
+
+            invalidate_app_cache()
             return PackageResult(steps, True, f"{package} installed successfully")
         else:
             return PackageResult(
