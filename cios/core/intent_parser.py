@@ -1529,7 +1529,7 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
     ),
     (
         re.compile(
-            r"(?:sair|logout|log\s*out|encerrar\s+sess[aã]o|fechar\s+sess[aã]o)",
+            r"(?:sair|deslogar?|logout|log\s*out|encerrar\s+sess[aã]o|fechar\s+sess[aã]o)",
             re.IGNORECASE,
         ),
         IntentType.SESSION,
