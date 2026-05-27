@@ -1,54 +1,57 @@
 """CIOS Lock Screen — Apple-style clock with password unlock.
 
-Shows:
+Shows as an overlay inside the main window (not a separate window).
 - Large centered clock (HH:MM)
 - Date below
 - Password field appears on click/keypress
-- Unlocks on correct password (PAM auth)
+- Unlocks on correct password
 """
 
 import os
 import subprocess
 import time
 
-from gi.repository import Gdk, GLib, Gtk
+from gi.repository import GLib, Gtk
 
 
 def show_lock_screen(parent_window):
-    """Show the lock screen overlay on top of the main window."""
-    lock = LockScreen(parent_window)
-    lock.show()
+    """Show the lock screen as an overlay inside the main window."""
+    # Find the root overlay
+    app = parent_window.get_application()
+    if hasattr(app, "_root_overlay"):
+        overlay = app._root_overlay
+    else:
+        # Fallback: try to get from window child
+        overlay = parent_window.get_child()
+        if not isinstance(overlay, Gtk.Overlay):
+            return
+
+    lock = LockScreenOverlay(overlay)
+    overlay.add_overlay(lock)
+    lock.grab_focus()
 
 
-class LockScreen(Gtk.Window):
-    """Fullscreen lock screen with clock and password unlock."""
+class LockScreenOverlay(Gtk.Box):
+    """Lock screen as overlay widget inside the main window."""
 
-    def __init__(self, parent):
-        super().__init__()
-        self.set_decorated(False)
-        self.set_modal(True)
-        self.set_transient_for(parent)
-        self.fullscreen()
-
-        self._parent = parent
+    def __init__(self, root_overlay):
+        super().__init__(orientation=Gtk.Orientation.VERTICAL)
+        self._root_overlay = root_overlay
         self._unlocked = False
 
-        # Main container
-        overlay = Gtk.Overlay()
-        self.set_child(overlay)
-
-        # Background (dark)
-        bg = Gtk.Box()
-        bg.add_css_class("lock-bg")
-        bg.set_hexpand(True)
-        bg.set_vexpand(True)
-        overlay.set_child(bg)
+        # Fill entire screen
+        self.set_valign(Gtk.Align.FILL)
+        self.set_halign(Gtk.Align.FILL)
+        self.set_vexpand(True)
+        self.set_hexpand(True)
+        self.add_css_class("lock-bg")
 
         # Center content
         center = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         center.set_halign(Gtk.Align.CENTER)
         center.set_valign(Gtk.Align.CENTER)
-        overlay.add_overlay(center)
+        center.set_vexpand(True)
+        self.append(center)
 
         # Clock (large)
         self._clock = Gtk.Label(label="00:00")
@@ -65,7 +68,7 @@ class LockScreen(Gtk.Window):
         spacer.set_size_request(-1, 40)
         center.append(spacer)
 
-        # Password area (hidden initially, shown on interaction)
+        # Password area (hidden initially)
         self._pass_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         self._pass_box.set_halign(Gtk.Align.CENTER)
         self._pass_box.set_visible(False)
@@ -111,8 +114,9 @@ class LockScreen(Gtk.Window):
         self._update_clock()
         GLib.timeout_add(1000, self._update_clock)
 
-        # Apply CSS
-        self._apply_css()
+        # Make focusable
+        self.set_focusable(True)
+        self.set_can_focus(True)
 
     def _on_key(self, ctrl, keyval, keycode, state):
         """Any key press reveals the password field."""
@@ -138,7 +142,6 @@ class LockScreen(Gtk.Window):
 
         username = os.environ.get("USER", "user")
 
-        # Verify password via su
         try:
             result = subprocess.run(
                 ["su", "-c", "true", username],
@@ -163,9 +166,9 @@ class LockScreen(Gtk.Window):
         GLib.timeout_add(3000, lambda: self._error.set_visible(False) or False)
 
     def _unlock(self):
-        """Dismiss lock screen."""
+        """Remove lock screen overlay."""
         self._unlocked = True
-        self.close()
+        self._root_overlay.remove_overlay(self)
 
     def _update_clock(self):
         """Update the clock display."""
@@ -175,7 +178,6 @@ class LockScreen(Gtk.Window):
         now = time.localtime()
         self._clock.set_label(time.strftime("%H:%M", now))
 
-        # Date: "domingo, 24 de maio"
         months_pt = [
             "",
             "janeiro",
@@ -197,54 +199,3 @@ class LockScreen(Gtk.Window):
         self._date.set_label(f"{day_name}, {now.tm_mday} de {month_name}")
 
         return True
-
-    def _apply_css(self):
-        """Apply lock screen CSS."""
-        css = """
-            .lock-bg {
-                background-color: #0a0a0f;
-            }
-            .lock-clock {
-                color: #ffffff;
-                font-size: 96px;
-                font-weight: 200;
-                letter-spacing: -2px;
-            }
-            .lock-date {
-                color: rgba(255,255,255,0.7);
-                font-size: 18px;
-                font-weight: 300;
-            }
-            .lock-user {
-                color: rgba(255,255,255,0.8);
-                font-size: 14px;
-                font-weight: 500;
-            }
-            .lock-password {
-                background-color: rgba(255,255,255,0.08);
-                border: 1px solid rgba(255,255,255,0.15);
-                border-radius: 8px;
-                color: #ffffff;
-                font-size: 14px;
-                padding: 8px 16px;
-                min-height: 36px;
-            }
-            .lock-password:focus {
-                border-color: rgba(0,229,255,0.5);
-                box-shadow: 0 0 8px rgba(0,229,255,0.15);
-            }
-            .lock-error {
-                color: #ff4444;
-                font-size: 12px;
-            }
-            .lock-hint {
-                color: rgba(255,255,255,0.4);
-                font-size: 12px;
-                margin-top: 40px;
-            }
-        """
-        provider = Gtk.CssProvider()
-        provider.load_from_data(css.encode())
-        Gtk.StyleContext.add_provider_for_display(
-            Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-        )

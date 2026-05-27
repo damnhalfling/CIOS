@@ -959,6 +959,46 @@ class CIOSApplication(Gtk.Application):
                 font-size: 14px;
                 margin-top: 16px;
             }}
+            .lock-bg {{
+                background-color: #0a0a0f;
+            }}
+            .lock-clock {{
+                color: #ffffff;
+                font-size: 96px;
+                font-weight: 200;
+                letter-spacing: -2px;
+            }}
+            .lock-date {{
+                color: rgba(255,255,255,0.7);
+                font-size: 18px;
+                font-weight: 300;
+            }}
+            .lock-user {{
+                color: rgba(255,255,255,0.8);
+                font-size: 14px;
+                font-weight: 500;
+            }}
+            .lock-password {{
+                background-color: rgba(255,255,255,0.08);
+                border: 1px solid rgba(255,255,255,0.15);
+                border-radius: 8px;
+                color: #ffffff;
+                font-size: 14px;
+                padding: 8px 16px;
+                min-height: 36px;
+            }}
+            .lock-password:focus {{
+                border-color: rgba(0,229,255,0.5);
+            }}
+            .lock-error {{
+                color: #ff4444;
+                font-size: 12px;
+            }}
+            .lock-hint {{
+                color: rgba(255,255,255,0.4);
+                font-size: 12px;
+                margin-top: 40px;
+            }}
             """
             + Topbar.get_css()
             + Sidebar.get_css()
