@@ -82,7 +82,7 @@ class LockScreenOverlay(Gtk.Box):
 
         # Password entry
         self._password = Gtk.PasswordEntry()
-        self._password.set_placeholder_text("Senha")
+        self._password.props.placeholder_text = "Senha"
         self._password.set_show_peek_icon(True)
         self._password.add_css_class("lock-password")
         self._password.set_size_request(250, -1)
