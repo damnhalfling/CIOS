@@ -320,7 +320,7 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
     # --- monitor configuration (PT + EN) ---
     (
         re.compile(
-            r"(?:configurar?|config|ajustar?|configure|setup)\s+(?:o?\s+)?(?:monitor(?:es)?|tela(?:s)?|display(?:s)?)",
+            r"(?:configurar?|config|ajustar?|configure|setup|extender?|estender?)\s+(?:o?\s+)?(?:monitor(?:es)?|tela(?:s)?|display(?:s)?)",
             re.IGNORECASE,
         ),
         IntentType.MONITOR,
