@@ -181,14 +181,32 @@ static void handle_xwayland_surface_unmap(struct wl_listener *listener, void *da
  */
 static void handle_xwayland_surface_destroy(struct wl_listener *listener, void *data) {
     struct CiosSurface *surface = wl_container_of(listener, surface, destroy);
+    struct CiosServer *server = surface->server;
 
     LOG_INFO("surface destroyed: s_%u", surface->id);
+
+    /* Clear focus if this surface was focused (prevents use-after-free) */
+    if (server->focused == surface) {
+        server->focused = NULL;
+    }
 
     /* Cancel the 500ms map timeout if still pending */
     if (surface->map_timer) {
         wl_event_source_remove(surface->map_timer);
         surface->map_timer = NULL;
     }
+
+    /* Destroy decorations if still present */
+    decorations_destroy(surface);
+
+    /* Remove scene tree node if still present (surface may not have been unmapped) */
+    if (surface->scene_tree) {
+        wlr_scene_node_destroy(&surface->scene_tree->node);
+        surface->scene_tree = NULL;
+    }
+
+    /* Remove from surfaces list (may already be removed by unmap, but safe to call) */
+    wl_list_remove(&surface->link);
 
     /* Remove all listeners */
     wl_list_remove(&surface->map.link);

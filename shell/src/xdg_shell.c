@@ -89,8 +89,23 @@ static void handle_xdg_surface_unmap(struct wl_listener *listener, void *data) {
 
 static void handle_xdg_surface_destroy(struct wl_listener *listener, void *data) {
     struct CiosSurface *surface = wl_container_of(listener, surface, destroy);
+    struct CiosServer *server = surface->server;
 
     LOG_INFO("xdg surface destroyed: s_%u", surface->id);
+
+    /* Clear focus if this surface was focused (prevents use-after-free) */
+    if (server->focused == surface) {
+        server->focused = NULL;
+    }
+
+    /* Destroy decorations if present */
+    decorations_destroy(surface);
+
+    /* Remove scene tree if present */
+    if (surface->scene_tree) {
+        wlr_scene_node_destroy(&surface->scene_tree->node);
+        surface->scene_tree = NULL;
+    }
 
     wl_list_remove(&surface->map.link);
     wl_list_remove(&surface->unmap.link);
