@@ -80,7 +80,13 @@ static void handle_output_frame(struct wl_listener *listener, void *data) {
     struct CiosOutput *output = wl_container_of(listener, output, frame);
     struct wlr_scene_output *scene_output = output->scene_output;
 
-    wlr_scene_output_commit(scene_output, NULL);
+    if (!scene_output || !output->wlr_output || !output->wlr_output->enabled) {
+        return;
+    }
+
+    if (!wlr_scene_output_commit(scene_output, NULL)) {
+        return;  /* Commit failed — skip frame done notification */
+    }
 
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);

@@ -165,14 +165,14 @@ static void handle_xwayland_surface_unmap(struct wl_listener *listener, void *da
     /* Destroy decorations */
     decorations_destroy(surface);
 
-    /* Remove scene tree node */
+    /* Hide scene tree node (don't destroy — destroy happens in surface_destroy) */
     if (surface->scene_tree) {
-        wlr_scene_node_destroy(&surface->scene_tree->node);
-        surface->scene_tree = NULL;
+        wlr_scene_node_set_enabled(&surface->scene_tree->node, false);
     }
 
     /* Remove from surfaces list */
     wl_list_remove(&surface->link);
+    wl_list_init(&surface->link);
     surface->visible = false;
 }
 
@@ -197,7 +197,9 @@ static void handle_xwayland_surface_destroy(struct wl_listener *listener, void *
     }
 
     /* Destroy decorations if still present */
-    decorations_destroy(surface);
+    if (surface->decorated) {
+        decorations_destroy(surface);
+    }
 
     /* Remove scene tree node if still present (surface may not have been unmapped) */
     if (surface->scene_tree) {
@@ -205,14 +207,21 @@ static void handle_xwayland_surface_destroy(struct wl_listener *listener, void *
         surface->scene_tree = NULL;
     }
 
-    /* Remove from surfaces list (may already be removed by unmap, but safe to call) */
+    /* Remove from surfaces list */
     wl_list_remove(&surface->link);
+    /* Initialize to empty so double-remove is safe */
+    wl_list_init(&surface->link);
 
-    /* Remove all listeners */
+    /* Remove all listeners LAST (after all other cleanup) */
     wl_list_remove(&surface->map.link);
     wl_list_remove(&surface->unmap.link);
     wl_list_remove(&surface->destroy.link);
     wl_list_remove(&surface->request_configure.link);
+
+    /* Zero out the struct before freeing to catch use-after-free earlier */
+    surface->server = NULL;
+    surface->xsurface = NULL;
+    surface->scene_tree = NULL;
 
     free(surface);
 }
