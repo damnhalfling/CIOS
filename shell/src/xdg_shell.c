@@ -101,11 +101,8 @@ static void handle_xdg_surface_destroy(struct wl_listener *listener, void *data)
     /* Destroy decorations if present */
     decorations_destroy(surface);
 
-    /* Remove scene tree if present */
-    if (surface->scene_tree) {
-        wlr_scene_node_destroy(&surface->scene_tree->node);
-        surface->scene_tree = NULL;
-    }
+    /* DON'T destroy scene tree — wlroots handles it when wlr_surface is destroyed */
+    surface->scene_tree = NULL;
 
     wl_list_remove(&surface->map.link);
     wl_list_remove(&surface->unmap.link);

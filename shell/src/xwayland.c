@@ -201,11 +201,11 @@ static void handle_xwayland_surface_destroy(struct wl_listener *listener, void *
         decorations_destroy(surface);
     }
 
-    /* Remove scene tree node if still present (surface may not have been unmapped) */
-    if (surface->scene_tree) {
-        wlr_scene_node_destroy(&surface->scene_tree->node);
-        surface->scene_tree = NULL;
-    }
+    /* DON'T destroy scene tree node here — wlroots destroys it internally
+     * when the wlr_surface is destroyed. Calling wlr_scene_node_destroy
+     * after wlroots already freed it causes use-after-free segfault in
+     * scene_node_get_root during the next frame commit. */
+    surface->scene_tree = NULL;
 
     /* Remove from surfaces list */
     wl_list_remove(&surface->link);
