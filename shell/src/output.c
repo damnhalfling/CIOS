@@ -184,7 +184,22 @@ static void handle_new_output(struct wl_listener *listener, void *data) {
         return;
     }
 
-    wlr_output_layout_add_auto(server->output_layout, wlr_output);
+    /* Position: first output at (0,0), subsequent outputs to the right */
+    if (wl_list_empty(&server->outputs)) {
+        /* First output — place at origin */
+        wlr_output_layout_add(server->output_layout, wlr_output, 0, 0);
+    } else {
+        /* Additional output — place to the right of existing outputs */
+        int total_width = 0;
+        struct CiosOutput *existing;
+        wl_list_for_each(existing, &server->outputs, link) {
+            int w, h;
+            wlr_output_effective_resolution(existing->wlr_output, &w, &h);
+            total_width += w;
+        }
+        wlr_output_layout_add(server->output_layout, wlr_output, total_width, 0);
+        LOG_INFO("output %s positioned at x=%d (extended)", wlr_output->name, total_width);
+    }
 
     /* Calculate usable area */
     output_update_usable_area(output);

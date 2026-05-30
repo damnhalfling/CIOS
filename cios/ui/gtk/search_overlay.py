@@ -183,6 +183,27 @@ class SearchOverlay(Gtk.Box):
         row = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         row.add_css_class("search-result-row")
 
+        # Click handler — re-execute the original input
+        click = Gtk.GestureClick()
+        first_input = ""
+        turns = result.get("turns", [])
+        if turns:
+            first_input = turns[0].get("input", "")
+
+        def on_click(gesture, n_press, x, y, user_input=first_input):
+            if user_input and self._bridge:
+                self.hide_overlay()
+                # Inject the command into the main input and submit
+                app = self.get_root()
+                if app and hasattr(app, "get_application"):
+                    cios_app = app.get_application()
+                    if hasattr(cios_app, "_input") and hasattr(cios_app, "_on_submit"):
+                        cios_app._input.set_text(user_input)
+                        cios_app._on_submit()
+
+        click.connect("released", on_click)
+        row.add_controller(click)
+
         # Top: icon + summary + time
         top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         row.append(top)

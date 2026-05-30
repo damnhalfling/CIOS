@@ -170,11 +170,14 @@ class LockScreenOverlay(Gtk.Box):
         self._unlocked = True
         self._root_overlay.remove_overlay(self)
         # Restore focus to the main input
-        app = self._root_overlay.get_root()
-        if app and hasattr(app, "get_application"):
-            cios_app = app.get_application()
-            if hasattr(cios_app, "_input"):
-                cios_app._input.grab_focus()
+        window = self._root_overlay.get_root()
+        if window:
+            app = window.get_application()
+            if app and hasattr(app, "_input"):
+                app._input.set_sensitive(True)
+                app._input.grab_focus()
+                if hasattr(app, "_busy"):
+                    app._busy = False
 
     def _update_clock(self):
         """Update the clock display."""
