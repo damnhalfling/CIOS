@@ -225,6 +225,13 @@ def find_app(query: str) -> AppInfo | None:
     # 1. Alias match
     if q in _ALIASES:
         for alias_target in _ALIASES[q]:
+            # First pass: prefer exact desktop_stem match (e.g. "foot" → foot.desktop)
+            for app in apps:
+                desktop_stem = Path(app.desktop_file).stem.lower() if app.desktop_file else ""
+                if alias_target == desktop_stem:
+                    return app
+
+            # Second pass: match by exec basename or app name
             for app in apps:
                 app_name_norm = _normalize(app.name)
                 exec_base = (
@@ -232,9 +239,19 @@ def find_app(query: str) -> AppInfo | None:
                     if app.exec_command
                     else ""
                 )
-                desktop_stem = Path(app.desktop_file).stem.lower()
+                # Only match exec_base if the command is exactly the target (no extra args)
+                exec_full = app.exec_command.strip().lower() if app.exec_command else ""
+                if alias_target in (exec_full, app_name_norm):
+                    return app
 
-                if alias_target in (exec_base, desktop_stem, app_name_norm):
+            # Third pass: relaxed exec_base match
+            for app in apps:
+                exec_base = (
+                    os.path.basename(app.exec_command.split()[0]).lower()
+                    if app.exec_command
+                    else ""
+                )
+                if alias_target == exec_base:
                     return app
 
         # Fallback: if no .desktop file matched, try to find the binary directly
