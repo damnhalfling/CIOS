@@ -23,7 +23,6 @@
 #include <wayland-server-core.h>
 #include <wlr/types/wlr_keyboard.h>
 #include <wlr/backend.h>
-#include <wlr/backend/session.h>
 #include <wlr/xwayland.h>
 
 #include <sys/ioctl.h>
@@ -288,17 +287,18 @@ bool hotkeys_handle_key(struct CiosServer *server, uint32_t keycode,
             unsigned int vt = keycode - KEY_F1 + 1;
             LOG_INFO("hotkey: Ctrl+Alt+F%u → VT switch to %u", vt, vt);
 
-            struct wlr_session *session = wlr_backend_get_session(server->backend);
-            if (session) {
-                wlr_session_change_vt(session, vt);
+            /* Use /dev/tty0 ioctl — compositor needs seat access via seatd/logind */
+            int tty_fd = open("/dev/tty0", O_RDWR | O_NOCTTY);
+            if (tty_fd >= 0) {
+                ioctl(tty_fd, VT_ACTIVATE, vt);
+                ioctl(tty_fd, VT_WAITACTIVE, vt);
+                close(tty_fd);
             } else {
-                /* Fallback: direct ioctl (requires root) */
-                int tty_fd = open("/dev/tty0", O_RDWR | O_NOCTTY);
-                if (tty_fd >= 0) {
-                    ioctl(tty_fd, VT_ACTIVATE, vt);
-                    ioctl(tty_fd, VT_WAITACTIVE, vt);
-                    close(tty_fd);
-                }
+                /* Fallback: try via /sys/class/tty/tty0/active */
+                char cmd[64];
+                snprintf(cmd, sizeof(cmd), "chvt %u", vt);
+                int ret = system(cmd);
+                (void)ret;
             }
             return true;
         }
