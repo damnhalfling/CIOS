@@ -155,9 +155,9 @@ class TestIntentParserRC58:
         from cios.core.intent_parser import IntentType, parse_intent
 
         intent = parse_intent(input_text)
-        assert intent.type == getattr(IntentType, expected_type), (
-            f"Input '{input_text}' parsed as {intent.type}, expected {expected_type}"
-        )
+        assert intent.type == getattr(
+            IntentType, expected_type
+        ), f"Input '{input_text}' parsed as {intent.type}, expected {expected_type}"
         assert intent.confidence >= 0.80
 
 
@@ -287,14 +287,16 @@ class TestMemoryRC58:
         from cios.core.memory import MemoryRecord
 
         for intent in ["audio", "disk", "network"]:
-            memory.store(MemoryRecord(
-                timestamp=time.time(),
-                user_input=f"{intent} command",
-                intent=intent,
-                plan=[],
-                commands=[],
-                outcome="success",
-            ))
+            memory.store(
+                MemoryRecord(
+                    timestamp=time.time(),
+                    user_input=f"{intent} command",
+                    intent=intent,
+                    plan=[],
+                    commands=[],
+                    outcome="success",
+                )
+            )
             time.sleep(0.01)  # ensure different timestamps
         recent = memory.recent(3)
         assert len(recent) == 3
@@ -407,7 +409,9 @@ class TestErrorRecoveryRC58:
         from cios.core.error_recovery import classify_error
 
         result = classify_error(error_text)
-        assert result == expected_type, f"'{error_text}' classified as '{result}', expected '{expected_type}'"
+        assert (
+            result == expected_type
+        ), f"'{error_text}' classified as '{result}', expected '{expected_type}'"
 
     @pytest.mark.parametrize("error_text,expected_type", ERROR_SAMPLES)
     def test_recovery_suggestion_not_empty(self, error_text, expected_type):

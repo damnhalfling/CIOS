@@ -956,10 +956,25 @@ class CIOSBridge:
             # User is answering a confirmation prompt (sim/não)
             answer_lower = answer_clean.lower()
             negatives = (
-                "não", "nao", "no", "n", "cancela", "cancelar", "cancel",
-                "nope", "nah", "nunca", "deixa", "esquece", "para",
+                "não",
+                "nao",
+                "no",
+                "n",
+                "cancela",
+                "cancelar",
+                "cancel",
+                "nope",
+                "nah",
+                "nunca",
+                "deixa",
+                "esquece",
+                "para",
             )
-            if answer_lower in negatives or answer_lower.startswith("não") or answer_lower.startswith("nao"):
+            if (
+                answer_lower in negatives
+                or answer_lower.startswith("não")
+                or answer_lower.startswith("nao")
+            ):
                 return {
                     "steps": [],
                     "result": "Ok, cancelado.",
