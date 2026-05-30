@@ -1,7 +1,7 @@
 # CIOS — Roadmap
 
 > Substituindo apps por intenção.
-> v2.0.0-rc58 — Maio 2026
+> v2.0.0-rc59 — Maio 2026
 
 ---
 
@@ -12,10 +12,17 @@
 ✅ Sistema funcional
 ✅ Polimento + narrativa + impacto
 ✅ Produto percebido
-🟡 Hardening final + distribuição
+✅ Compositor Wayland estável (sem crash, apps legados via XWayland)
+🟡 Desktop completude para primeiro lançamento real
 ```
 
-Escopo TRAVADO. NÃO adicionar features. Fechar o loop.
+**Milestone alcançado (Maio 2026):** Compositor Wayland rodando estável com apps legados.
+O CIOS é agora um OS utilizável no dia-a-dia, ainda com gaps de features básicas.
+
+**Fase atual:** Fechar gaps de desktop que bloqueiam uso diário → primeiro lançamento real.
+
+**Visão de longo prazo:** Evolução contínua rumo a cognição extrema — o ambiente de trabalho
+como extensão do ser. Independente de adesão comercial, o desenvolvimento continua.
 
 ---
 
@@ -52,10 +59,19 @@ Escopo TRAVADO. NÃO adicionar features. Fechar o loop.
 
 ## Visão futura
 
-### FASE 0.5 — Google Workspace + Desktop Completude
-> Integração com Google Workspace via MCP servers oficiais + fechar gaps desktop.
+### FASE 0.5 — Primeiro Lançamento Real
+> Desktop completo o suficiente para uso diário + bugs do Maestro/memória resolvidos.
+> Foco: features básicas que faltam no OS + estabilidade do fluxo conversacional.
 
-**Prioridade Máxima — Google Workspace MCP Integration:**
+**Contexto:** Compositor Wayland estável. Bugs remanescentes são do Maestro e da memória.
+O objetivo é um OS que funcione como ambiente de trabalho primário, mesmo que limitado.
+
+**Prioridade Máxima — Estabilidade do fluxo:**
+- Resolver bugs do Maestro (pipeline conversacional)
+- Resolver bugs da memória (persistência, retrieval)
+- Garantir fluxo inicial sem quebras (boot → login → uso → shutdown)
+
+**Prioridade Alta — Google Workspace MCP Integration:**
 - Expandir OAuth scopes (Gmail, Drive, Chat, Calendar) no login existente
 - Guardar Google refresh_token no banco (maestro)
 - Endpoint para access_token fresco (`GET /v1/auth/google/token`)
@@ -106,7 +122,7 @@ Escopo TRAVADO. NÃO adicionar features. Fechar o loop.
 - Confirmação semântica para ações destrutivas
 
 ### FASE 2 — Computação paralela
-> Quebrar o modelo single-focus. Aqui o CIOS começa a parecer "o futuro".
+> Quebrar o modelo single-focus. O CIOS começa a operar como extensão cognitiva.
 
 - Scheduler cognitivo (foreground/background, interruption control, attention routing)
 - Intent arbitration (priority model, cancellation, background queue)
@@ -119,7 +135,7 @@ Escopo TRAVADO. NÃO adicionar features. Fechar o loop.
 - Continuidade cross-session sem fricção
 
 ### FASE 3 — Intent-native core
-> Compositor muda de categoria. CIOS define o desktop.
+> Compositor muda de categoria. CIOS define o desktop cognitivo.
 
 - Window focus/layout gerido por intenção
 - Multitasking por objetivo (não por janela)
@@ -129,18 +145,20 @@ Escopo TRAVADO. NÃO adicionar features. Fechar o loop.
 - Focus gerido por contexto/projeto ativo
 - Foreground/background cognitive separation no compositor
 
-### FASE 4 — Memória cognitiva
-> CIOS como sistema contínuo.
+### FASE 4 — Memória cognitiva e awareness passivo
+> CIOS como sistema contínuo que percebe e aprende.
 
+- Awareness passivo: compositor rastreia foco, tempo, sequência de janelas
 - Intent graph (frequência, padrões, relações)
 - Context graph avançado (relações, objetivos, temporalidade)
 - Semantic indexing de atividade
 - Replay de workflows
 - Intent memory compression (sumarização, pruning, relevance decay)
 - Screenshot → contexto (OCR + entendimento)
+- Sessão cognitiva: restaura não só janelas, mas contexto mental do trabalho anterior
 
-### FASE 5 — Post-app computing
-> Substituir abstrações antigas. Paradigma novo completo.
+### FASE 5 — Post-app computing (cognição extrema)
+> Substituir abstrações antigas. O ambiente é extensão do ser.
 
 - File system semântico (acesso por contexto, não por path)
 - Antecipação de intenção (sugestão antes do input)
@@ -149,6 +167,19 @@ Escopo TRAVADO. NÃO adicionar features. Fechar o loop.
 - Inferência de hábitos (sugestões proativas)
 - Browser state como contexto (tabs abertas = intenção)
 - Cross-device sync do graph
+- Interfaces efêmeras (UI gerada pela IA sob demanda, destruída após uso)
+- Streaming de intenção contínuo (sistema não espera input, pré-calcula próximos passos)
+
+---
+
+## Filosofia de desenvolvimento
+
+O CIOS é um projeto de longo prazo. O objetivo final é construir o ambiente de trabalho
+cognitivo do futuro — uma extensão real do pensamento do usuário, não apenas um assistente
+que responde perguntas.
+
+O desenvolvimento continua independente de adesão comercial ou tração de mercado.
+Monetização é consequência, não pré-requisito.
 
 ---
 
@@ -161,3 +192,5 @@ Escopo TRAVADO. NÃO adicionar features. Fechar o loop.
 - **Local-first.** Privacidade, offline, determinismo. Cloud é extensão, não dependência.
 - **Desktop-complete antes de futurista.** Gaps básicos (notifications, theming, automount) antes de features avançadas (intent graph, zero-click).
 - **Acessibilidade não é opcional.** Screen reader, zoom, high contrast são requisitos, não nice-to-have.
+- **Evolução natural.** Cada camada cognitiva é construída sobre a anterior. Sem saltos de fé.
+- **Extensão do ser.** O destino final é um ambiente que pensa junto, não um assistente que responde.

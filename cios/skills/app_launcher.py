@@ -237,6 +237,18 @@ def find_app(query: str) -> AppInfo | None:
                 if alias_target in (exec_base, desktop_stem, app_name_norm):
                     return app
 
+        # Fallback: if no .desktop file matched, try to find the binary directly
+        import shutil
+
+        for alias_target in _ALIASES[q]:
+            if shutil.which(alias_target):
+                return AppInfo(
+                    name=alias_target.capitalize(),
+                    exec_command=alias_target,
+                    desktop_file="",
+                    keywords=[q],
+                )
+
     # 2. Exact name match
     for app in apps:
         if _normalize(app.name) == q:

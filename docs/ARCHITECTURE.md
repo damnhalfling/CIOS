@@ -1,6 +1,6 @@
 # CIOS — Arquitetura
 
-> v2.0.0-rc58 — Maio 2026
+> v2.0.0-rc59 — Maio 2026
 
 ---
 
@@ -35,8 +35,8 @@ Boot → GRUB (0s, silent) → Plymouth (splash CIOS) → greetd (login)
 ## Pipeline de intenção
 
 ```
-User Input → Parser (189 patterns) → Classifier (regex → cache → Ollama)
-  → MCO (decision layer) → Planner (29 handlers) → Executor
+User Input → Parser (201 patterns) → Classifier (regex → cache → Ollama)
+  → MCO (decision layer) → Planner (30 handlers) → Executor
   → Humanizer (260+ translations) → UI (streaming GTK4)
 ```
 
@@ -213,9 +213,9 @@ cios-os/
 │   ├── main.py              # Entry point (6 modos)
 │   ├── core/                # Engine cognitiva
 │   │   ├── bridge.py        # UI ↔ backend (CIOSBridge) + periodic sync
-│   │   ├── intent_parser.py # 189 regex patterns (incl. HISTORY_SEARCH)
+│   │   ├── intent_parser.py # 201 regex patterns (incl. HISTORY_SEARCH)
 │   │   ├── intent_classifier.py # Hybrid: regex → cache → Ollama
-│   │   ├── planner.py       # 29 handlers + MCO
+│   │   ├── planner.py       # 30 handlers + MCO
 │   │   ├── mcp.py           # Live system state
 │   │   ├── executor.py      # Shell execution (timeout, blocked cmds)
 │   │   ├── humanizer.py     # 260+ translations
@@ -225,8 +225,8 @@ cios-os/
 │   │   ├── intelligence.py  # Cloud AI integration
 │   │   ├── model_router.py  # LLM routing + fallback
 │   │   ├── error_recovery.py # 19 error types
-│   │   └── handlers/        # 17 intent handler modules (29 handler methods)
-│   ├── skills/              # 27 system skills
+│   │   └── handlers/        # 16 intent handler modules (30 handler methods)
+│   ├── skills/              # 28 system skills
 │   ├── ui/                  # GTK4 + CLI + hotkey + topbar
 │   │   └── gtk/
 │   │       ├── app.py           # Main application (Ctrl+K, overlays)
@@ -240,7 +240,7 @@ cios-os/
 │   └── infra/               # Daemon, voice, monitors, deps
 ├── shell/                   # Compositor C (wlroots 0.18)
 │   └── src/                 # 13 source files
-├── tests/                   # 635 testes (33 arquivos)
+├── tests/                   # 415 testes (33 arquivos)
 ├── session/                 # Wayland session config
 ├── scripts/                 # Build/install scripts
 └── pyproject.toml           # Project config

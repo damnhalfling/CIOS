@@ -952,6 +952,26 @@ class CIOSBridge:
 
         # --- Legacy single-question path (backward compatible) ---
         # Inject answer into intent params based on question type
+        if question.question_type == "confirm_action":
+            # User is answering a confirmation prompt (sim/não)
+            answer_lower = answer_clean.lower()
+            negatives = (
+                "não", "nao", "no", "n", "cancela", "cancelar", "cancel",
+                "nope", "nah", "nunca", "deixa", "esquece", "para",
+            )
+            if answer_lower in negatives or answer_lower.startswith("não") or answer_lower.startswith("nao"):
+                return {
+                    "steps": [],
+                    "result": "Ok, cancelado.",
+                    "status": "success",
+                    "confirm": None,
+                    "voice_mode": "full",
+                }
+            # Positive confirmation — re-execute with confirmed=True
+            result = self._execute_intent(intent, context)
+            self._record_turn(answer_clean, intent, result)
+            return result
+
         if question.question_type == "sudo_password":
             intent.params["sudo_password"] = answer_clean
             # Execute directly (already confirmed)

@@ -172,6 +172,8 @@ static void handle_alt_f4(struct CiosServer *server) {
 
     if (focused->xsurface) {
         wlr_xwayland_surface_close(focused->xsurface);
+    } else if (focused->xdg_toplevel) {
+        wlr_xdg_toplevel_send_close(focused->xdg_toplevel);
     }
 }
 
