@@ -33,6 +33,14 @@
 /* Default xcursor theme size */
 #define XCURSOR_SIZE 24
 
+/* Drag state for titlebar window move */
+static struct {
+    struct CiosSurface *surface;
+    double grab_x, grab_y;      /* cursor position at grab start */
+    int orig_x, orig_y;         /* surface position at grab start */
+    bool active;
+} drag_state = {0};
+
 /* Keyboard wrapper — holds listeners and back-pointer to server */
 struct CiosKeyboard {
     struct CiosServer *server;
@@ -169,6 +177,14 @@ static struct CiosSurface *surface_at(struct CiosServer *server,
  * and set cursor image.
  */
 static void process_cursor_motion(struct CiosServer *server, uint32_t time_msec) {
+    /* Handle active drag (titlebar move) */
+    if (drag_state.active && drag_state.surface) {
+        int new_x = drag_state.orig_x + (int)(server->cursor->x - drag_state.grab_x);
+        int new_y = drag_state.orig_y + (int)(server->cursor->y - drag_state.grab_y);
+        wlr_scene_node_set_position(&drag_state.surface->scene_tree->node, new_x, new_y);
+        return;
+    }
+
     double sx, sy;
     struct wlr_surface *wlr_surface = NULL;
 
@@ -266,8 +282,16 @@ static void handle_cursor_button(struct wl_listener *listener, void *data) {
                     }
                     return;
                 } else if (hit == CIOS_DECO_TITLEBAR) {
-                    /* Click on titlebar — focus the surface */
+                    /* Click on titlebar — start drag to move window */
                     server_focus_surface(server, surf);
+                    int surf_x, surf_y_pos;
+                    wlr_scene_node_coords(&surf->scene_tree->node, &surf_x, &surf_y_pos);
+                    drag_state.surface = surf;
+                    drag_state.grab_x = server->cursor->x;
+                    drag_state.grab_y = server->cursor->y;
+                    drag_state.orig_x = surf_x;
+                    drag_state.orig_y = surf_y_pos;
+                    drag_state.active = true;
                     wlr_seat_pointer_notify_button(server->seat,
                         event->time_msec, event->button, event->state);
                     return;
@@ -291,6 +315,12 @@ static void handle_cursor_button(struct wl_listener *listener, void *data) {
                 wlr_seat_pointer_notify_enter(server->seat, wlr_surface, sx, sy);
             }
         }
+    }
+
+    /* End drag on button release */
+    if (event->state == WL_POINTER_BUTTON_STATE_RELEASED && drag_state.active) {
+        drag_state.active = false;
+        drag_state.surface = NULL;
     }
 
     /* Notify the seat of the button event */
