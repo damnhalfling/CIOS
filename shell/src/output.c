@@ -189,14 +189,7 @@ static void handle_new_output(struct wl_listener *listener, void *data) {
     output->server = server;
     output->wlr_output = wlr_output;
 
-    /* Create scene output and add to output layout */
-    output->scene_output = wlr_scene_output_create(server->scene, wlr_output);
-    if (!output->scene_output) {
-        LOG_ERROR("failed to create scene output for %s", wlr_output->name);
-        free(output);
-        return;
-    }
-
+    /* Add to output layout first (scene_layout needs this to position scene_output) */
     wlr_output_layout_add_auto(server->output_layout, wlr_output);
 
     /* If this is not the first output, reposition to extend (not mirror).
@@ -228,6 +221,14 @@ static void handle_new_output(struct wl_listener *listener, void *data) {
                 LOG_INFO("output %s repositioned to x=%d (extended)", wlr_output->name, right_edge);
             }
         }
+    }
+
+    /* Create scene output AFTER layout positioning — scene_layout auto-syncs */
+    output->scene_output = wlr_scene_output_create(server->scene, wlr_output);
+    if (!output->scene_output) {
+        LOG_ERROR("failed to create scene output for %s", wlr_output->name);
+        free(output);
+        return;
     }
 
     /* Calculate usable area */

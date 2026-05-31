@@ -322,34 +322,14 @@ class CIOSApplication(Gtk.Application):
         self._on_submit()
 
     def _spawn_secondary_windows(self):
-        """Detect secondary outputs and create independent windows for them."""
-        try:
-            from cios.skills.monitor import get_monitors
+        """Detect secondary outputs and create independent windows for them.
 
-            monitors = get_monitors()
-            if len(monitors) < 2:
-                return
-
-            # Find non-primary monitors
-            primary = next((m for m in monitors if m.primary), monitors[0])
-            secondaries = [m for m in monitors if m.name != primary.name]
-
-            for mon in secondaries:
-                from cios.ui.gtk.secondary_window import SecondaryWindow
-
-                sec_win = SecondaryWindow(
-                    app=self,
-                    bridge=self._bridge,
-                    monitor_name=mon.name,
-                    width=mon.width,
-                    height=mon.height,
-                )
-                sec_win.present()
-                logger.info(
-                    "Secondary window created for %s (%dx%d)", mon.name, mon.width, mon.height
-                )
-        except Exception as e:
-            logger.debug("Secondary windows not spawned: %s", e)
+        Currently disabled — extended monitors work as drag targets for app windows.
+        The compositor handles rendering on extended outputs automatically.
+        Secondary windows will be re-enabled when proper output-aware window
+        placement is implemented.
+        """
+        pass
 
     def _on_hotkey_triggered(self):
         """Called when Ctrl+Space is pressed (via compositor IPC)."""
