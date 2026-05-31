@@ -240,6 +240,29 @@ static void handle_cursor_button(struct wl_listener *listener, void *data) {
         double sx, sy;
         struct wlr_surface *wlr_surface = NULL;
 
+        /* Super+Left click: start drag on any surface (no titlebar needed) */
+        if (event->button == BTN_LEFT) {
+            struct wlr_keyboard *kb = wlr_seat_get_keyboard(server->seat);
+            uint32_t mods = kb ? wlr_keyboard_get_modifiers(kb) : 0;
+            if (mods & WLR_MODIFIER_LOGO) {
+                struct CiosSurface *surface = surface_at(server,
+                    server->cursor->x, server->cursor->y,
+                    &wlr_surface, &sx, &sy);
+                if (surface && surface->scene_tree) {
+                    server_focus_surface(server, surface);
+                    int surf_x, surf_y;
+                    wlr_scene_node_coords(&surface->scene_tree->node, &surf_x, &surf_y);
+                    drag_state.surface = surface;
+                    drag_state.grab_x = server->cursor->x;
+                    drag_state.grab_y = server->cursor->y;
+                    drag_state.orig_x = surf_x;
+                    drag_state.orig_y = surf_y;
+                    drag_state.active = true;
+                    return;
+                }
+            }
+        }
+
         /* Check for decoration clicks (left button only) */
         if (event->button == BTN_LEFT) {
             struct CiosSurface *surf;
