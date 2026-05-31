@@ -41,11 +41,13 @@ static void output_update_usable_area(struct CiosOutput *output) {
 
 /*
  * Determine which output should be primary.
- * Strategy: first output in list, or largest by pixel area.
+ * Strategy: prefer internal displays (eDP, LVDS, DSI) over external.
+ * Among same type, prefer largest by pixel area.
  */
 static void output_update_primary(struct CiosServer *server) {
     struct CiosOutput *best = NULL;
     int best_area = 0;
+    bool best_is_internal = false;
 
     struct CiosOutput *output;
     wl_list_for_each(output, &server->outputs, link) {
@@ -55,19 +57,30 @@ static void output_update_primary(struct CiosServer *server) {
 
         output->is_primary = false;
 
-        if (!best || area > best_area) {
+        /* Internal displays: eDP, LVDS, DSI */
+        const char *name = output->wlr_output->name;
+        bool is_internal = (strncmp(name, "eDP", 3) == 0 ||
+                           strncmp(name, "LVDS", 4) == 0 ||
+                           strncmp(name, "DSI", 3) == 0);
+
+        /* Prefer internal over external, then largest area */
+        if (!best ||
+            (is_internal && !best_is_internal) ||
+            (is_internal == best_is_internal && area > best_area)) {
             best = output;
             best_area = area;
+            best_is_internal = is_internal;
         }
     }
 
     if (best) {
         best->is_primary = true;
         server->primary_output = best;
-        LOG_INFO("primary output: %s (%dx%d)",
+        LOG_INFO("primary output: %s (%dx%d)%s",
             best->wlr_output->name,
             best->usable_width,
-            best->usable_height + TOPBAR_HEIGHT);
+            best->usable_height + TOPBAR_HEIGHT,
+            best_is_internal ? " [internal]" : " [external]");
     } else {
         server->primary_output = NULL;
     }
