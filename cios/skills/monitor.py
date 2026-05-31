@@ -35,54 +35,102 @@ class MonitorInfo:
 
 
 def _ipc_send(command: dict) -> dict | None:
-    """Send IPC command to compositor."""
-    import socket
-
-    runtime_dir = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
-    sock_path = os.path.join(runtime_dir, "cios-shell.sock")
-
-    if not os.path.exists(sock_path):
-        return None
-
-    try:
-        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
-            sock.settimeout(3)
-            sock.connect(sock_path)
-            payload = {"v": 1, "id": f"mon_{id(command)}", "command": command.pop("cmd"), **command}
-            msg = json.dumps(payload) + "\n"
-            sock.sendall(msg.encode("utf-8"))
-            data = b""
-            while b"\n" not in data:
-                chunk = sock.recv(4096)
-                if not chunk:
-                    break
-                data += chunk
-            if data:
-                return json.loads(data.decode("utf-8").strip())
-    except (OSError, json.JSONDecodeError) as e:
-        logger.debug("Monitor IPC failed: %s", e)
+    """Send IPC command to compositor. Currently unused — IPC only accepts one connection."""
+    # The compositor only accepts one IPC connection (the runtime listener).
+    # Monitor detection uses DRM sysfs instead.
     return None
 
 
-def get_monitors() -> list[MonitorInfo]:
-    """Get list of connected monitors from compositor."""
-    resp = _ipc_send({"cmd": "get_outputs"})
-    if not resp or "outputs" not in resp:
-        return []
+def _get_monitors_from_drm() -> list[MonitorInfo]:
+    """Read connected monitors from /sys/class/drm (kernel DRM subsystem).
+
+    This works regardless of IPC state and gives us connected outputs
+    with their preferred resolution.
+    """
+    import glob
+    import re
 
     monitors = []
-    for out in resp["outputs"]:
+    drm_cards = glob.glob("/sys/class/drm/card*-*")
+
+    for card_path in sorted(drm_cards):
+        status_file = os.path.join(card_path, "status")
+        if not os.path.exists(status_file):
+            continue
+
+        try:
+            with open(status_file) as f:
+                status = f.read().strip()
+        except OSError:
+            continue
+
+        if status != "connected":
+            continue
+
+        # Extract connector name (e.g. "eDP-1", "HDMI-A-1")
+        card_name = os.path.basename(card_path)
+        # Format: card1-HDMI-A-1 → HDMI-A-1
+        match = re.match(r"card\d+-(.+)", card_name)
+        if not match:
+            continue
+        name = match.group(1)
+
+        # Read preferred mode (first mode listed)
+        modes_file = os.path.join(card_path, "modes")
+        width, height = 0, 0
+        if os.path.exists(modes_file):
+            try:
+                with open(modes_file) as f:
+                    first_mode = f.readline().strip()
+                if first_mode:
+                    mode_match = re.match(r"(\d+)x(\d+)", first_mode)
+                    if mode_match:
+                        width = int(mode_match.group(1))
+                        height = int(mode_match.group(2))
+            except OSError:
+                pass
+
+        # First monitor is primary
+        is_primary = len(monitors) == 0
+
         monitors.append(
             MonitorInfo(
-                name=out.get("name", "unknown"),
-                width=out.get("width", 0),
-                height=out.get("height", 0),
-                x=out.get("x", 0),
-                y=out.get("y", 0),
-                primary=out.get("primary", False),
+                name=name,
+                width=width,
+                height=height,
+                x=0,
+                y=0,
+                primary=is_primary,
             )
         )
+
     return monitors
+
+
+def get_monitors() -> list[MonitorInfo]:
+    """Get list of connected monitors.
+
+    Tries IPC first (has position info), falls back to DRM sysfs.
+    """
+    # Try IPC (has accurate position data from compositor)
+    resp = _ipc_send({"cmd": "get_outputs"})
+    if resp and "outputs" in resp and resp["outputs"]:
+        monitors = []
+        for out in resp["outputs"]:
+            monitors.append(
+                MonitorInfo(
+                    name=out.get("name", "unknown"),
+                    width=out.get("width", 0),
+                    height=out.get("height", 0),
+                    x=out.get("x", 0),
+                    y=out.get("y", 0),
+                    primary=out.get("primary", False),
+                )
+            )
+        return monitors
+
+    # Fallback: read from DRM sysfs (no position info, but detects connected outputs)
+    return _get_monitors_from_drm()
 
 
 def configure_position(target: str, position: str, reference: str) -> tuple[list[str], bool, str]:
