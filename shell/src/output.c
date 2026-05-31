@@ -223,12 +223,22 @@ static void handle_new_output(struct wl_listener *listener, void *data) {
         }
     }
 
-    /* Create scene output AFTER layout positioning — scene_layout auto-syncs */
+    /* Create scene output AFTER layout positioning */
     output->scene_output = wlr_scene_output_create(server->scene, wlr_output);
     if (!output->scene_output) {
         LOG_ERROR("failed to create scene output for %s", wlr_output->name);
         free(output);
         return;
+    }
+
+    /* Explicitly sync scene_output position with layout position */
+    struct wlr_output_layout_output *layout_output =
+        wlr_output_layout_get(server->output_layout, wlr_output);
+    if (layout_output) {
+        wlr_scene_output_set_position(output->scene_output,
+            layout_output->x, layout_output->y);
+        LOG_INFO("scene output %s set to (%d, %d)",
+            wlr_output->name, layout_output->x, layout_output->y);
     }
 
     /* Calculate usable area */
