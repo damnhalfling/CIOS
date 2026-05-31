@@ -3,6 +3,9 @@
 Maintains a persistent connection to the compositor's Unix socket
 and dispatches events (key_intercepted, logout_requested, etc.)
 to the GTK4 application via GLib.idle_add.
+
+Also provides send_command() for skills that need to communicate
+with the compositor (e.g. monitor configuration).
 """
 
 import json
@@ -10,6 +13,7 @@ import logging
 import os
 import socket
 import threading
+import time as _time
 
 from gi.repository import GLib
 
@@ -19,6 +23,8 @@ logger = logging.getLogger(__name__)
 class IPCListener:
     """Persistent IPC connection to cios-shell compositor."""
 
+    _instance = None
+
     def __init__(self, on_hotkey=None, on_logout=None, on_search=None):
         self._on_hotkey = on_hotkey
         self._on_logout = on_logout
@@ -26,6 +32,49 @@ class IPCListener:
         self._socket = None
         self._running = False
         self._thread = None
+        # Command support: pending responses keyed by message ID
+        self._pending_responses: dict[str, threading.Event] = {}
+        self._response_data: dict[str, dict] = {}
+        self._send_lock = threading.Lock()
+        IPCListener._instance = self
+
+    @classmethod
+    def get_instance(cls):
+        """Get the singleton IPCListener instance."""
+        return cls._instance
+
+    def send_command(self, command: dict, timeout: float = 3.0) -> dict | None:
+        """Send a command to the compositor and wait for response.
+
+        Thread-safe. The listener thread will capture the response by ID.
+        """
+        if not self._socket:
+            return None
+
+        msg_id = f"cmd_{id(command)}_{_time.monotonic_ns()}"
+        cmd_name = command.pop("cmd", "unknown")
+        payload = {"v": 1, "id": msg_id, "command": cmd_name, **command}
+
+        # Register pending response
+        event = threading.Event()
+        self._pending_responses[msg_id] = event
+
+        try:
+            with self._send_lock:
+                msg = json.dumps(payload) + "\n"
+                self._socket.sendall(msg.encode())
+
+            # Wait for the listener thread to capture the response
+            if event.wait(timeout=timeout):
+                return self._response_data.pop(msg_id, None)
+            else:
+                logger.debug("IPC send_command timeout for %s", cmd_name)
+                return None
+        except OSError as e:
+            logger.debug("IPC send_command failed: %s", e)
+            return None
+        finally:
+            self._pending_responses.pop(msg_id, None)
 
     def start(self):
         """Start listening for compositor events in background thread."""
@@ -84,9 +133,7 @@ class IPCListener:
 
             # Reconnect after 2s
             if self._running:
-                import time
-
-                time.sleep(2)
+                _time.sleep(2)
 
     def _handle_message(self, raw: str):
         """Parse and dispatch a JSON message from the compositor."""
@@ -95,9 +142,16 @@ class IPCListener:
         except json.JSONDecodeError:
             return
 
+        # Check if this is a response to a pending command
+        msg_id = msg.get("id", "")
+        if msg_id in self._pending_responses:
+            self._response_data[msg_id] = msg
+            self._pending_responses[msg_id].set()
+            return
+
         event = msg.get("event")
         if not event:
-            return  # Response, not event
+            return  # Response to unknown command, ignore
 
         if event == "key_intercepted":
             key = msg.get("key", "")

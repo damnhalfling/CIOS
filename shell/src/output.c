@@ -309,6 +309,11 @@ bool output_set_position(struct CiosOutput *output, int x, int y) {
     wlr_output_layout_add(server->output_layout, output->wlr_output, x, y);
     output_update_usable_area(output);
 
+    /* Update scene output position to match layout */
+    if (output->scene_output) {
+        wlr_scene_output_set_position(output->scene_output, x, y);
+    }
+
     LOG_INFO("output repositioned: %s at (%d, %d)", output->wlr_output->name, x, y);
     return true;
 }

@@ -35,9 +35,15 @@ class MonitorInfo:
 
 
 def _ipc_send(command: dict) -> dict | None:
-    """Send IPC command to compositor. Currently unused — IPC only accepts one connection."""
-    # The compositor only accepts one IPC connection (the runtime listener).
-    # Monitor detection uses DRM sysfs instead.
+    """Send IPC command to compositor via the runtime's persistent connection."""
+    try:
+        from cios.ui.gtk.ipc_listener import IPCListener
+
+        listener = IPCListener.get_instance()
+        if listener:
+            return listener.send_command(command)
+    except ImportError:
+        pass
     return None
 
 
