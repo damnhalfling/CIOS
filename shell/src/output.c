@@ -186,6 +186,37 @@ static void handle_new_output(struct wl_listener *listener, void *data) {
 
     wlr_output_layout_add_auto(server->output_layout, wlr_output);
 
+    /* If this is not the first output, reposition to extend (not mirror).
+     * wlr_output_layout_add_auto may place at (0,0) causing mirror.
+     * We use the layout's bounding box to find the right edge. */
+    if (!wl_list_empty(&server->outputs)) {
+        /* Get the bounding box of all outputs currently in the layout */
+        struct wlr_box layout_box;
+        wlr_output_layout_get_box(server->output_layout, NULL, &layout_box);
+
+        /* Check if this output was placed at origin (overlapping) */
+        struct wlr_output_layout_output *lo =
+            wlr_output_layout_get(server->output_layout, wlr_output);
+        if (lo && lo->x == 0 && lo->y == 0 && layout_box.width > 0) {
+            /* Find the right edge of existing outputs (exclude this one's width) */
+            int this_w, this_h;
+            wlr_output_effective_resolution(wlr_output, &this_w, &this_h);
+            int right_edge = layout_box.width - this_w;
+            if (right_edge <= 0) {
+                /* Fallback: use the first output's width */
+                struct CiosOutput *first;
+                wl_list_for_each(first, &server->outputs, link) {
+                    wlr_output_effective_resolution(first->wlr_output, &right_edge, &this_h);
+                    break;
+                }
+            }
+            if (right_edge > 0) {
+                wlr_output_layout_add(server->output_layout, wlr_output, right_edge, 0);
+                LOG_INFO("output %s repositioned to x=%d (extended)", wlr_output->name, right_edge);
+            }
+        }
+    }
+
     /* Calculate usable area */
     output_update_usable_area(output);
 
