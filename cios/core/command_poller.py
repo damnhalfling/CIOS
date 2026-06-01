@@ -105,9 +105,15 @@ class CommandPoller:
 
         while self._running:
             try:
+                # Poll for ready-to-execute commands
                 commands = self._fetch_pending()
                 for cmd in commands:
                     self._execute_command(cmd)
+
+                # Poll for commands needing local confirmation (write ops from remote)
+                confirmations = self._fetch_confirmations()
+                for cmd in confirmations:
+                    self._notify_confirmation_needed(cmd)
             except Exception as e:
                 logger.debug("CommandPoller poll error: %s", e)
 
@@ -215,3 +221,100 @@ class CommandPoller:
                 pass  # 200 OK is enough
         except Exception as e:
             logger.debug("CommandPoller: failed to update status for #%d: %s", command_id, e)
+
+    def _fetch_confirmations(self) -> list[RemoteCommand]:
+        """Fetch commands that need local user confirmation (write ops from remote)."""
+        if not self._token:
+            return []
+
+        url = f"{self._api_base}/v1/commands/confirmations"
+        headers = {
+            "Authorization": f"Bearer {self._token}",
+            "Accept": "application/json",
+        }
+
+        req = urllib.request.Request(url, headers=headers, method="GET")
+
+        try:
+            with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
+                data = json.loads(resp.read())
+                commands = data.get("commands", [])
+                return [
+                    RemoteCommand(
+                        id=cmd_data["id"],
+                        command=cmd_data["command"],
+                        context=cmd_data.get("context"),
+                    )
+                    for cmd_data in commands
+                ]
+        except Exception:
+            return []
+
+    def _notify_confirmation_needed(self, cmd: RemoteCommand) -> None:
+        """Show a notification asking user to confirm a remote write operation.
+
+        The notification has Confirm/Reject actions. When user confirms,
+        the command status changes to 'pending' and gets executed on next poll.
+        """
+        from cios.infra.notifications import bus, NotificationType, NotificationAction
+
+        # Parse command for human-readable description
+        description = cmd.command
+        try:
+            data = json.loads(cmd.command)
+            description = data.get("description", data.get("action", cmd.command))
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+        bus.notify(
+            title="Operação remota pendente",
+            body=f"{description[:100]}",
+            type=NotificationType.ACTION,
+            icon="📋",
+            source="command_poller",
+            actions=[
+                NotificationAction(
+                    label="Confirmar",
+                    callback_id="command_confirm",
+                    params={"command_id": cmd.id},
+                ),
+                NotificationAction(
+                    label="Rejeitar",
+                    callback_id="command_reject",
+                    params={"command_id": cmd.id},
+                ),
+            ],
+        )
+        logger.info("CommandPoller: confirmation notification for #%d", cmd.id)
+
+    def confirm_command(self, command_id: int) -> bool:
+        """Confirm a pending command (called from notification action)."""
+        url = f"{self._api_base}/v1/commands/{command_id}/confirm"
+        headers = {
+            "Authorization": f"Bearer {self._token}",
+            "Content-Type": "application/json",
+        }
+        req = urllib.request.Request(url, data=b"", headers=headers, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=_TIMEOUT):
+                logger.info("CommandPoller: confirmed command #%d", command_id)
+                return True
+        except Exception as e:
+            logger.warning("CommandPoller: confirm failed for #%d: %s", command_id, e)
+            return False
+
+    def reject_command(self, command_id: int) -> bool:
+        """Reject a pending command (called from notification action)."""
+        url = f"{self._api_base}/v1/commands/{command_id}/reject"
+        headers = {
+            "Authorization": f"Bearer {self._token}",
+            "Content-Type": "application/json",
+        }
+        req = urllib.request.Request(url, data=b"", headers=headers, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=_TIMEOUT):
+                logger.info("CommandPoller: rejected command #%d", command_id)
+                return True
+        except Exception as e:
+            logger.warning("CommandPoller: reject failed for #%d: %s", command_id, e)
+            return False
