@@ -245,3 +245,58 @@ class NotificationBus:
 
 # Singleton instance
 bus = NotificationBus()
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  DO NOT DISTURB MODE (#523)
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class DoNotDisturb:
+    """Do Not Disturb mode — silences all notifications.
+
+    When active, notifications are still stored in history but
+    subscribers are NOT notified (no UI popups, no sounds).
+
+    #523 — Do Not Disturb mode
+    """
+
+    def __init__(self):
+        self._active = False
+        self._original_subscribers: list[NotificationCallback] = []
+
+    @property
+    def active(self) -> bool:
+        return self._active
+
+    def enable(self) -> None:
+        """Enable DND — mute all notification delivery."""
+        if self._active:
+            return
+        self._active = True
+        # Store current subscribers and clear them
+        self._original_subscribers = list(bus._subscribers)
+        bus._subscribers = []
+        logger.info("Do Not Disturb: enabled")
+
+    def disable(self) -> None:
+        """Disable DND — restore notification delivery."""
+        if not self._active:
+            return
+        self._active = False
+        # Restore subscribers
+        bus._subscribers = self._original_subscribers
+        self._original_subscribers = []
+        logger.info("Do Not Disturb: disabled")
+
+    def toggle(self) -> bool:
+        """Toggle DND. Returns new state."""
+        if self._active:
+            self.disable()
+        else:
+            self.enable()
+        return self._active
+
+
+# Singleton
+dnd = DoNotDisturb()
