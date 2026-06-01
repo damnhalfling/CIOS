@@ -46,6 +46,7 @@ from cios.core.handlers.google_workspace import (
     handle_calendar,
     handle_gchat,
 )
+from cios.core.handlers.desktop import handle_theming, handle_scheduler
 from cios.core.handlers.system import handle_power, handle_session, handle_system_health
 from cios.core.intent_parser import Intent, IntentType
 from cios.core.mcp import context as mcp
@@ -137,6 +138,8 @@ _HANDLER_MAP = {
     IntentType.DRIVE: handle_drive,
     IntentType.CALENDAR: handle_calendar,
     IntentType.GCHAT: handle_gchat,
+    IntentType.THEMING: handle_theming,
+    IntentType.SCHEDULER: handle_scheduler,
     IntentType.HISTORY_SEARCH: None,  # Handled directly in bridge
 }
 

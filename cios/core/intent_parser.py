@@ -51,6 +51,8 @@ class IntentType(Enum):
     DRIVE = "drive"
     CALENDAR = "calendar"
     GCHAT = "gchat"
+    THEMING = "theming"
+    SCHEDULER = "scheduler"
     UNKNOWN = "unknown"
 
 
@@ -1973,6 +1975,62 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
         IntentType.INTELLIGENCE,
         lambda m: {"intent": "translate", "query": m.group(0)},
         0.88,
+    ),
+    # --- Theming (PT + EN) ---
+    (
+        re.compile(
+            r"(?:modo\s+)?(?:escuro|dark)\s*(?:mode)?",
+            re.IGNORECASE,
+        ),
+        IntentType.THEMING,
+        lambda m: {"action": "set", "theme": "dark"},
+        0.92,
+    ),
+    (
+        re.compile(
+            r"(?:modo\s+)?(?:claro|light)\s*(?:mode)?",
+            re.IGNORECASE,
+        ),
+        IntentType.THEMING,
+        lambda m: {"action": "set", "theme": "light"},
+        0.92,
+    ),
+    (
+        re.compile(
+            r"(?:trocar?|mudar?|alternar?|toggle|switch)\s+(?:o?\s+)?(?:tema|theme|modo|mode)",
+            re.IGNORECASE,
+        ),
+        IntentType.THEMING,
+        lambda m: {"action": "toggle"},
+        0.90,
+    ),
+    # --- Scheduler / Reminders (PT + EN) ---
+    (
+        re.compile(
+            r"(?:lembr[ae](?:-me)?|remind\s*(?:me)?|avisa(?:-me)?)\s+(.+)",
+            re.IGNORECASE,
+        ),
+        IntentType.SCHEDULER,
+        lambda m: {"action": "remind", "text": m.group(1).strip()},
+        0.92,
+    ),
+    (
+        re.compile(
+            r"(?:daqui\s+a|in|em)\s+(\d+)\s*(?:min|minuto|minute|hora|hour|h)\s*(.+)?",
+            re.IGNORECASE,
+        ),
+        IntentType.SCHEDULER,
+        lambda m: {"action": "timer", "time_expr": m.group(0), "text": (m.group(2) or "").strip()},
+        0.90,
+    ),
+    (
+        re.compile(
+            r"(?:às|as|at)\s+(\d{1,2}(?::\d{2})?)\s*h?\s+(.+)",
+            re.IGNORECASE,
+        ),
+        IntentType.SCHEDULER,
+        lambda m: {"action": "remind", "time_expr": m.group(0), "text": m.group(2).strip()},
+        0.90,
     ),
     # --- Google Workspace: Email (PT + EN) ---
     (
