@@ -35,8 +35,8 @@ Boot → GRUB (0s, silent) → Plymouth (splash CIOS) → greetd (login)
 ## Pipeline de intenção
 
 ```
-User Input → Parser (201 patterns) → Classifier (regex → cache → Ollama)
-  → MCO (decision layer) → Planner (30 handlers) → Executor
+User Input → Parser (201+ patterns) → Classifier (regex → cache → Ollama)
+  → MCO (decision layer) → Planner (38 handlers) → Executor
   → Humanizer (260+ translations) → UI (streaming GTK4)
 ```
 
@@ -213,9 +213,9 @@ cios-os/
 │   ├── main.py              # Entry point (6 modos)
 │   ├── core/                # Engine cognitiva
 │   │   ├── bridge.py        # UI ↔ backend (CIOSBridge) + periodic sync
-│   │   ├── intent_parser.py # 201 regex patterns (incl. HISTORY_SEARCH)
+│   │   ├── intent_parser.py # 201+ regex patterns (incl. Google, desktop, networking)
 │   │   ├── intent_classifier.py # Hybrid: regex → cache → Ollama
-│   │   ├── planner.py       # 30 handlers + MCO
+│   │   ├── planner.py       # 38 handlers + MCO
 │   │   ├── mcp.py           # Live system state
 │   │   ├── executor.py      # Shell execution (timeout, blocked cmds)
 │   │   ├── humanizer.py     # 260+ translations
@@ -239,8 +239,8 @@ cios-os/
 │   │       └── ...
 │   └── infra/               # Daemon, voice, monitors, deps
 ├── shell/                   # Compositor C (wlroots 0.18)
-│   └── src/                 # 13 source files
-├── tests/                   # 415 testes (33 arquivos)
+│   └── src/                 # 14 source files (incl. gestures.c)
+├── tests/                   # 838+ testes (35 arquivos)
 ├── session/                 # Wayland session config
 ├── scripts/                 # Build/install scripts
 └── pyproject.toml           # Project config
