@@ -40,6 +40,12 @@ from cios.core.handlers.peripherals import (
 from cios.core.handlers.process import handle_process_control, handle_status
 from cios.core.handlers.screen_capture import handle_screen_capture
 from cios.core.handlers.spreadsheet import handle_spreadsheet
+from cios.core.handlers.google_workspace import (
+    handle_email,
+    handle_drive,
+    handle_calendar,
+    handle_gchat,
+)
 from cios.core.handlers.system import handle_power, handle_session, handle_system_health
 from cios.core.intent_parser import Intent, IntentType
 from cios.core.mcp import context as mcp
@@ -127,6 +133,10 @@ _HANDLER_MAP = {
     IntentType.GALLERY_MANAGE: handle_gallery_manage,
     IntentType.SCREEN_CAPTURE: handle_screen_capture,
     IntentType.SPREADSHEET: handle_spreadsheet,
+    IntentType.EMAIL: handle_email,
+    IntentType.DRIVE: handle_drive,
+    IntentType.CALENDAR: handle_calendar,
+    IntentType.GCHAT: handle_gchat,
     IntentType.HISTORY_SEARCH: None,  # Handled directly in bridge
 }
 
