@@ -92,3 +92,89 @@ def handle_scheduler(intent: Intent, executor: Executor, memory: Memory) -> Plan
         outcome="success",
         summary=f"Lembrete agendado: '{reminder_text}' às {time_str}.",
     )
+
+
+def handle_vpn(intent: Intent, executor: Executor, memory: Memory) -> PlanResult:
+    """Handle VPN intents: connect, disconnect, status."""
+    from cios.skills.vpn import connect_vpn, disconnect_vpn, get_vpn_status
+
+    action = intent.params.get("action", "status")
+    name = intent.params.get("name", "")
+
+    if action == "connect":
+        steps, success, msg = connect_vpn(name)
+    elif action == "disconnect":
+        steps, success, msg = disconnect_vpn(name)
+    else:
+        steps, success, msg = get_vpn_status()
+
+    return PlanResult(
+        plan_steps=steps,
+        results=[],
+        outcome="success" if success else "failure",
+        summary=msg,
+    )
+
+
+def handle_firewall(intent: Intent, executor: Executor, memory: Memory) -> PlanResult:
+    """Handle firewall intents: allow/deny port, enable/disable."""
+    from cios.skills.firewall import allow_port, deny_port, enable_firewall, disable_firewall, get_status
+
+    action = intent.params.get("action", "status")
+    port = intent.params.get("port", 0)
+
+    if action == "allow" and port:
+        steps, success, msg = allow_port(port)
+    elif action == "deny" and port:
+        steps, success, msg = deny_port(port)
+    elif action == "enable":
+        steps, success, msg = enable_firewall()
+    elif action == "disable":
+        steps, success, msg = disable_firewall()
+    else:
+        steps, success, msg = get_status()
+
+    return PlanResult(
+        plan_steps=steps,
+        results=[],
+        outcome="success" if success else "failure",
+        summary=msg,
+    )
+
+
+def handle_trash(intent: Intent, executor: Executor, memory: Memory) -> PlanResult:
+    """Handle trash intents: list, empty, restore."""
+    from cios.skills.trash import list_trash, empty_trash, restore_file, get_trash_size
+
+    action = intent.params.get("action", "list")
+    name = intent.params.get("name", "")
+
+    if action == "empty":
+        steps, success, msg = empty_trash()
+        return PlanResult(plan_steps=steps, results=[], outcome="success" if success else "failure", summary=msg)
+
+    elif action == "restore" and name:
+        steps, success, msg = restore_file(name)
+        return PlanResult(plan_steps=steps, results=[], outcome="success" if success else "failure", summary=msg)
+
+    else:
+        # List trash contents
+        items = list_trash()
+        total_bytes, count = get_trash_size()
+        if not items:
+            return PlanResult(
+                plan_steps=["Verificando lixeira"],
+                results=[],
+                outcome="success",
+                summary="Lixeira vazia.",
+            )
+
+        from cios.skills.trash import _format_size
+        lines = [f"• {item.name} ({item.deletion_date[:10]})" for item in items[:10]]
+        summary = f"Lixeira: {count} item(ns), {_format_size(total_bytes)}:\n" + "\n".join(lines)
+        return PlanResult(
+            plan_steps=["Verificando lixeira"],
+            results=[],
+            outcome="success",
+            summary=summary,
+        )

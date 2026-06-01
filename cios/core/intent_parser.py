@@ -53,6 +53,9 @@ class IntentType(Enum):
     GCHAT = "gchat"
     THEMING = "theming"
     SCHEDULER = "scheduler"
+    VPN = "vpn"
+    FIREWALL = "firewall"
+    TRASH = "trash"
     UNKNOWN = "unknown"
 
 
@@ -2030,6 +2033,99 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
         ),
         IntentType.SCHEDULER,
         lambda m: {"action": "remind", "time_expr": m.group(0), "text": m.group(2).strip()},
+        0.90,
+    ),
+    # --- VPN (PT + EN) ---
+    (
+        re.compile(
+            r"(?:conect(?:ar?|e)|connect|ligar?|ativar?|enable)\s+(?:a?\s+)?(?:vpn|wireguard|openvpn)",
+            re.IGNORECASE,
+        ),
+        IntentType.VPN,
+        lambda m: {"action": "connect"},
+        0.92,
+    ),
+    (
+        re.compile(
+            r"(?:desconect(?:ar?|e)|disconnect|desligar?|desativar?|disable)\s+(?:a?\s+)?(?:vpn|wireguard|openvpn)",
+            re.IGNORECASE,
+        ),
+        IntentType.VPN,
+        lambda m: {"action": "disconnect"},
+        0.92,
+    ),
+    (
+        re.compile(
+            r"(?:status|estado)\s+(?:da?\s+)?(?:vpn)",
+            re.IGNORECASE,
+        ),
+        IntentType.VPN,
+        lambda m: {"action": "status"},
+        0.90,
+    ),
+    # --- Firewall (PT + EN) ---
+    (
+        re.compile(
+            r"(?:bloque(?:ar?|ia)|block|deny)\s+(?:a?\s+)?(?:porta|port)\s+(\d+)",
+            re.IGNORECASE,
+        ),
+        IntentType.FIREWALL,
+        lambda m: {"action": "deny", "port": int(m.group(1))},
+        0.93,
+    ),
+    (
+        re.compile(
+            r"(?:liber(?:ar?|e)|allow|open)\s+(?:a?\s+)?(?:porta|port)\s+(\d+)",
+            re.IGNORECASE,
+        ),
+        IntentType.FIREWALL,
+        lambda m: {"action": "allow", "port": int(m.group(1))},
+        0.93,
+    ),
+    (
+        re.compile(
+            r"(?:ativar?|enable|habilitar?)\s+(?:o?\s+)?(?:firewall|ufw)",
+            re.IGNORECASE,
+        ),
+        IntentType.FIREWALL,
+        lambda m: {"action": "enable"},
+        0.92,
+    ),
+    (
+        re.compile(
+            r"(?:desativar?|disable|desabilitar?)\s+(?:o?\s+)?(?:firewall|ufw)",
+            re.IGNORECASE,
+        ),
+        IntentType.FIREWALL,
+        lambda m: {"action": "disable"},
+        0.92,
+    ),
+    # --- Trash (PT + EN) ---
+    (
+        re.compile(
+            r"(?:lixeira|trash|recycle\s*bin)",
+            re.IGNORECASE,
+        ),
+        IntentType.TRASH,
+        lambda m: {"action": "list"},
+        0.88,
+    ),
+    (
+        re.compile(
+            r"(?:esvaziar?|empty|limpar?)\s+(?:a?\s+)?(?:lixeira|trash)",
+            re.IGNORECASE,
+        ),
+        IntentType.TRASH,
+        lambda m: {"action": "empty"},
+        0.92,
+    ),
+    (
+        re.compile(
+            r"(?:restaurar?|restore|recuperar?)\s+(.+?)(?:\s+da\s+lixeira|\s+from\s+trash)?$",
+            re.IGNORECASE,
+        ),
+        IntentType.TRASH,
+        lambda m: {"action": "restore", "name": m.group(1).strip()},
         0.90,
     ),
     # --- Google Workspace: Email (PT + EN) ---
