@@ -236,4 +236,12 @@ void decorations_destroy(struct CiosSurface *surface);
 int decorations_hit_test(struct CiosSurface *surface, int x, int y);
 void decorations_minimize(struct CiosSurface *surface);
 
+/* gestures.c */
+void gesture_swipe_begin(struct CiosServer *server, uint32_t fingers);
+void gesture_swipe_update(struct CiosServer *server, double dx, double dy);
+void gesture_swipe_end(struct CiosServer *server);
+void gesture_pinch_begin(struct CiosServer *server, uint32_t fingers);
+void gesture_pinch_update(struct CiosServer *server, double scale);
+void gesture_pinch_end(struct CiosServer *server);
+
 #endif /* CIOS_SERVER_H */
