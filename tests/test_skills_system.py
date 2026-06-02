@@ -3,11 +3,7 @@
 All subprocess calls are mocked — tests logic, not system state.
 """
 
-from unittest.mock import patch, MagicMock
-import subprocess
-
-import pytest
-
+from unittest.mock import MagicMock, patch
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  AUDIO SKILL

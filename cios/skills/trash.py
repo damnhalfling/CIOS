@@ -9,9 +9,7 @@ Implements the FreeDesktop.org Trash specification:
 """
 
 import logging
-import os
 import shutil
-import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path

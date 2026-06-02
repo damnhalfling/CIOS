@@ -17,7 +17,6 @@ import threading
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +145,7 @@ class Scheduler:
 
     def _fire_task(self, task: ScheduledTask) -> None:
         """Fire a task — send notification or execute deferred intent."""
-        from cios.infra.notifications import bus, NotificationType
+        from cios.infra.notifications import NotificationType, bus
 
         if task.intent:
             # Deferred intent — notify and let bridge handle execution

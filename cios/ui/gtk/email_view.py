@@ -123,7 +123,7 @@ def create_email_list_view(emails: list[dict], on_select=None) -> "Gtk.Widget | 
     listbox.set_selection_mode(Gtk.SelectionMode.SINGLE)
     listbox.add_css_class("boxed-list")
 
-    for i, email in enumerate(emails[:10]):
+    for _i, email in enumerate(emails[:10]):
         row = Gtk.ListBoxRow()
         row_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         row_box.set_margin_start(8)

@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 def handle_theming(intent: Intent, executor: Executor, memory: Memory) -> PlanResult:
     """Handle theming intents: set dark/light, toggle."""
-    from cios.skills.theming import set_theme, toggle_theme, get_current_theme
+    from cios.skills.theming import get_current_theme, set_theme, toggle_theme
 
     action = intent.params.get("action", "toggle")
     theme = intent.params.get("theme", "")
@@ -48,9 +48,8 @@ def handle_theming(intent: Intent, executor: Executor, memory: Memory) -> PlanRe
 
 def handle_scheduler(intent: Intent, executor: Executor, memory: Memory) -> PlanResult:
     """Handle scheduler intents: reminders, timers."""
-    from cios.skills.scheduler import scheduler, parse_time_expression
+    from cios.skills.scheduler import parse_time_expression, scheduler
 
-    action = intent.params.get("action", "remind")
     text = intent.params.get("text", "")
     time_expr = intent.params.get("time_expr", "")
 
@@ -83,7 +82,7 @@ def handle_scheduler(intent: Intent, executor: Executor, memory: Memory) -> Plan
     scheduler.start()
 
     # Add the reminder
-    task = scheduler.add_reminder(reminder_text, trigger_at)
+    scheduler.add_reminder(reminder_text, trigger_at)
 
     time_str = trigger_at.strftime("%H:%M")
     return PlanResult(
@@ -118,7 +117,13 @@ def handle_vpn(intent: Intent, executor: Executor, memory: Memory) -> PlanResult
 
 def handle_firewall(intent: Intent, executor: Executor, memory: Memory) -> PlanResult:
     """Handle firewall intents: allow/deny port, enable/disable."""
-    from cios.skills.firewall import allow_port, deny_port, enable_firewall, disable_firewall, get_status
+    from cios.skills.firewall import (
+        allow_port,
+        deny_port,
+        disable_firewall,
+        enable_firewall,
+        get_status,
+    )
 
     action = intent.params.get("action", "status")
     port = intent.params.get("port", 0)
@@ -144,7 +149,7 @@ def handle_firewall(intent: Intent, executor: Executor, memory: Memory) -> PlanR
 
 def handle_trash(intent: Intent, executor: Executor, memory: Memory) -> PlanResult:
     """Handle trash intents: list, empty, restore."""
-    from cios.skills.trash import list_trash, empty_trash, restore_file, get_trash_size
+    from cios.skills.trash import empty_trash, get_trash_size, list_trash, restore_file
 
     action = intent.params.get("action", "list")
     name = intent.params.get("name", "")

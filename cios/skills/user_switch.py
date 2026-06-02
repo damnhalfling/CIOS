@@ -25,7 +25,7 @@ def list_users() -> list[dict]:
     """
     users = []
     try:
-        with open("/etc/passwd", "r") as f:
+        with open("/etc/passwd") as f:
             for line in f:
                 parts = line.strip().split(":")
                 if len(parts) >= 7:

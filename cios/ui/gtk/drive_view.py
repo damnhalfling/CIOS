@@ -153,7 +153,7 @@ def create_drive_list_view(files: list[dict], on_select=None) -> "Gtk.Widget | N
     listbox.set_selection_mode(Gtk.SelectionMode.SINGLE)
     listbox.add_css_class("boxed-list")
 
-    for i, file in enumerate(files[:10]):
+    for _i, file in enumerate(files[:10]):
         row = Gtk.ListBoxRow()
         row_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         row_box.set_margin_start(8)

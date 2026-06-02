@@ -11,7 +11,6 @@ Flow:
 Requires: user logged into Intelligence (has refresh_token stored in Maestro).
 """
 
-import json
 import logging
 from typing import Any
 
@@ -134,7 +133,7 @@ class GoogleMCPClient:
             return result.get("result", {})
 
         except requests.RequestException as e:
-            raise GoogleMCPError(service, tool, f"Network error: {str(e)}")
+            raise GoogleMCPError(service, tool, f"Network error: {str(e)}") from e
 
     def has_workspace_access(self) -> bool:
         """Check if user has Google Workspace connected (via Maestro /me)."""
@@ -180,4 +179,4 @@ class GoogleMCPClient:
             return self._access_token
 
         except requests.RequestException as e:
-            raise GoogleMCPError("auth", "token", f"Network error: {str(e)}")
+            raise GoogleMCPError("auth", "token", f"Network error: {str(e)}") from e

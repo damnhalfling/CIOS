@@ -13,13 +13,13 @@ Launched by greetd as the greeter session.
 
 import json
 import os
+import os as _os
 import socket
 import struct
 import sys
+import time
 
 import gi
-import time
-import os as _os
 
 
 def _wait_for_wayland(max_wait=5.0):
@@ -30,7 +30,7 @@ def _wait_for_wayland(max_wait=5.0):
     This wait ensures GTK4 can connect successfully.
     """
     runtime_dir = _os.environ.get("XDG_RUNTIME_DIR", "/run/user/0")
-    for i in range(int(max_wait * 10)):
+    for _i in range(int(max_wait * 10)):
         try:
             for f in _os.listdir(runtime_dir):
                 if f.startswith("wayland-") and not f.endswith(".lock"):

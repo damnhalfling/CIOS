@@ -85,7 +85,7 @@ def print_file(file_path: str, printer: str = "", copies: int = 1) -> tuple[list
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
         if result.returncode == 0:
-            return steps, True, f"Documento enviado para impressão."
+            return steps, True, "Documento enviado para impressão."
         return steps, False, f"Falha: {result.stderr.strip()[:100]}"
     except FileNotFoundError:
         return steps, False, "CUPS não instalado. Instale com: sudo apt install cups"

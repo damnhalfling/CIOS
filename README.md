@@ -78,10 +78,13 @@ No terminal. No menus. No jargon. Just results.
 | Manage windows | Ignore windows |
 | Search for files | Ask for the result |
 | Read error messages | Get a suggestion |
+| Configure manually | System learns from you |
+| Repeat yourself | Once is enough — it remembers |
+| Set up cron jobs | Say it in plain language |
 
 ## How it works
 
-CIOS is built on three layers:
+CIOS is built on four layers:
 
 ### MCP — Model Context Protocol
 
@@ -108,6 +111,18 @@ Real system execution. 28 skills, zero abstraction.
 Wi-Fi (nmcli) · Audio (pactl) · Files · Processes · Packages (apt) · Windows (compositor IPC) · Clipboard (wl-clipboard) · Battery · Brightness · Dev environments · Disk analysis · Auto-learning · File search · Workflow start · Explore system · Gallery management · Favorites & albums · Duplicate detection · Face clustering · Screen capture · Image editing · Spreadsheets (CSV/XLSX)
 
 **No LLM for critical actions.** Pattern matching handles 80%+ of intents. Hybrid classifier (regex → cache → LLM) ensures natural language works while keeping latency low.
+
+### Intelligence — Memory & Learning (paid)
+
+The layer that makes CIOS smarter over time.
+
+- **Cognitive memory** — cross-session recall, semantic search over past conversations
+- **User modeling** — learns preferences, routines, and project context progressively
+- **Self-improving skills** — complex solutions become reusable shortcuts automatically
+- **Scheduled automations** — natural language cron ("every morning, check updates")
+- **Persistence nudges** — proactively suggests saving knowledge after complex sessions
+
+Local auto-learning (regex pattern detection) works offline. Intelligence adds deep memory and reasoning on top.
 
 ## Voice-first, offline
 
@@ -160,19 +175,37 @@ CIOS: Connected to Starlink (192.168.1.42)
 
 Every error includes a recovery suggestion. **Zero dead-ends.**
 
-## CIOS Intelligence (optional)
+## CIOS Intelligence (paid)
 
-For tasks that need cloud AI — like summarizing news, generating text, or translating — CIOS can connect to **CIOS Intelligence**, an optional cloud service.
+CIOS Intelligence is the cloud layer that makes CIOS smarter over time. It handles tasks that benefit from large models, persistent memory, and cross-device continuity.
 
-The OS optimizes requests locally before sending, keeping usage minimal. Authentication is handled via the onboarding flow.
+**What it does:**
+
+- **Cognitive memory** — remembers past conversations, learns your patterns, recalls context across sessions
+- **User modeling** — builds a progressive profile (preferences, projects, routines) without manual config
+- **Semantic search** — "how did I fix that server issue last week?" finds the answer from history
+- **Complex reasoning** — summarizing, translating, generating text, answering knowledge questions
+- **Cross-device sync** — same memory, same context between OS, web, and mobile
+- **OS command generation** — Intelligence understands your intent and sends executable commands back to the OS
+
+**What stays local:**
+
+- All system actions (Wi-Fi, volume, files, packages) — always local, always instant
+- Pattern matching (80%+ of intents) — works offline, zero latency
+- Intent cache — previously seen inputs never need the cloud again
+- Voice (STT/TTS) — whisper.cpp + piper, fully on-device
 
 ```
 You: "what happened in the world today?"
-CIOS: "I can look that up with CIOS Intelligence."
-         [Activate] [No thanks]
+CIOS: "Consulting CIOS Intelligence..."
+→ Returns a summary from multiple sources
+
+You: "how did I set up the nginx last time?"
+CIOS: "Found it. Last Tuesday you ran these 4 commands..."
+→ Cognitive memory retrieves the session
 ```
 
-Everything local stays local. Intelligence is opt-in.
+Intelligence is a paid service. The OS works fully offline for system tasks — Intelligence adds memory, reasoning, and cross-device continuity on top.
 
 ## Cross-device continuity
 
@@ -227,6 +260,9 @@ The OS polls for remote commands every 5 seconds. When another device (mobile, w
 | `parar gravação` | Stops screen recording |
 | `girar foto` | Rotates current image 90° |
 | `info da foto` | Shows EXIF metadata |
+| `how did I fix the server last time?` | Intelligence searches past sessions, shows the commands |
+| `every morning check for updates` | Creates a scheduled automation (cron) |
+| `prepare my work environment` | Parallel: opens editor, starts backend, checks git, opens browser |
 
 All commands work in **English** and **Portuguese**.
 
@@ -316,6 +352,12 @@ In practice: if no LLM is available, all regex-matched intents (the vast majorit
 - ✅ XWayland — full support for X11 apps (browser, editor, terminal)
 - ✅ VT switching (Ctrl+Alt+Fn) for TTY access
 - ✅ greetd bundled (no dependency on external repos)
+- ✅ CIOS Intelligence — cloud cognitive layer (auth, streaming, memory, cross-device sync)
+- 🔜 Self-improving skills — solutions become reusable shortcuts
+- 🔜 Natural language cron — scheduled automations via daemon
+- 🔜 Project context files (`.cios.yml`) — declarative workflow config
+- 🔜 Parallel task delegation — complex intents split into concurrent sub-tasks
+- 🔜 Persistence nudges — proactive knowledge capture after complex sessions
 
 **This is not a prototype. It runs on real hardware.**
 
@@ -325,7 +367,12 @@ In practice: if no LLM is available, all regex-matched intents (the vast majorit
 - ✅ ~~Wayland compositor~~ — done (wlroots 0.18, XWayland, layer-shell)
 - ✅ ~~Custom Debian-based distribution~~ — done (greetd, Plymouth, ISO)
 - ⏳ Voice module (STT/TTS as alternative I/O)
-- ⏳ Cognitive memory (intent graph, semantic indexing)
+- ⏳ Cognitive memory (intent graph, semantic indexing) — via Intelligence
+- ⏳ Self-improving skills — skills that refine themselves from usage patterns
+- ⏳ Project context files (`.cios.yml`) — declarative project config for instant workflow start
+- ⏳ Natural language cron — scheduled automations ("every morning, check updates")
+- ⏳ Parallel task delegation — split complex intents into concurrent sub-tasks
+- ⏳ Persistence nudges — proactive suggestions to save knowledge after complex sessions
 
 ## Architecture (for contributors)
 
@@ -335,10 +382,15 @@ User Input → Intent Parser → Classifier → MCO → Planner → Executor →
             201 Patterns     Cache +      MCP     28 Skills   Shell      Translates
             (PT/EN)         LLM +       (live    + Auto-     Control    to human
                            Stemming     state)   Learner      │        language
-                                                            Memory
-                                                              │
-                                                         TaskQueue
-                                                     (background ops)
+                                                   │        Memory
+                                                   │          │
+                                                Scheduler  TaskQueue
+                                                (cron)   (background ops)
+                                                   │
+                                              Intelligence
+                                          (cognitive memory +
+                                           user model + skills
+                                            self-improvement)
 ```
 
 <details>
@@ -352,6 +404,7 @@ User Input → Intent Parser → Classifier → MCO → Planner → Executor →
 - **Planner** — 30 handlers with context-aware execution and `_resilient_call()` retry
 - **Executor** — Safe shell execution with timeout, blocked command list, background processes
 - **Humanizer** — 260+ translations PT/EN, all technical output becomes plain language
+- **Intelligence** — Cloud cognitive layer: memory across sessions, user modeling, semantic search, skill self-improvement
 - **Model Router** — Ollama (local, default) with fallback support, 8s timeout
 - **Memory** — SQLite store of intents, commands, and outcomes
 - **Error Recovery** — 19 error types classified with actionable suggestions (PT/EN)
@@ -378,6 +431,8 @@ cios-os/
 │   │   ├── planner.py          # 30 handlers + MCO + _resilient_call()
 │   │   ├── task_queue.py       # Background task execution (TaskManager + TaskThread)
 │   │   ├── thread_manager.py   # Conversation thread state + classification
+│   │   ├── intelligence.py     # Cloud cognitive layer (memory, user model, commands)
+│   │   ├── scheduler.py        # Natural language cron (planned)
 │   │   ├── handlers/           # Intent handlers (gallery, media, screen, etc.)
 │   │   ├── mcp.py              # Live system state (watchers + adaptive polling)
 │   │   ├── executor.py         # Safe shell execution
@@ -397,7 +452,7 @@ cios-os/
 │   │   ├── screen_capture.py   # Screenshot + screen recording
 │   │   └── ...                 # network, audio, bluetooth, etc.
 │   ├── ui/                     # GUI, CLI, hotkey, topbar, splash, gallery, viewer
-│   └── infra/                  # Daemon, voice, multi-monitor
+│   └── infra/                  # Daemon, voice, multi-monitor, scheduler
 ├── shell/                      # Wayland compositor (C, wlroots 0.18)
 │   ├── src/
 │   │   ├── main.c, server.c, output.c, input.c
@@ -448,6 +503,9 @@ Contributions are welcome — especially in:
 8. **Resilient** — retry + fallback chain + circuit breaker
 9. **Voice-first ready** — speak results, never read commands
 10. **Zero dead-ends** — every error includes a recovery suggestion
+11. **Learn from use** — repeated patterns become shortcuts, complex solutions become skills
+12. **Remember everything** — Intelligence retains context across sessions and devices
+13. **Anticipate, don't wait** — proactive suggestions based on time, context, and history
 
 ---
 
@@ -491,20 +549,41 @@ Pronto.
 | Navegar menus | Execução direta |
 | Gerenciar janelas | Ignorar janelas |
 | Procurar arquivos | Pedir o resultado |
+| Configurar manualmente | O sistema aprende com você |
+| Se repetir | Uma vez basta — ele lembra |
+| Configurar cron jobs | Dizer em linguagem natural |
 
-### CIOS Intelligence (opcional)
+### CIOS Intelligence (pago)
 
-Para tarefas que precisam de IA cloud — como resumir notícias, gerar texto, ou traduzir — o CIOS pode se conectar ao **CIOS Intelligence**, um serviço cloud opcional.
+CIOS Intelligence é a camada cloud que torna o CIOS mais inteligente com o tempo. Lida com tarefas que se beneficiam de modelos grandes, memória persistente e continuidade entre dispositivos.
 
-O OS otimiza requisições localmente antes de enviar, mantendo o uso mínimo. Autenticação é feita pelo fluxo de onboarding.
+**O que faz:**
+
+- **Memória cognitiva** — lembra conversas passadas, aprende seus padrões, recupera contexto entre sessões
+- **Modelagem de usuário** — constrói um perfil progressivo (preferências, projetos, rotinas) sem configuração manual
+- **Busca semântica** — "como eu resolvi aquele problema do servidor semana passada?" encontra a resposta no histórico
+- **Raciocínio complexo** — resumir, traduzir, gerar texto, responder perguntas de conhecimento
+- **Sync cross-device** — mesma memória, mesmo contexto entre OS, web e mobile
+- **Geração de comandos** — Intelligence entende sua intenção e envia comandos executáveis de volta ao OS
+
+**O que permanece local:**
+
+- Todas as ações de sistema (Wi-Fi, volume, arquivos, pacotes) — sempre local, sempre instantâneo
+- Pattern matching (80%+ dos intents) — funciona offline, zero latência
+- Cache de intents — inputs já vistos nunca precisam do cloud novamente
+- Voz (STT/TTS) — whisper.cpp + piper, totalmente no dispositivo
 
 ```
 Você: "o que aconteceu hoje no mundo?"
-CIOS: "Posso buscar isso com CIOS Intelligence."
-         [Ativar] [Não, obrigado]
+CIOS: "Consultando CIOS Intelligence..."
+→ Retorna um resumo de múltiplas fontes
+
+Você: "como eu configurei o nginx da última vez?"
+CIOS: "Achei. Na terça passada você rodou esses 4 comandos..."
+→ Memória cognitiva recupera a sessão
 ```
 
-Tudo local permanece local. Intelligence é opt-in.
+Intelligence é um serviço pago. O OS funciona totalmente offline para tarefas de sistema — Intelligence adiciona memória, raciocínio e continuidade cross-device por cima.
 
 ### O que você pode dizer
 
@@ -528,6 +607,9 @@ Tudo local permanece local. Intelligence é opt-in.
 | `onde está o contrato?` | Busca arquivos por nome e conteúdo |
 | `quero assistir um vídeo` | Abre o player de vídeo |
 | `atualizar cios` | Verifica e instala atualizações |
+| `como eu resolvi o problema do servidor?` | Intelligence busca nas sessões passadas, mostra os comandos |
+| `toda manhã verifica atualizações` | Cria uma automação agendada (cron) |
+| `prepara meu ambiente de trabalho` | Paralelo: abre editor, sobe backend, checa git, abre browser |
 
 ### UX Conversacional
 

@@ -8,10 +8,7 @@ Validates:
 
 import time
 from datetime import datetime, timedelta
-from unittest.mock import patch, MagicMock
-
-import pytest
-
+from unittest.mock import MagicMock, patch
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  NOTIFICATION BUS
@@ -50,7 +47,10 @@ class TestNotificationBus:
 
     def test_unsubscribe(self):
         received = []
-        cb = lambda n: received.append(n)
+
+        def cb(n):
+            received.append(n)
+
         self.bus.subscribe(cb)
         self.bus.notify("First")
         self.bus.unsubscribe(cb)
@@ -109,7 +109,7 @@ class TestNotificationBus:
         assert notif_error.icon == "❌"
 
     def test_action_notifications(self):
-        from cios.infra.notifications import NotificationType, NotificationAction
+        from cios.infra.notifications import NotificationAction, NotificationType
         notif = self.bus.notify(
             "USB detected",
             type=NotificationType.ACTION,
@@ -243,7 +243,7 @@ class TestTheming:
     """Test theming skill."""
 
     def test_get_current_theme_default(self):
-        from cios.skills.theming import get_current_theme, DEFAULT_THEME
+        from cios.skills.theming import DEFAULT_THEME, get_current_theme
         # Without config file, should return default
         with patch("cios.skills.theming._load_config", return_value={}):
             assert get_current_theme() == DEFAULT_THEME

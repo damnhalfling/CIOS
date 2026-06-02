@@ -256,7 +256,7 @@ class CommandPoller:
         The notification has Confirm/Reject actions. When user confirms,
         the command status changes to 'pending' and gets executed on next poll.
         """
-        from cios.infra.notifications import bus, NotificationType, NotificationAction
+        from cios.infra.notifications import NotificationAction, NotificationType, bus
 
         # Parse command for human-readable description
         description = cmd.command

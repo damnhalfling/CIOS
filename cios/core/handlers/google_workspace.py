@@ -56,7 +56,7 @@ def handle_email(intent: Intent, executor: Executor, memory: Memory) -> PlanResu
     if not mcp:
         return _no_workspace()
 
-    from cios.skills.email import search_emails, read_email, draft_email
+    from cios.skills.email import draft_email, search_emails
 
     action = intent.params.get("action", "search")
     query = intent.params.get("query", "")
@@ -153,7 +153,7 @@ def handle_drive(intent: Intent, executor: Executor, memory: Memory) -> PlanResu
     if not mcp:
         return _no_workspace()
 
-    from cios.skills.drive import search_files, read_file, create_file
+    from cios.skills.drive import search_files
 
     action = intent.params.get("action", "search")
     query = intent.params.get("query", "")
@@ -215,7 +215,7 @@ def handle_calendar(intent: Intent, executor: Executor, memory: Memory) -> PlanR
     if not mcp:
         return _no_workspace()
 
-    from cios.skills.calendar import list_events, create_event
+    from cios.skills.calendar import create_event, list_events
 
     action = intent.params.get("action", "list")
 
@@ -302,7 +302,7 @@ def handle_gchat(intent: Intent, executor: Executor, memory: Memory) -> PlanResu
     if not mcp:
         return _no_workspace()
 
-    from cios.skills.gchat import search_messages, send_message, list_spaces
+    from cios.skills.gchat import search_messages, send_message
 
     action = intent.params.get("action", "search")
     query = intent.params.get("query", "")

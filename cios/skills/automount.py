@@ -130,7 +130,7 @@ class AutomountWatcher:
 
     def _on_device_added(self, device: str) -> None:
         """Handle new device detection — notify user."""
-        from cios.infra.notifications import bus, NotificationType, NotificationAction
+        from cios.infra.notifications import NotificationAction, NotificationType, bus
 
         info = self._get_device_info(device)
         label = info.get("label", device.split("/")[-1])
@@ -154,7 +154,7 @@ class AutomountWatcher:
 
     def _on_device_removed(self, device: str) -> None:
         """Handle device removal."""
-        from cios.infra.notifications import bus, NotificationType
+        from cios.infra.notifications import NotificationType, bus
 
         self._mounted.pop(device, None)
         bus.notify(

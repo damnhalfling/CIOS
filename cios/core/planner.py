@@ -13,6 +13,13 @@ from cios.core.executor import Executor
 from cios.core.handlers._common import PlanResult
 from cios.core.handlers.apps import handle_app_launch, handle_explore_system, handle_list_apps
 from cios.core.handlers.audio import handle_audio
+from cios.core.handlers.desktop import (
+    handle_firewall,
+    handle_scheduler,
+    handle_theming,
+    handle_trash,
+    handle_vpn,
+)
 
 # Import all handlers
 from cios.core.handlers.dev import (  # noqa: F401
@@ -26,6 +33,12 @@ from cios.core.handlers.dev import (  # noqa: F401
 from cios.core.handlers.disk import handle_disk
 from cios.core.handlers.files import handle_file_organize, handle_files_open, handle_files_search
 from cios.core.handlers.gallery import handle_gallery_manage
+from cios.core.handlers.google_workspace import (
+    handle_calendar,
+    handle_drive,
+    handle_email,
+    handle_gchat,
+)
 from cios.core.handlers.logs import handle_fix_last_error, handle_log_analysis
 from cios.core.handlers.media import handle_intent_browse, handle_intent_media, handle_intent_write
 from cios.core.handlers.misc import handle_command_exec, handle_intelligence, handle_self_update
@@ -40,13 +53,6 @@ from cios.core.handlers.peripherals import (
 from cios.core.handlers.process import handle_process_control, handle_status
 from cios.core.handlers.screen_capture import handle_screen_capture
 from cios.core.handlers.spreadsheet import handle_spreadsheet
-from cios.core.handlers.google_workspace import (
-    handle_email,
-    handle_drive,
-    handle_calendar,
-    handle_gchat,
-)
-from cios.core.handlers.desktop import handle_theming, handle_scheduler, handle_vpn, handle_firewall, handle_trash
 from cios.core.handlers.system import handle_power, handle_session, handle_system_health
 from cios.core.intent_parser import Intent, IntentType
 from cios.core.mcp import context as mcp

@@ -6,9 +6,9 @@ Uses wlr-gamma-control or gammastep for Wayland.
 """
 
 import logging
-import subprocess
 import os
 import signal
+import subprocess
 
 logger = logging.getLogger(__name__)
 
