@@ -388,11 +388,25 @@ echo "[CIOS] ✓ greetd configured (Wayland-only)"
 
 echo "[CIOS] [6/6] Boot experience (Plymouth + GRUB)..."
 
-# Plymouth
-plymouth-set-default-theme cios 2>/dev/null || {
+# Plymouth — universal approach (works on Ubuntu, Debian, Fedora)
+CIOS_PLYMOUTH="/usr/share/plymouth/themes/cios/cios.plymouth"
+if [ -f "$CIOS_PLYMOUTH" ]; then
+    # Method 1: plymouth-set-default-theme (Debian/Ubuntu with plymouth-themes)
+    if command -v plymouth-set-default-theme &>/dev/null; then
+        plymouth-set-default-theme cios 2>/dev/null || true
+    fi
+
+    # Method 2: update-alternatives (Ubuntu 24.04+)
+    if command -v update-alternatives &>/dev/null; then
+        update-alternatives --install /usr/share/plymouth/themes/default.plymouth \
+            default.plymouth "$CIOS_PLYMOUTH" 200 2>/dev/null || true
+        update-alternatives --set default.plymouth "$CIOS_PLYMOUTH" 2>/dev/null || true
+    fi
+
+    # Method 3: direct config (fallback for any distro)
     mkdir -p /etc/plymouth
     printf "[Daemon]\nTheme=cios\n" > /etc/plymouth/plymouthd.conf
-}
+fi
 
 mkdir -p /etc/initramfs-tools/conf.d
 echo "FRAMEBUFFER=y" > /etc/initramfs-tools/conf.d/cios-splash
