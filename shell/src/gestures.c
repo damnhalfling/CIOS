@@ -2,17 +2,7 @@
  * CIOS Shell — Touchpad gesture handling
  *
  * Detects multi-finger swipe and pinch gestures from libinput
- * and maps them to compositor actions:
- *
- * - 3-finger swipe up: overview / app switcher (Alt+Tab equivalent)
- * - 3-finger swipe down: minimize focused window
- * - 3-finger swipe left/right: switch workspace (future)
- * - 4-finger swipe up: show all windows
- * - Pinch in: zoom out (future accessibility)
- * - Pinch out: zoom in (future accessibility)
- *
- * Requires: libinput gesture events via wlroots.
- * Integration: called from input.c when pointer_gesture events arrive.
+ * and maps them to compositor actions.
  *
  * #524 — Touchpad gestures no compositor
  */
@@ -30,33 +20,37 @@
 #include "server.h"
 
 /* Gesture detection thresholds */
-#define SWIPE_THRESHOLD 50.0    /* pixels to trigger a swipe */
-#define PINCH_THRESHOLD 0.3     /* scale delta to trigger pinch */
+#define SWIPE_THRESHOLD 50.0
+#define PINCH_THRESHOLD 0.3
 
 /* Gesture state tracking */
-struct GestureState {
+static struct {
     bool active;
     int fingers;
-    double dx;          /* accumulated horizontal delta */
-    double dy;          /* accumulated vertical delta */
-    double scale;       /* accumulated pinch scale (1.0 = no change) */
-};
+    double dx;
+    double dy;
+    double scale;
+} gesture = {0};
 
-static struct GestureState gesture = {0};
+/* Forward declarations */
+static void gesture_action_app_switcher(struct CiosServer *server);
+static void gesture_action_minimize(struct CiosServer *server);
+static void gesture_action_show_all(struct CiosServer *server);
 
 /* ═══════════════════════════════════════════════════════════════
- *  Gesture event handlers (called from input.c)
+ *  Gesture event handlers
  * ═══════════════════════════════════════════════════════════════ */
 
 void gesture_swipe_begin(struct CiosServer *server, uint32_t fingers) {
+    (void)server;
     gesture.active = true;
     gesture.fingers = fingers;
     gesture.dx = 0.0;
     gesture.dy = 0.0;
-    CIOS_LOG_DEBUG("Gesture swipe begin: %d fingers", fingers);
 }
 
 void gesture_swipe_update(struct CiosServer *server, double dx, double dy) {
+    (void)server;
     if (!gesture.active) return;
     gesture.dx += dx;
     gesture.dy += dy;
@@ -68,9 +62,7 @@ void gesture_swipe_end(struct CiosServer *server) {
     double abs_dx = fabs(gesture.dx);
     double abs_dy = fabs(gesture.dy);
 
-    /* Determine dominant direction */
     if (abs_dx < SWIPE_THRESHOLD && abs_dy < SWIPE_THRESHOLD) {
-        /* Too small — not a gesture */
         goto cleanup;
     }
 
@@ -78,25 +70,16 @@ void gesture_swipe_end(struct CiosServer *server) {
 
     if (gesture.fingers == 3) {
         if (!horizontal && gesture.dy < -SWIPE_THRESHOLD) {
-            /* 3-finger swipe UP — trigger app switcher */
-            CIOS_LOG_INFO("Gesture: 3-finger swipe up → app switcher");
-            _gesture_trigger_app_switcher(server);
+            LOG_INFO("gesture: 3-finger swipe up -> app switcher");
+            gesture_action_app_switcher(server);
         } else if (!horizontal && gesture.dy > SWIPE_THRESHOLD) {
-            /* 3-finger swipe DOWN — minimize focused */
-            CIOS_LOG_INFO("Gesture: 3-finger swipe down → minimize");
-            _gesture_minimize_focused(server);
-        } else if (horizontal && gesture.dx < -SWIPE_THRESHOLD) {
-            /* 3-finger swipe LEFT — (future: prev workspace) */
-            CIOS_LOG_INFO("Gesture: 3-finger swipe left");
-        } else if (horizontal && gesture.dx > SWIPE_THRESHOLD) {
-            /* 3-finger swipe RIGHT — (future: next workspace) */
-            CIOS_LOG_INFO("Gesture: 3-finger swipe right");
+            LOG_INFO("gesture: 3-finger swipe down -> minimize");
+            gesture_action_minimize(server);
         }
     } else if (gesture.fingers == 4) {
         if (!horizontal && gesture.dy < -SWIPE_THRESHOLD) {
-            /* 4-finger swipe UP — show all windows */
-            CIOS_LOG_INFO("Gesture: 4-finger swipe up → show all");
-            _gesture_show_all_windows(server);
+            LOG_INFO("gesture: 4-finger swipe up -> show all");
+            gesture_action_show_all(server);
         }
     }
 
@@ -108,29 +91,28 @@ cleanup:
 }
 
 void gesture_pinch_begin(struct CiosServer *server, uint32_t fingers) {
+    (void)server;
     gesture.active = true;
     gesture.fingers = fingers;
     gesture.scale = 1.0;
-    CIOS_LOG_DEBUG("Gesture pinch begin: %d fingers", fingers);
 }
 
 void gesture_pinch_update(struct CiosServer *server, double scale) {
+    (void)server;
     if (!gesture.active) return;
     gesture.scale = scale;
 }
 
 void gesture_pinch_end(struct CiosServer *server) {
+    (void)server;
     if (!gesture.active) return;
 
     double delta = gesture.scale - 1.0;
-
     if (fabs(delta) > PINCH_THRESHOLD) {
         if (delta > 0) {
-            /* Pinch OUT (spread) — zoom in (future) */
-            CIOS_LOG_INFO("Gesture: pinch out → zoom in");
+            LOG_INFO("gesture: pinch out (zoom in placeholder)");
         } else {
-            /* Pinch IN (squeeze) — zoom out (future) */
-            CIOS_LOG_INFO("Gesture: pinch in → zoom out");
+            LOG_INFO("gesture: pinch in (zoom out placeholder)");
         }
     }
 
@@ -142,21 +124,19 @@ void gesture_pinch_end(struct CiosServer *server) {
  *  Gesture actions
  * ═══════════════════════════════════════════════════════════════ */
 
-static void _gesture_trigger_app_switcher(struct CiosServer *server) {
-    /* Send Alt+Tab equivalent via IPC to runtime */
+static void gesture_action_app_switcher(struct CiosServer *server) {
     if (server->ipc && server->ipc->connected) {
         ipc_send_event(server->ipc, "gesture", "{\"action\":\"app_switcher\"}");
     }
 }
 
-static void _gesture_minimize_focused(struct CiosServer *server) {
+static void gesture_action_minimize(struct CiosServer *server) {
     if (server->focused) {
         decorations_minimize(server->focused);
     }
 }
 
-static void _gesture_show_all_windows(struct CiosServer *server) {
-    /* Send show-all event via IPC */
+static void gesture_action_show_all(struct CiosServer *server) {
     if (server->ipc && server->ipc->connected) {
         ipc_send_event(server->ipc, "gesture", "{\"action\":\"show_all\"}");
     }

@@ -16,34 +16,33 @@ class TestAudioSkill:
     def test_get_volume(self):
         from cios.skills import audio
 
-        audio._backend = None  # Reset cached backend
-        with patch("shutil.which", return_value="/usr/bin/pactl"):
+        with patch.object(audio, "_backend", "pactl"):
             with patch("subprocess.run") as mock_run:
                 mock_run.return_value = MagicMock(
                     returncode=0,
-                    stdout="Volume: front-left: 45000 /  69% / -9.50 dB,   front-right: 45000 /  69% / -9.50 dB\n",
+                    stdout="Volume: front-left: 45000 /  69% / -9.50 dB,"
+                    "   front-right: 45000 /  69% / -9.50 dB\n",
                 )
-                audio._backend = "pactl"  # Force backend
                 vol = audio.get_volume()
                 assert vol == 69
 
     def test_set_volume(self):
         from cios.skills import audio
 
-        audio._backend = "pactl"
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0, stdout="")
-            steps, success, msg = audio.set_volume(80)
-            assert success is True
+        with patch.object(audio, "_backend", "pactl"):
+            with patch("subprocess.run") as mock_run:
+                mock_run.return_value = MagicMock(returncode=0, stdout="")
+                steps, success, msg = audio.set_volume(80)
+                assert success is True
 
     def test_mute(self):
         from cios.skills import audio
 
-        audio._backend = "pactl"
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0, stdout="")
-            steps, success, msg = audio.mute(True)
-            assert success is True
+        with patch.object(audio, "_backend", "pactl"):
+            with patch("subprocess.run") as mock_run:
+                mock_run.return_value = MagicMock(returncode=0, stdout="")
+                steps, success, msg = audio.mute(True)
+                assert success is True
 
 
 # ═══════════════════════════════════════════════════════════════════════════
