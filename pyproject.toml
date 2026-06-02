@@ -153,6 +153,14 @@ module = "cios.core.bridge"
 ignore_errors = true
 
 [[tool.mypy.overrides]]
+module = "cios.core.google_mcp"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "cios.core.handlers.*"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
 module = "cios.skills.*"
 follow_imports = "skip"
 

@@ -21,9 +21,16 @@ def _get_mcp_client(memory: Memory):
     """
     try:
         from cios.core.google_mcp import GoogleMCPClient
+        from cios.core.config import CIOS_HOME
+        import json
 
-        api_url = memory.get("intelligence_api_url", "https://api.cios-ai.com")
-        jwt_token = memory.get("intelligence_token", "")
+        auth_file = CIOS_HOME / "intelligence.json"
+        if not auth_file.exists():
+            return None
+
+        data = json.loads(auth_file.read_text())
+        api_url = data.get("api_url", "https://api.cios-ai.com")
+        jwt_token = data.get("token", "")
 
         if not jwt_token:
             return None

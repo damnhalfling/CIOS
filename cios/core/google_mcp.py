@@ -155,7 +155,7 @@ class GoogleMCPClient:
 
     def _get_access_token(self) -> str:
         """Get fresh Google access_token from Maestro."""
-        if self._access_token:
+        if self._access_token is not None:
             return self._access_token
 
         try:
