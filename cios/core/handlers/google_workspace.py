@@ -20,9 +20,10 @@ def _get_mcp_client(memory: Memory):
     Returns None if user is not logged into Intelligence.
     """
     try:
-        from cios.core.google_mcp import GoogleMCPClient
-        from cios.core.config import CIOS_HOME
         import json
+
+        from cios.core.config import CIOS_HOME
+        from cios.core.google_mcp import GoogleMCPClient
 
         auth_file = CIOS_HOME / "intelligence.json"
         if not auth_file.exists():
