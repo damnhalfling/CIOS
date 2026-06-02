@@ -65,6 +65,18 @@ class Sidebar(Gtk.Box):
         sep1.add_css_class("sidebar-sep")
         self.append(sep1)
 
+        # ── Background tasks (red, above history — visible while running) ──
+        self._tasks_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        self._tasks_box.set_margin_start(8)
+        self._tasks_box.set_margin_end(8)
+        self._tasks_box.set_margin_top(6)
+        self._tasks_box.set_margin_bottom(4)
+        self._tasks_box.set_visible(False)  # Hidden when no tasks
+        self.append(self._tasks_box)
+
+        self._tasks_list = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        self._tasks_box.append(self._tasks_list)
+
         # ── Message history (scrollable, fills available space) ──
         self._history_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         self._history_box.set_margin_start(8)
@@ -143,6 +155,45 @@ class Sidebar(Gtk.Box):
     def set_artifact_panel(self, panel):
         """Set reference to artifact panel for opening URLs."""
         self._artifact_panel = panel
+
+    # ── Background task management (B4 fix) ──
+
+    def add_background_task(self, task_id: str, description: str) -> None:
+        """Add a background task indicator (red, above history).
+
+        Shown while the task is running. Removed when complete.
+        """
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        row.add_css_class("task-row")
+        row.set_name(f"task_{task_id}")
+
+        spinner = Gtk.Spinner()
+        spinner.start()
+        spinner.set_size_request(12, 12)
+        row.append(spinner)
+
+        label = Gtk.Label(label=description)
+        label.set_xalign(0)
+        label.set_ellipsize(2)  # Pango.EllipsizeMode.END
+        label.add_css_class("task-label")
+        row.append(label)
+
+        self._tasks_list.append(row)
+        self._tasks_box.set_visible(True)
+
+    def remove_background_task(self, task_id: str) -> None:
+        """Remove a completed background task from the sidebar."""
+        child = self._tasks_list.get_first_child()
+        while child:
+            next_child = child.get_next_sibling()
+            if child.get_name() == f"task_{task_id}":
+                self._tasks_list.remove(child)
+                break
+            child = next_child
+
+        # Hide tasks box if empty
+        if not self._tasks_list.get_first_child():
+            self._tasks_box.set_visible(False)
 
     def refresh_history(self):
         """Reload thread history."""
@@ -538,6 +589,16 @@ class Sidebar(Gtk.Box):
             }}
             .history-row:hover {{
                 background-color: {BG_HOVER};
+            }}
+            .task-row {{
+                background-color: rgba(239, 68, 68, 0.1);
+                border: 1px solid rgba(239, 68, 68, 0.3);
+                border-radius: 6px;
+                padding: 4px 8px;
+            }}
+            .task-label {{
+                color: #ef4444;
+                font-size: 11px;
             }}
             .history-icon {{
                 color: {FG_DIM};

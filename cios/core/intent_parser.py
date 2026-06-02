@@ -1979,6 +1979,43 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
         lambda m: {"intent": "translate", "query": m.group(0)},
         0.88,
     ),
+    # --- Personal Memory (PT + EN) → routes to Intelligence ---
+    (
+        re.compile(
+            r"(?:o\s+qu[ée]\s+)?(?:voc[êe]|vc|tu)\s+(?:sabe|lembra|conhece)\s+(?:sobre|de)\s+mim",
+            re.IGNORECASE,
+        ),
+        IntentType.INTELLIGENCE,
+        lambda m: {"intent": "personal_memory", "query": m.group(0)},
+        0.95,
+    ),
+    (
+        re.compile(
+            r"(?:quem\s+(?:sou\s+eu|eu\s+sou))|(?:me\s+(?:conhece|descreve))",
+            re.IGNORECASE,
+        ),
+        IntentType.INTELLIGENCE,
+        lambda m: {"intent": "personal_memory", "query": m.group(0)},
+        0.93,
+    ),
+    (
+        re.compile(
+            r"(?:what\s+do\s+you\s+know\s+about\s+me|who\s+am\s+i|do\s+you\s+(?:know|remember)\s+me)",
+            re.IGNORECASE,
+        ),
+        IntentType.INTELLIGENCE,
+        lambda m: {"intent": "personal_memory", "query": m.group(0)},
+        0.93,
+    ),
+    (
+        re.compile(
+            r"(?:meus?\s+projetos?|my\s+projects?|quais?\s+(?:meus?|são\s+meus?)\s+projetos?)",
+            re.IGNORECASE,
+        ),
+        IntentType.INTELLIGENCE,
+        lambda m: {"intent": "projects", "query": m.group(0)},
+        0.92,
+    ),
     # --- Theming (PT + EN) ---
     (
         re.compile(

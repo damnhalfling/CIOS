@@ -2,17 +2,16 @@
 
 Resolution chain (intent-first, IA-first):
 1. Hardcoded (regex patterns, 180+ aliases) — trivial commands, zero latency
-2. Ollama (local LLM, REQUIRED) — classifies intent + resolves local commands
-3. External API (only when local can't resolve) — generates execution plans
+2. Ollama (local LLM) — classifies intent + resolves local commands
+   - ONLY used on machines with >= 16GB RAM
+   - Machines < 16GB skip Ollama and use external API directly
+3. External API (when local can't resolve or isn't available) — generates plans
    - Uses the user's preferred provider (configured once, used always)
    - Fallback order: preferred → other configured → CIOS Cloud API
 
-The external API is ONLY called when:
-- The intent requires knowledge the local model doesn't have
-- Example: installing software, factual questions, complex multi-step configs
-
 Design decisions:
-- Ollama is REQUIRED — the system doesn't operate without it
+- Ollama is OPTIONAL on low-RAM machines (< 16GB) — use external LLM instead
+- This prevents memory pressure that causes compositor lag (B6 fix)
 - User picks ONE preferred external provider (or auto-selects first available)
 - Ollama summarizes context before sending to API (token optimization)
 - CIOS Cloud API is always the final fallback (no key needed for basic tier)

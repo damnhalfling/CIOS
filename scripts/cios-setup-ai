@@ -110,9 +110,20 @@ select_model() {
         --force-low)  SELECTED_MODEL="$MODEL_LOW";  TIER="low (forced)";  return ;;
         --force-mid)  SELECTED_MODEL="$MODEL_MID";  TIER="mid (forced)";  return ;;
         --force-high) SELECTED_MODEL="$MODEL_HIGH"; TIER="high (forced)"; return ;;
+        --force-external) SELECTED_MODEL="none"; TIER="external (forced)"; return ;;
     esac
 
     # Decision tree:
+    # 0. RAM < 16GB? → SKIP local LLM entirely, use external API
+    #    This prevents memory pressure that causes compositor/mouse lag
+    if [ "$RAM_MB" -lt 16000 ]; then
+        SELECTED_MODEL="none"
+        TIER="external (RAM < 16GB — local LLM would cause lag)"
+        warn "RAM < 16GB — skipping local LLM. CIOS will use Intelligence API."
+        warn "Pattern matching (80%+ of intents) still works offline."
+        return
+    fi
+
     # 1. Not enough disk? → LOW
     if [ "$DISK_FREE_GB" -lt 3 ]; then
         SELECTED_MODEL="$MODEL_LOW"
