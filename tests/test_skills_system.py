@@ -14,30 +14,35 @@ class TestAudioSkill:
     """Test audio control skill (mocked pactl)."""
 
     def test_get_volume(self):
-        from cios.skills.audio import get_volume
+        from cios.skills import audio
 
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=0,
-                stdout="Volume: front-left: 45000 /  69% / -9.50 dB,   front-right: 45000 /  69% / -9.50 dB\n",
-            )
-            vol = get_volume()
-            assert vol == 69
+        audio._backend = None  # Reset cached backend
+        with patch("shutil.which", return_value="/usr/bin/pactl"):
+            with patch("subprocess.run") as mock_run:
+                mock_run.return_value = MagicMock(
+                    returncode=0,
+                    stdout="Volume: front-left: 45000 /  69% / -9.50 dB,   front-right: 45000 /  69% / -9.50 dB\n",
+                )
+                audio._backend = "pactl"  # Force backend
+                vol = audio.get_volume()
+                assert vol == 69
 
     def test_set_volume(self):
-        from cios.skills.audio import set_volume
+        from cios.skills import audio
 
+        audio._backend = "pactl"
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout="")
-            steps, success, msg = set_volume(80)
+            steps, success, msg = audio.set_volume(80)
             assert success is True
 
     def test_mute(self):
-        from cios.skills.audio import mute
+        from cios.skills import audio
 
+        audio._backend = "pactl"
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout="")
-            steps, success, msg = mute(True)
+            steps, success, msg = audio.mute(True)
             assert success is True
 
 
