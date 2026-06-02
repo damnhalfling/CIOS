@@ -21,7 +21,8 @@ def is_available() -> bool:
     try:
         result = subprocess.run(
             ["which", "secret-tool"],
-            capture_output=True, timeout=3,
+            capture_output=True,
+            timeout=3,
         )
         return result.returncode == 0
     except Exception:
@@ -41,8 +42,16 @@ def store_secret(service: str, username: str, secret: str) -> tuple[bool, str]:
     """
     try:
         proc = subprocess.Popen(
-            ["secret-tool", "store", "--label", f"{service}/{username}",
-             "service", service, "username", username],
+            [
+                "secret-tool",
+                "store",
+                "--label",
+                f"{service}/{username}",
+                "service",
+                service,
+                "username",
+                username,
+            ],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -68,7 +77,9 @@ def get_secret(service: str, username: str) -> str | None:
     try:
         result = subprocess.run(
             ["secret-tool", "lookup", "service", service, "username", username],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
@@ -88,7 +99,9 @@ def delete_secret(service: str, username: str) -> tuple[bool, str]:
     try:
         result = subprocess.run(
             ["secret-tool", "clear", "service", service, "username", username],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0:
             return True, f"Secret deleted for {service}/{username}."
@@ -110,6 +123,7 @@ def _store_file_fallback(service: str, username: str, secret: str) -> tuple[bool
         _SECRETS_DIR.mkdir(parents=True, exist_ok=True)
         # Simple obfuscation (not real encryption — placeholder for proper impl)
         import base64
+
         encoded = base64.b64encode(secret.encode()).decode()
         key = f"{service}_{username}"
         secrets_file = _SECRETS_DIR / "store.json"
@@ -129,6 +143,7 @@ def _get_file_fallback(service: str, username: str) -> str | None:
     """Retrieve secret from file fallback."""
     try:
         import base64
+
         secrets_file = _SECRETS_DIR / "store.json"
         if not secrets_file.exists():
             return None

@@ -147,6 +147,7 @@ def create_email_list_view(emails: list[dict], on_select=None) -> "Gtk.Widget | 
         listbox.append(row)
 
     if on_select:
+
         def _on_row_activated(lb, row):
             idx = row.get_index()
             if 0 <= idx < len(emails):

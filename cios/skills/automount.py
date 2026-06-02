@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class MountedDevice:
     """A mounted external device."""
+
     device: str  # /dev/sdb1
     label: str  # "USB_DRIVE" or partition label
     mount_point: str  # /media/user/USB_DRIVE
@@ -61,7 +62,9 @@ class AutomountWatcher:
         try:
             result = subprocess.run(
                 ["udisksctl", "mount", "-b", device],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             if result.returncode == 0:
                 # Parse mount point from output: "Mounted /dev/sdb1 at /media/user/LABEL"
@@ -93,7 +96,9 @@ class AutomountWatcher:
         try:
             result = subprocess.run(
                 ["udisksctl", "unmount", "-b", device],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             if result.returncode == 0:
                 self._mounted.pop(device, None)
@@ -146,8 +151,12 @@ class AutomountWatcher:
             icon="💾",
             source="automount",
             actions=[
-                NotificationAction(label="Montar", callback_id="automount_mount", params={"device": device}),
-                NotificationAction(label="Ignorar", callback_id="automount_ignore", params={"device": device}),
+                NotificationAction(
+                    label="Montar", callback_id="automount_mount", params={"device": device}
+                ),
+                NotificationAction(
+                    label="Ignorar", callback_id="automount_ignore", params={"device": device}
+                ),
             ],
         )
         logger.info("New device detected: %s (%s)", device, label)
@@ -171,7 +180,9 @@ class AutomountWatcher:
         try:
             result = subprocess.run(
                 ["lsblk", "-nrpo", "NAME,RM,TYPE,MOUNTPOINT"],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             for line in result.stdout.strip().split("\n"):
                 parts = line.split()
@@ -191,7 +202,9 @@ class AutomountWatcher:
         try:
             result = subprocess.run(
                 ["lsblk", "-nrpo", "LABEL,FSTYPE,SIZE", device],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             parts = result.stdout.strip().split()
             if len(parts) >= 1:

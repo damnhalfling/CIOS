@@ -24,6 +24,7 @@ TRASH_INFO = TRASH_DIR / "info"
 @dataclass
 class TrashItem:
     """An item in the trash."""
+
     name: str
     original_path: str
     deletion_date: str
@@ -116,7 +117,11 @@ def restore_file(name: str) -> tuple[list[str], bool, str]:
 
     # Check if destination already exists
     if dest.exists():
-        return steps, False, f"Já existe um arquivo em '{original_path}'. Renomeie antes de restaurar."
+        return (
+            steps,
+            False,
+            f"Já existe um arquivo em '{original_path}'. Renomeie antes de restaurar.",
+        )
 
     try:
         # Ensure parent directory exists
@@ -150,13 +155,15 @@ def list_trash() -> list[TrashItem]:
 
         size = item.stat().st_size if item.is_file() else _dir_size(item)
 
-        items.append(TrashItem(
-            name=item.name,
-            original_path=original_path,
-            deletion_date=deletion_date,
-            size=size,
-            is_dir=item.is_dir(),
-        ))
+        items.append(
+            TrashItem(
+                name=item.name,
+                original_path=original_path,
+                deletion_date=deletion_date,
+                size=size,
+                is_dir=item.is_dir(),
+            )
+        )
 
     # Sort by deletion date (most recent first)
     items.sort(key=lambda x: x.deletion_date, reverse=True)

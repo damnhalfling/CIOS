@@ -35,12 +35,14 @@ def list_users() -> list[dict]:
                     # Only real users (UID >= 1000, valid shell)
                     if uid >= 1000 and shell not in ("/usr/sbin/nologin", "/bin/false"):
                         gecos = parts[4].split(",")[0]  # Full name
-                        users.append({
-                            "username": username,
-                            "uid": uid,
-                            "name": gecos or username,
-                            "home": parts[5],
-                        })
+                        users.append(
+                            {
+                                "username": username,
+                                "uid": uid,
+                                "name": gecos or username,
+                                "home": parts[5],
+                            }
+                        )
     except Exception as e:
         logger.error("Failed to list users: %s", e)
     return users
@@ -81,7 +83,9 @@ def switch_to_user(username: str) -> tuple[list[str], bool, str]:
         # Find a free VT
         result = subprocess.run(
             ["fgconsole"],
-            capture_output=True, text=True, timeout=3,
+            capture_output=True,
+            text=True,
+            timeout=3,
         )
         current_vt = int(result.stdout.strip()) if result.returncode == 0 else 7
 
@@ -89,7 +93,8 @@ def switch_to_user(username: str) -> tuple[list[str], bool, str]:
         target_vt = 1 if current_vt != 1 else 2
         subprocess.run(
             ["sudo", "chvt", str(target_vt)],
-            capture_output=True, timeout=5,
+            capture_output=True,
+            timeout=5,
         )
         return steps, True, f"Alternado para VT{target_vt}. Faça login como {username}."
     except Exception as e:
@@ -109,7 +114,8 @@ def lock_and_switch() -> tuple[list[str], bool, str]:
         # Switch to greetd VT (VT1)
         subprocess.run(
             ["sudo", "chvt", "1"],
-            capture_output=True, timeout=5,
+            capture_output=True,
+            timeout=5,
         )
         return steps, True, "Sessão bloqueada. Tela de login exibida."
     except Exception as e:
@@ -127,10 +133,12 @@ def _switch_via_greetd(username: str) -> bool:
         sock.settimeout(5)
 
         # Create session
-        request = json.dumps({
-            "type": "create_session",
-            "username": username,
-        })
+        request = json.dumps(
+            {
+                "type": "create_session",
+                "username": username,
+            }
+        )
         _send_greetd_msg(sock, request)
         response = _recv_greetd_msg(sock)
 
@@ -139,10 +147,12 @@ def _switch_via_greetd(username: str) -> bool:
             return False
 
         # Start session with default command (cios-shell)
-        request = json.dumps({
-            "type": "start_session",
-            "cmd": ["cios-shell"],
-        })
+        request = json.dumps(
+            {
+                "type": "start_session",
+                "cmd": ["cios-shell"],
+            }
+        )
         _send_greetd_msg(sock, request)
         response = _recv_greetd_msg(sock)
 

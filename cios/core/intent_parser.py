@@ -2227,7 +2227,10 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
             re.IGNORECASE,
         ),
         IntentType.CALENDAR,
-        lambda m: {"action": "list", "days": 1 if "hoje" in m.group(0).lower() or "today" in m.group(0).lower() else 7},
+        lambda m: {
+            "action": "list",
+            "days": 1 if "hoje" in m.group(0).lower() or "today" in m.group(0).lower() else 7,
+        },
         0.93,
     ),
     (

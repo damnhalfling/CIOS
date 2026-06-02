@@ -16,9 +16,13 @@ def list_spaces(mcp_client, max_results: int = 20) -> dict[str, Any]:
         {"spaces": [{"name", "displayName", "type"}], "count": int}
     """
     try:
-        result = mcp_client.call("chat", "list_spaces", {
-            "maxResults": max_results,
-        })
+        result = mcp_client.call(
+            "chat",
+            "list_spaces",
+            {
+                "maxResults": max_results,
+            },
+        )
         return result
     except Exception as e:
         logger.error("Chat list spaces failed: %s", e)
@@ -36,10 +40,14 @@ def search_messages(mcp_client, query: str, max_results: int = 10) -> dict[str, 
         {"messages": [{"text", "sender", "space", "createTime"}], "count": int}
     """
     try:
-        result = mcp_client.call("chat", "search_messages", {
-            "query": query,
-            "maxResults": max_results,
-        })
+        result = mcp_client.call(
+            "chat",
+            "search_messages",
+            {
+                "query": query,
+                "maxResults": max_results,
+            },
+        )
         return result
     except Exception as e:
         logger.error("Chat search failed: %s", e)
@@ -57,10 +65,14 @@ def send_message(mcp_client, space: str, text: str) -> dict[str, Any]:
         {"message_id": str, "status": "sent"}
     """
     try:
-        result = mcp_client.call("chat", "create_message", {
-            "space": space,
-            "text": text,
-        })
+        result = mcp_client.call(
+            "chat",
+            "create_message",
+            {
+                "space": space,
+                "text": text,
+            },
+        )
         return result
     except Exception as e:
         logger.error("Chat send failed: %s", e)

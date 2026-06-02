@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class Printer:
     """A configured printer."""
+
     name: str
     description: str
     is_default: bool
@@ -27,7 +28,9 @@ def list_printers() -> list[Printer]:
     try:
         result = subprocess.run(
             ["lpstat", "-p", "-d"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode != 0:
             return []
@@ -39,7 +42,9 @@ def list_printers() -> list[Printer]:
 
         result2 = subprocess.run(
             ["lpstat", "-p"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         for line in result2.stdout.strip().split("\n"):
             if line.startswith("printer"):
@@ -51,12 +56,14 @@ def list_printers() -> list[Printer]:
                         state = "stopped"
                     elif "printing" in line.lower():
                         state = "printing"
-                    printers.append(Printer(
-                        name=name,
-                        description=name,
-                        is_default=name == default_name,
-                        state=state,
-                    ))
+                    printers.append(
+                        Printer(
+                            name=name,
+                            description=name,
+                            is_default=name == default_name,
+                            state=state,
+                        )
+                    )
     except Exception as e:
         logger.debug("Failed to list printers: %s", e)
     return printers
@@ -99,7 +106,9 @@ def get_queue() -> tuple[list[str], bool, str]:
     try:
         result = subprocess.run(
             ["lpstat", "-o"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0:
             output = result.stdout.strip()

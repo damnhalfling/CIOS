@@ -84,7 +84,9 @@ def backup_directory(source: str, destination: str = "") -> tuple[list[str], boo
     try:
         result = subprocess.run(
             ["rsync", "-a", "--progress", str(source_path) + "/", str(dest_path) + "/"],
-            capture_output=True, text=True, timeout=300,
+            capture_output=True,
+            text=True,
+            timeout=300,
         )
         if result.returncode == 0:
             return steps, True, f"Backup de '{source_path.name}' concluído em {dest_path}."
@@ -100,12 +102,14 @@ def list_backups() -> list[dict]:
         for item in sorted(DEFAULT_BACKUP_DIR.iterdir(), reverse=True):
             if item.is_dir():
                 size = sum(f.stat().st_size for f in item.rglob("*") if f.is_file())
-                backups.append({
-                    "name": item.name,
-                    "path": str(item),
-                    "date": item.stat().st_mtime,
-                    "size": size,
-                })
+                backups.append(
+                    {
+                        "name": item.name,
+                        "path": str(item),
+                        "date": item.stat().st_mtime,
+                        "size": size,
+                    }
+                )
     return backups[:20]
 
 
@@ -118,8 +122,16 @@ def create_system_snapshot() -> tuple[list[str], bool, str]:
     steps = ["Criando snapshot do sistema"]
     try:
         result = subprocess.run(
-            ["sudo", "timeshift", "--create", "--comments", f"CIOS backup {datetime.now().strftime('%Y-%m-%d %H:%M')}"],
-            capture_output=True, text=True, timeout=300,
+            [
+                "sudo",
+                "timeshift",
+                "--create",
+                "--comments",
+                f"CIOS backup {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=300,
         )
         if result.returncode == 0:
             return steps, True, "Snapshot do sistema criado."

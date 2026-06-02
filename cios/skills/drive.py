@@ -21,10 +21,14 @@ def search_files(mcp_client, query: str, max_results: int = 10) -> dict[str, Any
         {"files": [{"id", "name", "mimeType", "modifiedTime"}], "count": int}
     """
     try:
-        result = mcp_client.call("drive", "search_files", {
-            "query": query,
-            "maxResults": max_results,
-        })
+        result = mcp_client.call(
+            "drive",
+            "search_files",
+            {
+                "query": query,
+                "maxResults": max_results,
+            },
+        )
         return result
     except Exception as e:
         logger.error("Drive search failed: %s", e)
@@ -38,27 +42,37 @@ def read_file(mcp_client, file_id: str) -> dict[str, Any]:
         {"name": str, "content": str, "mimeType": str}
     """
     try:
-        result = mcp_client.call("drive", "read_file", {
-            "fileId": file_id,
-        })
+        result = mcp_client.call(
+            "drive",
+            "read_file",
+            {
+                "fileId": file_id,
+            },
+        )
         return result
     except Exception as e:
         logger.error("Drive read failed: %s", e)
         return {"error": str(e)}
 
 
-def create_file(mcp_client, name: str, content: str, mime_type: str = "text/plain") -> dict[str, Any]:
+def create_file(
+    mcp_client, name: str, content: str, mime_type: str = "text/plain"
+) -> dict[str, Any]:
     """Create a new file in Google Drive.
 
     Returns:
         {"file_id": str, "name": str, "webViewLink": str}
     """
     try:
-        result = mcp_client.call("drive", "create_file", {
-            "name": name,
-            "content": content,
-            "mimeType": mime_type,
-        })
+        result = mcp_client.call(
+            "drive",
+            "create_file",
+            {
+                "name": name,
+                "content": content,
+                "mimeType": mime_type,
+            },
+        )
         return result
     except Exception as e:
         logger.error("Drive create failed: %s", e)
@@ -72,9 +86,13 @@ def download_file(mcp_client, file_id: str, destination: str) -> dict[str, Any]:
         {"path": str, "size": int, "status": "downloaded"}
     """
     try:
-        result = mcp_client.call("drive", "export_file", {
-            "fileId": file_id,
-        })
+        result = mcp_client.call(
+            "drive",
+            "export_file",
+            {
+                "fileId": file_id,
+            },
+        )
         # Write content to local file
         if "content" in result:
             with open(destination, "w") as f:

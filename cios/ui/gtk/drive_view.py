@@ -198,6 +198,7 @@ def create_drive_list_view(files: list[dict], on_select=None) -> "Gtk.Widget | N
         listbox.append(row)
 
     if on_select:
+
         def _on_row_activated(lb, row):
             idx = row.get_index()
             if 0 <= idx < len(files):

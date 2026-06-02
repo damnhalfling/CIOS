@@ -49,7 +49,11 @@ def enable_night_light(temperature: int = 3500) -> tuple[list[str], bool, str]:
             _gammastep_pid = proc.pid
             return steps, True, f"Luz noturna ativada ({temperature}K)."
         except FileNotFoundError:
-            return steps, False, "gammastep ou wlsunset não instalado. Instale com: sudo apt install gammastep"
+            return (
+                steps,
+                False,
+                "gammastep ou wlsunset não instalado. Instale com: sudo apt install gammastep",
+            )
     except Exception as e:
         return steps, False, f"Erro: {e}"
 
@@ -85,7 +89,8 @@ def is_active() -> bool:
     try:
         result = subprocess.run(
             ["pgrep", "-f", "gammastep|wlsunset"],
-            capture_output=True, timeout=3,
+            capture_output=True,
+            timeout=3,
         )
         return result.returncode == 0
     except Exception:

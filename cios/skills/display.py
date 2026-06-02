@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class DisplayInfo:
     """Information about a connected display."""
+
     name: str  # e.g. "eDP-1", "HDMI-A-1"
     resolution: str  # e.g. "1920x1080"
     refresh_rate: float  # e.g. 60.0
@@ -33,7 +34,9 @@ def list_displays() -> list[DisplayInfo]:
     try:
         result = subprocess.run(
             ["wlr-randr", "--json"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0:
             data = json.loads(result.stdout)
@@ -43,15 +46,21 @@ def list_displays() -> list[DisplayInfo]:
                 modes = output.get("modes", [])
                 current_mode = next((m for m in modes if m.get("current")), None)
 
-                displays.append(DisplayInfo(
-                    name=name,
-                    resolution=f"{current_mode['width']}x{current_mode['height']}" if current_mode else "unknown",
-                    refresh_rate=current_mode.get("refresh", 60.0) / 1000 if current_mode else 60.0,
-                    scale=output.get("scale", 1.0),
-                    position=f"{output.get('x', 0)},{output.get('y', 0)}",
-                    enabled=enabled,
-                    primary=output.get("x", 0) == 0 and output.get("y", 0) == 0,
-                ))
+                displays.append(
+                    DisplayInfo(
+                        name=name,
+                        resolution=f"{current_mode['width']}x{current_mode['height']}"
+                        if current_mode
+                        else "unknown",
+                        refresh_rate=current_mode.get("refresh", 60.0) / 1000
+                        if current_mode
+                        else 60.0,
+                        scale=output.get("scale", 1.0),
+                        position=f"{output.get('x', 0)},{output.get('y', 0)}",
+                        enabled=enabled,
+                        primary=output.get("x", 0) == 0 and output.get("y", 0) == 0,
+                    )
+                )
             return displays
     except FileNotFoundError:
         logger.debug("wlr-randr not found, trying fallback")
@@ -62,7 +71,9 @@ def list_displays() -> list[DisplayInfo]:
     try:
         result = subprocess.run(
             ["wlr-randr"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0:
             displays = _parse_wlr_randr_text(result.stdout)
@@ -72,7 +83,9 @@ def list_displays() -> list[DisplayInfo]:
     return displays
 
 
-def set_resolution(output: str, width: int, height: int, refresh: float | None = None) -> tuple[bool, str]:
+def set_resolution(
+    output: str, width: int, height: int, refresh: float | None = None
+) -> tuple[bool, str]:
     """Set resolution for a display.
 
     Args:
@@ -111,7 +124,9 @@ def set_scale(output: str, scale: float) -> tuple[bool, str]:
     try:
         result = subprocess.run(
             ["wlr-randr", "--output", output, "--scale", str(scale)],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0:
             return True, f"Escala de {output} alterada para {scale}x."
@@ -134,7 +149,9 @@ def set_position(output: str, x: int, y: int) -> tuple[bool, str]:
     try:
         result = subprocess.run(
             ["wlr-randr", "--output", output, "--pos", f"{x},{y}"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0:
             return True, f"Posição de {output} alterada para ({x}, {y})."
@@ -148,7 +165,9 @@ def enable_output(output: str) -> tuple[bool, str]:
     try:
         result = subprocess.run(
             ["wlr-randr", "--output", output, "--on"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0:
             return True, f"{output} ativado."
@@ -162,7 +181,9 @@ def disable_output(output: str) -> tuple[bool, str]:
     try:
         result = subprocess.run(
             ["wlr-randr", "--output", output, "--off"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0:
             return True, f"{output} desativado."
@@ -190,14 +211,16 @@ def _parse_wlr_randr_text(output: str) -> list[DisplayInfo]:
             parts = line.split()
             if parts:
                 mode = parts[0]  # e.g. "1920x1080"
-                displays.append(DisplayInfo(
-                    name=current_name,
-                    resolution=mode,
-                    refresh_rate=60.0,
-                    scale=1.0,
-                    position="0,0",
-                    enabled=current_enabled,
-                    primary=len(displays) == 0,
-                ))
+                displays.append(
+                    DisplayInfo(
+                        name=current_name,
+                        resolution=mode,
+                        refresh_rate=60.0,
+                        scale=1.0,
+                        position="0,0",
+                        enabled=current_enabled,
+                        primary=len(displays) == 0,
+                    )
+                )
 
     return displays

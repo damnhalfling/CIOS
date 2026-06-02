@@ -20,10 +20,12 @@ class TestNotificationBus:
 
     def setup_method(self):
         from cios.infra.notifications import NotificationBus
+
         self.bus = NotificationBus()
 
     def test_notify_returns_notification(self):
         from cios.infra.notifications import NotificationType
+
         notif = self.bus.notify("Test", type=NotificationType.INFO)
         assert notif.title == "Test"
         assert notif.type == NotificationType.INFO
@@ -94,6 +96,7 @@ class TestNotificationBus:
 
     def test_progress_update(self):
         from cios.infra.notifications import NotificationType
+
         notif = self.bus.notify("Installing", type=NotificationType.PROGRESS, progress=0.0)
         self.bus.update_progress(notif.id, 0.5, "50%")
         history = self.bus.get_history()
@@ -103,6 +106,7 @@ class TestNotificationBus:
 
     def test_default_icons(self):
         from cios.infra.notifications import NotificationType
+
         notif_info = self.bus.notify("Info", type=NotificationType.INFO)
         notif_error = self.bus.notify("Error", type=NotificationType.ERROR)
         assert notif_info.icon == "ℹ️"
@@ -110,6 +114,7 @@ class TestNotificationBus:
 
     def test_action_notifications(self):
         from cios.infra.notifications import NotificationAction, NotificationType
+
         notif = self.bus.notify(
             "USB detected",
             type=NotificationType.ACTION,
@@ -120,7 +125,9 @@ class TestNotificationBus:
         assert notif.actions[0].callback_id == "mount_usb"
 
     def test_max_history_cap(self):
-        bus = __import__("cios.infra.notifications", fromlist=["NotificationBus"]).NotificationBus(max_history=5)
+        bus = __import__("cios.infra.notifications", fromlist=["NotificationBus"]).NotificationBus(
+            max_history=5
+        )
         for i in range(10):
             bus.notify(f"Notif {i}")
         history = bus.get_history(limit=100)
@@ -144,6 +151,7 @@ class TestSchedulerTimeParsing:
 
     def test_relative_minutes(self):
         from cios.skills.scheduler import parse_time_expression
+
         result = parse_time_expression("daqui a 30 minutos")
         assert result is not None
         diff = (result - datetime.now()).total_seconds()
@@ -151,6 +159,7 @@ class TestSchedulerTimeParsing:
 
     def test_relative_hours(self):
         from cios.skills.scheduler import parse_time_expression
+
         result = parse_time_expression("em 2 horas")
         assert result is not None
         diff = (result - datetime.now()).total_seconds()
@@ -158,6 +167,7 @@ class TestSchedulerTimeParsing:
 
     def test_relative_english(self):
         from cios.skills.scheduler import parse_time_expression
+
         result = parse_time_expression("in 15 minutes")
         assert result is not None
         diff = (result - datetime.now()).total_seconds()
@@ -165,6 +175,7 @@ class TestSchedulerTimeParsing:
 
     def test_absolute_time_pt(self):
         from cios.skills.scheduler import parse_time_expression
+
         result = parse_time_expression("às 17h")
         assert result is not None
         assert result.hour == 17
@@ -172,6 +183,7 @@ class TestSchedulerTimeParsing:
 
     def test_absolute_time_with_minutes(self):
         from cios.skills.scheduler import parse_time_expression
+
         result = parse_time_expression("às 14:30")
         assert result is not None
         assert result.hour == 14
@@ -179,12 +191,14 @@ class TestSchedulerTimeParsing:
 
     def test_absolute_time_en(self):
         from cios.skills.scheduler import parse_time_expression
+
         result = parse_time_expression("at 5pm")
         assert result is not None
         assert result.hour == 17
 
     def test_tomorrow(self):
         from cios.skills.scheduler import parse_time_expression
+
         result = parse_time_expression("amanhã às 9h")
         assert result is not None
         tomorrow = datetime.now() + timedelta(days=1)
@@ -193,6 +207,7 @@ class TestSchedulerTimeParsing:
 
     def test_invalid_returns_none(self):
         from cios.skills.scheduler import parse_time_expression
+
         result = parse_time_expression("qualquer coisa sem horário")
         assert result is None
 
@@ -202,6 +217,7 @@ class TestSchedulerTasks:
 
     def setup_method(self):
         from cios.skills.scheduler import Scheduler
+
         self.scheduler = Scheduler()
 
     def test_add_reminder(self):
@@ -229,7 +245,9 @@ class TestSchedulerTasks:
 
     def test_add_deferred_intent(self):
         trigger = datetime.now() + timedelta(minutes=30)
-        task = self.scheduler.add_deferred_intent("package", {"action": "install", "package": "htop"}, trigger)
+        task = self.scheduler.add_deferred_intent(
+            "package", {"action": "install", "package": "htop"}, trigger
+        )
         assert task.intent == "package"
         assert task.params["package"] == "htop"
 
@@ -244,14 +262,15 @@ class TestTheming:
 
     def test_get_current_theme_default(self):
         from cios.skills.theming import DEFAULT_THEME, get_current_theme
+
         # Without config file, should return default
         with patch("cios.skills.theming._load_config", return_value={}):
             assert get_current_theme() == DEFAULT_THEME
 
     def test_set_theme_dark(self):
         from cios.skills.theming import set_theme
-        with patch("subprocess.run") as mock_run, \
-             patch("cios.skills.theming._save_config"):
+
+        with patch("subprocess.run") as mock_run, patch("cios.skills.theming._save_config"):
             mock_run.return_value = MagicMock(returncode=0)
             success, msg = set_theme("dark")
             assert success is True
@@ -259,8 +278,8 @@ class TestTheming:
 
     def test_set_theme_light(self):
         from cios.skills.theming import set_theme
-        with patch("subprocess.run") as mock_run, \
-             patch("cios.skills.theming._save_config"):
+
+        with patch("subprocess.run") as mock_run, patch("cios.skills.theming._save_config"):
             mock_run.return_value = MagicMock(returncode=0)
             success, msg = set_theme("light")
             assert success is True
@@ -268,20 +287,25 @@ class TestTheming:
 
     def test_set_invalid_theme(self):
         from cios.skills.theming import set_theme
+
         success, msg = set_theme("neon")
         assert success is False
         assert "não existe" in msg.lower()
 
     def test_toggle_theme(self):
         from cios.skills.theming import toggle_theme
-        with patch("cios.skills.theming.get_current_theme", return_value="dark"), \
-             patch("cios.skills.theming.set_theme") as mock_set:
+
+        with (
+            patch("cios.skills.theming.get_current_theme", return_value="dark"),
+            patch("cios.skills.theming.set_theme") as mock_set,
+        ):
             mock_set.return_value = (True, "Tema alterado para Modo claro.")
             success, msg = toggle_theme()
             mock_set.assert_called_once_with("light")
 
     def test_available_themes(self):
         from cios.skills.theming import THEMES
+
         assert "dark" in THEMES
         assert "light" in THEMES
         assert len(THEMES) >= 2

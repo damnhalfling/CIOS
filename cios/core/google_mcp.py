@@ -120,7 +120,8 @@ class GoogleMCPClient:
 
             if response.status_code != 200:
                 raise GoogleMCPError(
-                    service, tool,
+                    service,
+                    tool,
                     f"HTTP {response.status_code}: {response.text[:200]}",
                 )
 
@@ -128,7 +129,9 @@ class GoogleMCPClient:
 
             if "error" in result:
                 error = result["error"]
-                raise GoogleMCPError(service, tool, f"MCP error: {error.get('message', str(error))}")
+                raise GoogleMCPError(
+                    service, tool, f"MCP error: {error.get('message', str(error))}"
+                )
 
             return result.get("result", {})
 
@@ -164,13 +167,15 @@ class GoogleMCPClient:
 
             if response.status_code == 403:
                 raise GoogleMCPError(
-                    "auth", "token",
+                    "auth",
+                    "token",
                     "Google Workspace not connected. Login to Intelligence with workspace=true.",
                 )
 
             if response.status_code != 200:
                 raise GoogleMCPError(
-                    "auth", "token",
+                    "auth",
+                    "token",
                     f"Failed to get token: HTTP {response.status_code}",
                 )
 

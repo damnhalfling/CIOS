@@ -21,10 +21,14 @@ def search_emails(mcp_client, query: str, max_results: int = 10) -> dict[str, An
         {"emails": [...], "count": int}
     """
     try:
-        result = mcp_client.call("gmail", "search_emails", {
-            "query": query,
-            "maxResults": max_results,
-        })
+        result = mcp_client.call(
+            "gmail",
+            "search_emails",
+            {
+                "query": query,
+                "maxResults": max_results,
+            },
+        )
         return result
     except Exception as e:
         logger.error("Gmail search failed: %s", e)
@@ -38,9 +42,13 @@ def read_email(mcp_client, message_id: str) -> dict[str, Any]:
         {"subject": str, "from": str, "date": str, "body": str, "labels": [...]}
     """
     try:
-        result = mcp_client.call("gmail", "read_email", {
-            "messageId": message_id,
-        })
+        result = mcp_client.call(
+            "gmail",
+            "read_email",
+            {
+                "messageId": message_id,
+            },
+        )
         return result
     except Exception as e:
         logger.error("Gmail read failed: %s", e)
@@ -54,11 +62,15 @@ def draft_email(mcp_client, to: str, subject: str, body: str) -> dict[str, Any]:
         {"draft_id": str, "status": "created"}
     """
     try:
-        result = mcp_client.call("gmail", "create_draft", {
-            "to": to,
-            "subject": subject,
-            "body": body,
-        })
+        result = mcp_client.call(
+            "gmail",
+            "create_draft",
+            {
+                "to": to,
+                "subject": subject,
+                "body": body,
+            },
+        )
         return result
     except Exception as e:
         logger.error("Gmail draft failed: %s", e)
@@ -72,10 +84,14 @@ def label_email(mcp_client, message_id: str, labels: list[str]) -> dict[str, Any
         {"status": "labeled", "labels": [...]}
     """
     try:
-        result = mcp_client.call("gmail", "modify_labels", {
-            "messageId": message_id,
-            "addLabels": labels,
-        })
+        result = mcp_client.call(
+            "gmail",
+            "modify_labels",
+            {
+                "messageId": message_id,
+                "addLabels": labels,
+            },
+        )
         return result
     except Exception as e:
         logger.error("Gmail label failed: %s", e)

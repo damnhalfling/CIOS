@@ -16,7 +16,9 @@ def get_timezone() -> str:
     try:
         result = subprocess.run(
             ["timedatectl", "show", "--property=Timezone", "--value"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0:
             return result.stdout.strip()
@@ -38,7 +40,9 @@ def set_timezone(tz: str) -> tuple[list[str], bool, str]:
     try:
         result = subprocess.run(
             ["sudo", "timedatectl", "set-timezone", tz],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         if result.returncode == 0:
             return steps, True, f"Timezone alterado para {tz}."
@@ -52,7 +56,9 @@ def list_timezones(filter_text: str = "") -> list[str]:
     try:
         result = subprocess.run(
             ["timedatectl", "list-timezones"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0:
             zones = result.stdout.strip().split("\n")
@@ -69,7 +75,9 @@ def get_locale() -> str:
     try:
         result = subprocess.run(
             ["localectl", "status"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0:
             for line in result.stdout.split("\n"):
@@ -93,7 +101,9 @@ def set_locale(locale: str) -> tuple[list[str], bool, str]:
     try:
         result = subprocess.run(
             ["sudo", "localectl", "set-locale", f"LANG={locale}"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         if result.returncode == 0:
             return steps, True, f"Locale alterado para {locale}."

@@ -21,10 +21,14 @@ def list_events(mcp_client, days: int = 7, max_results: int = 20) -> dict[str, A
         {"events": [{"id", "summary", "start", "end", "location"}], "count": int}
     """
     try:
-        result = mcp_client.call("calendar", "list_events", {
-            "daysAhead": days,
-            "maxResults": max_results,
-        })
+        result = mcp_client.call(
+            "calendar",
+            "list_events",
+            {
+                "daysAhead": days,
+                "maxResults": max_results,
+            },
+        )
         return result
     except Exception as e:
         logger.error("Calendar list failed: %s", e)
@@ -52,13 +56,17 @@ def create_event(
         {"event_id": str, "htmlLink": str, "status": "created"}
     """
     try:
-        result = mcp_client.call("calendar", "create_event", {
-            "summary": summary,
-            "start": start,
-            "end": end,
-            "description": description,
-            "location": location,
-        })
+        result = mcp_client.call(
+            "calendar",
+            "create_event",
+            {
+                "summary": summary,
+                "start": start,
+                "end": end,
+                "description": description,
+                "location": location,
+            },
+        )
         return result
     except Exception as e:
         logger.error("Calendar create failed: %s", e)
@@ -76,10 +84,14 @@ def update_event(mcp_client, event_id: str, updates: dict[str, Any]) -> dict[str
         {"event_id": str, "status": "updated"}
     """
     try:
-        result = mcp_client.call("calendar", "update_event", {
-            "eventId": event_id,
-            **updates,
-        })
+        result = mcp_client.call(
+            "calendar",
+            "update_event",
+            {
+                "eventId": event_id,
+                **updates,
+            },
+        )
         return result
     except Exception as e:
         logger.error("Calendar update failed: %s", e)

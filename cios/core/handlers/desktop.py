@@ -67,11 +67,10 @@ def handle_scheduler(intent: Intent, executor: Executor, memory: Memory) -> Plan
 
     # Extract the reminder text (remove time parts)
     import re
+
     reminder_text = text or "Lembrete"
     # Clean time expressions from the text
-    reminder_text = re.sub(
-        r"(?:às|as|at)\s+\d{1,2}(?::\d{2})?\s*h?", "", reminder_text
-    ).strip()
+    reminder_text = re.sub(r"(?:às|as|at)\s+\d{1,2}(?::\d{2})?\s*h?", "", reminder_text).strip()
     reminder_text = re.sub(
         r"(?:daqui\s+a|in|em)\s+\d+\s*(?:min|minuto|minute|hora|hour|h)", "", reminder_text
     ).strip()
@@ -156,11 +155,15 @@ def handle_trash(intent: Intent, executor: Executor, memory: Memory) -> PlanResu
 
     if action == "empty":
         steps, success, msg = empty_trash()
-        return PlanResult(plan_steps=steps, results=[], outcome="success" if success else "failure", summary=msg)
+        return PlanResult(
+            plan_steps=steps, results=[], outcome="success" if success else "failure", summary=msg
+        )
 
     elif action == "restore" and name:
         steps, success, msg = restore_file(name)
-        return PlanResult(plan_steps=steps, results=[], outcome="success" if success else "failure", summary=msg)
+        return PlanResult(
+            plan_steps=steps, results=[], outcome="success" if success else "failure", summary=msg
+        )
 
     else:
         # List trash contents
@@ -175,6 +178,7 @@ def handle_trash(intent: Intent, executor: Executor, memory: Memory) -> PlanResu
             )
 
         from cios.skills.trash import _format_size
+
         lines = [f"• {item.name} ({item.deletion_date[:10]})" for item in items[:10]]
         summary = f"Lixeira: {count} item(ns), {_format_size(total_bytes)}:\n" + "\n".join(lines)
         return PlanResult(

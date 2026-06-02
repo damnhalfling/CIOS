@@ -15,6 +15,7 @@ class TestAudioSkill:
 
     def test_get_volume(self):
         from cios.skills.audio import get_volume
+
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(
                 returncode=0,
@@ -25,6 +26,7 @@ class TestAudioSkill:
 
     def test_set_volume(self):
         from cios.skills.audio import set_volume
+
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout="")
             steps, success, msg = set_volume(80)
@@ -32,6 +34,7 @@ class TestAudioSkill:
 
     def test_mute(self):
         from cios.skills.audio import mute
+
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout="")
             steps, success, msg = mute(True)
@@ -48,11 +51,8 @@ class TestNetworkSkill:
 
     def test_list_networks(self):
         from cios.skills.network import list_networks
-        nmcli_output = (
-            "Starlink:85:WPA2\n"
-            "Vizinho:40:WPA2\n"
-            "OpenNet:60:--\n"
-        )
+
+        nmcli_output = "Starlink:85:WPA2\n" "Vizinho:40:WPA2\n" "OpenNet:60:--\n"
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout=nmcli_output)
             networks = list_networks()
@@ -60,6 +60,7 @@ class TestNetworkSkill:
 
     def test_connect_network(self):
         from cios.skills.network import connect
+
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(
                 returncode=0,
@@ -70,6 +71,7 @@ class TestNetworkSkill:
 
     def test_get_current_connection(self):
         from cios.skills.network import get_current_connection
+
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(
                 returncode=0,
@@ -91,6 +93,7 @@ class TestDisplaySkill:
 
     def test_set_resolution(self):
         from cios.skills.display import set_resolution
+
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
             success, msg = set_resolution("eDP-1", 1920, 1080)
@@ -99,6 +102,7 @@ class TestDisplaySkill:
 
     def test_set_resolution_failure(self):
         from cios.skills.display import set_resolution
+
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="Mode not found")
             success, msg = set_resolution("eDP-1", 9999, 9999)
@@ -106,6 +110,7 @@ class TestDisplaySkill:
 
     def test_set_scale(self):
         from cios.skills.display import set_scale
+
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
             success, msg = set_scale("eDP-1", 1.5)
@@ -114,6 +119,7 @@ class TestDisplaySkill:
 
     def test_set_position(self):
         from cios.skills.display import set_position
+
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
             success, msg = set_position("HDMI-A-1", 1920, 0)
@@ -121,6 +127,7 @@ class TestDisplaySkill:
 
     def test_enable_output(self):
         from cios.skills.display import enable_output
+
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
             success, msg = enable_output("HDMI-A-1")
@@ -128,6 +135,7 @@ class TestDisplaySkill:
 
     def test_disable_output(self):
         from cios.skills.display import disable_output
+
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
             success, msg = disable_output("HDMI-A-1")
@@ -144,6 +152,7 @@ class TestAutomountSkill:
 
     def test_mount_device_success(self):
         from cios.skills.automount import AutomountWatcher
+
         watcher = AutomountWatcher()
 
         with patch("subprocess.run") as mock_run:
@@ -160,6 +169,7 @@ class TestAutomountSkill:
 
     def test_mount_device_failure(self):
         from cios.skills.automount import AutomountWatcher
+
         watcher = AutomountWatcher()
 
         with patch("subprocess.run") as mock_run:
@@ -169,6 +179,7 @@ class TestAutomountSkill:
 
     def test_unmount_device(self):
         from cios.skills.automount import AutomountWatcher
+
         watcher = AutomountWatcher()
 
         with patch("subprocess.run") as mock_run:
@@ -178,13 +189,11 @@ class TestAutomountSkill:
 
     def test_scan_removable_devices(self):
         from cios.skills.automount import AutomountWatcher
+
         watcher = AutomountWatcher()
 
         lsblk_output = (
-            "/dev/sda 0 disk \n"
-            "/dev/sda1 0 part /\n"
-            "/dev/sdb 1 disk \n"
-            "/dev/sdb1 1 part \n"
+            "/dev/sda 0 disk \n" "/dev/sda1 0 part /\n" "/dev/sdb 1 disk \n" "/dev/sdb1 1 part \n"
         )
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout=lsblk_output)
@@ -194,6 +203,7 @@ class TestAutomountSkill:
 
     def test_list_mounted_empty(self):
         from cios.skills.automount import AutomountWatcher
+
         watcher = AutomountWatcher()
         assert watcher.list_mounted() == []
 
@@ -208,6 +218,7 @@ class TestFileSearchSkill:
 
     def test_search_files_by_name(self):
         from cios.skills.file_search import search_files
+
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(
                 returncode=0,
@@ -220,6 +231,7 @@ class TestFileSearchSkill:
 
     def test_search_no_results(self):
         from cios.skills.file_search import search_files
+
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout="")
             result = search_files("nonexistent_file_xyz")

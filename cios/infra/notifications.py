@@ -43,6 +43,7 @@ class NotificationType(Enum):
 @dataclass
 class NotificationAction:
     """An action button on a notification."""
+
     label: str
     callback_id: str  # Identifier for the action (handler resolves)
     params: dict = field(default_factory=dict)
@@ -51,6 +52,7 @@ class NotificationAction:
 @dataclass
 class Notification:
     """A single notification."""
+
     id: str
     type: NotificationType
     title: str
@@ -200,9 +202,9 @@ class NotificationBus:
         now = time.time()
         with self._lock:
             return sum(
-                1 for n in self._history
-                if not n.dismissed and not n.read
-                and (not n.expires_at or n.expires_at > now)
+                1
+                for n in self._history
+                if not n.dismissed and not n.read and (not n.expires_at or n.expires_at > now)
             )
 
     def update_progress(self, notif_id: str, progress: float, body: str = "") -> None:

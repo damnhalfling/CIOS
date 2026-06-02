@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ScheduledTask:
     """A scheduled task/reminder."""
+
     id: str
     title: str
     trigger_at: datetime
@@ -63,7 +64,9 @@ class Scheduler:
             self._thread.join(timeout=5)
         logger.info("Scheduler stopped")
 
-    def add_reminder(self, title: str, trigger_at: datetime, recurring: str | None = None) -> ScheduledTask:
+    def add_reminder(
+        self, title: str, trigger_at: datetime, recurring: str | None = None
+    ) -> ScheduledTask:
         """Add a reminder that fires a notification at the specified time."""
         with self._lock:
             self._counter += 1

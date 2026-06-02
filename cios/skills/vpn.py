@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class VPNConnection:
     """A VPN connection."""
+
     name: str
     type: str  # "wireguard" | "openvpn" | "nmcli"
     active: bool
@@ -36,17 +37,21 @@ def list_vpns() -> list[VPNConnection]:
     try:
         result = subprocess.run(
             ["nmcli", "-t", "-f", "NAME,TYPE,ACTIVE", "connection", "show"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0:
             for line in result.stdout.strip().split("\n"):
                 parts = line.split(":")
                 if len(parts) >= 3 and "vpn" in parts[1].lower():
-                    vpns.append(VPNConnection(
-                        name=parts[0],
-                        type="nmcli",
-                        active=parts[2].lower() == "yes",
-                    ))
+                    vpns.append(
+                        VPNConnection(
+                            name=parts[0],
+                            type="nmcli",
+                            active=parts[2].lower() == "yes",
+                        )
+                    )
     except Exception as e:
         logger.debug("nmcli VPN list failed: %s", e)
 
@@ -58,12 +63,14 @@ def list_vpns() -> list[VPNConnection]:
             # Check if interface is active
             active = _is_wg_active(name)
             if not any(v.name == name for v in vpns):
-                vpns.append(VPNConnection(
-                    name=name,
-                    type="wireguard",
-                    active=active,
-                    interface=name,
-                ))
+                vpns.append(
+                    VPNConnection(
+                        name=name,
+                        type="wireguard",
+                        active=active,
+                        interface=name,
+                    )
+                )
 
     return vpns
 
@@ -86,7 +93,11 @@ def connect_vpn(name: str = "") -> tuple[list[str], bool, str]:
         if not inactive:
             if vpns:
                 return steps, False, "Todas as VPNs já estão conectadas."
-            return steps, False, "Nenhuma VPN configurada. Configure em /etc/wireguard/ ou via nmcli."
+            return (
+                steps,
+                False,
+                "Nenhuma VPN configurada. Configure em /etc/wireguard/ ou via nmcli.",
+            )
         name = inactive[0].name
         vpn_type = inactive[0].type
     else:
@@ -100,7 +111,9 @@ def connect_vpn(name: str = "") -> tuple[list[str], bool, str]:
         try:
             result = subprocess.run(
                 ["sudo", "wg-quick", "up", name],
-                capture_output=True, text=True, timeout=15,
+                capture_output=True,
+                text=True,
+                timeout=15,
             )
             if result.returncode == 0:
                 return steps, True, f"VPN '{name}' conectada (WireGuard)."
@@ -113,7 +126,9 @@ def connect_vpn(name: str = "") -> tuple[list[str], bool, str]:
     try:
         result = subprocess.run(
             ["nmcli", "connection", "up", name],
-            capture_output=True, text=True, timeout=15,
+            capture_output=True,
+            text=True,
+            timeout=15,
         )
         if result.returncode == 0:
             return steps, True, f"VPN '{name}' conectada."
@@ -178,7 +193,9 @@ def _is_wg_active(interface: str) -> bool:
     try:
         result = subprocess.run(
             ["ip", "link", "show", interface],
-            capture_output=True, text=True, timeout=3,
+            capture_output=True,
+            text=True,
+            timeout=3,
         )
         return result.returncode == 0
     except Exception:
@@ -191,7 +208,9 @@ def _disconnect_single(vpn: VPNConnection) -> bool:
         try:
             result = subprocess.run(
                 ["sudo", "wg-quick", "down", vpn.name],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             return result.returncode == 0
         except Exception:
@@ -201,7 +220,9 @@ def _disconnect_single(vpn: VPNConnection) -> bool:
     try:
         result = subprocess.run(
             ["nmcli", "connection", "down", vpn.name],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         return result.returncode == 0
     except Exception:

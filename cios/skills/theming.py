@@ -58,8 +58,15 @@ def set_theme(theme_name: str) -> tuple[bool, str]:
     # Apply GTK4 color scheme via gsettings
     try:
         subprocess.run(
-            ["gsettings", "set", "org.gnome.desktop.interface", "color-scheme", theme["color_scheme"]],
-            capture_output=True, timeout=5,
+            [
+                "gsettings",
+                "set",
+                "org.gnome.desktop.interface",
+                "color-scheme",
+                theme["color_scheme"],
+            ],
+            capture_output=True,
+            timeout=5,
         )
     except Exception as e:
         logger.debug("gsettings color-scheme failed (expected on non-GNOME): %s", e)
@@ -68,7 +75,8 @@ def set_theme(theme_name: str) -> tuple[bool, str]:
     try:
         subprocess.run(
             ["gsettings", "set", "org.gnome.desktop.interface", "gtk-theme", theme["gtk_theme"]],
-            capture_output=True, timeout=5,
+            capture_output=True,
+            timeout=5,
         )
     except Exception as e:
         logger.debug("gsettings gtk-theme failed: %s", e)
