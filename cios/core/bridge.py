@@ -658,7 +658,7 @@ class CIOSBridge:
 
             return {
                 "steps": [f"⟳ {task.description}"],
-                "result": f"Executando em background... (task {task_id})",
+                "result": f"Executando em background: {task.description}",
                 "status": "background",
                 "confirm": None,
                 "voice_mode": "brief",
