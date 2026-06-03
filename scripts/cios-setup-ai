@@ -325,6 +325,22 @@ main() {
     info "Selected model: $SELECTED_MODEL (tier: $TIER)"
     echo ""
 
+    # 3-7: Skip Ollama entirely if external mode (RAM < 16GB)
+    if [ "$SELECTED_MODEL" = "none" ]; then
+        ok "External mode — no local model needed"
+        update_cios_settings "none"
+        echo ""
+        echo "═══════════════════════════════════════════"
+        echo "  ✓ AI backend ready (external mode)"
+        echo ""
+        echo "  Pattern matching (80%+ of intents) works offline."
+        echo "  LLM queries will use CIOS Intelligence API."
+        echo "  Connect to Intelligence for full functionality."
+        echo "═══════════════════════════════════════════"
+        echo ""
+        return 0
+    fi
+
     # 3. Ensure Ollama
     ensure_ollama_installed
     ensure_ollama_running
