@@ -494,11 +494,15 @@ class CIOSApplication(Gtk.Application):
         self._sidebar.refresh_history()
 
     def _finish_streaming_background(self, message: str, task_id: str):
-        """Show background task progress."""
+        """Show background task progress in chat + sidebar."""
         progress_bubble = self._chat_feed.add_progress_message(message)
         self._input.set_sensitive(True)
         self._input.grab_focus()
         self._busy = False
+
+        # Add to sidebar (red indicator)
+        if task_id and self._sidebar:
+            self._sidebar.add_background_task(task_id, message)
 
         if task_id:
             GLib.timeout_add(2000, self._poll_task_chat, task_id, progress_bubble)
@@ -577,6 +581,9 @@ class CIOSApplication(Gtk.Application):
             self._remove_bubble(progress_bubble)
             self._chat_feed.add_assistant_message(result_text)
             self._sidebar.refresh_history()
+            # Remove from sidebar background tasks
+            if self._sidebar:
+                self._sidebar.remove_background_task(task_id)
             return False
 
         return True
