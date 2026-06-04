@@ -27,7 +27,6 @@ from cios.core.humanizer import humanize_error, humanize_result
 from cios.core.intent_classifier import classify_intent, learn_from_success
 from cios.core.intent_parser import Intent, IntentType, parse_intent
 from cios.core.memory import Memory
-from cios.core.model_router import resolve_unknown_intent
 from cios.core.planner import Planner, PlanResult
 from cios.core.thread_manager import (
     ThreadManager,
@@ -309,11 +308,6 @@ class CIOSBridge:
                 raise _CancelledError()
             # Priority 1: If Intelligence is logged in, ask cloud directly (fastest path)
             from cios.core.intelligence import intelligence
-            from cios.core.model_router import (
-                has_external_provider,
-                is_any_provider_available,
-                request_execution_plan,
-            )
 
             if intelligence.is_logged_in:
                 signal_topbar_processing("Consultando inteligência…")
@@ -448,7 +442,6 @@ class CIOSBridge:
         if intent.type == IntentType.UNKNOWN:
             # Priority 1: If Intelligence is logged in, ask cloud directly
             from cios.core.intelligence import intelligence
-            from cios.core.model_router import is_any_provider_available
 
             if intelligence.is_logged_in:
                 if on_step:

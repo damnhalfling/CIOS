@@ -229,117 +229,10 @@ fi
 echo "[CIOS] ✓ Python environment ready"
 
 # ══════════════════════════════════════════════════
-#  2. Ollama + AI model (hardware-aware selection)
+#  2. greetd + session (CRITICAL — must complete for boot)
 # ══════════════════════════════════════════════════
 
-echo "[CIOS] [2/6] AI backend (Ollama + auto-selected model)..."
-
-if ! command -v ollama &>/dev/null; then
-    echo "[CIOS]   Downloading Ollama..."
-    curl -fsSL https://ollama.com/install.sh | sh || {
-        echo "[CIOS] ✗ FAILED to install Ollama."
-        echo "[CIOS]   CIOS requires Ollama. Install manually:"
-        echo "[CIOS]   curl -fsSL https://ollama.com/install.sh | sh"
-        exit 1
-    }
-fi
-
-# Run hardware-aware model selection
-if [ -x /usr/local/bin/cios-setup-ai ]; then
-    /usr/local/bin/cios-setup-ai
-else
-    # Fallback: inline hardware detection
-    systemctl start ollama 2>/dev/null || (ollama serve &>/dev/null & sleep 3)
-
-    RAM_MB=$(awk '/MemTotal/ {printf "%d", $2/1024}' /proc/meminfo 2>/dev/null || echo 4096)
-    CPU_CORES=$(nproc 2>/dev/null || echo 2)
-    CPU_BOGOMIPS=$(awk '/bogomips/ {printf "%d", $3; exit}' /proc/cpuinfo 2>/dev/null || echo 0)
-    CPU_SCORE=$(( CPU_CORES * CPU_BOGOMIPS / 1000 ))
-    DISK_FREE_GB=$(df -BG / 2>/dev/null | awk 'NR==2 {gsub("G",""); print $4}' || echo 10)
-
-    # Select model based on hardware
-    if [ "$CPU_CORES" -ge 8 ] && [ "$RAM_MB" -ge 12000 ] && [ "$CPU_SCORE" -ge 40 ]; then
-        AI_MODEL="mistral"
-    elif [ "$CPU_CORES" -ge 4 ] && [ "$RAM_MB" -ge 7000 ] && [ "$CPU_SCORE" -ge 20 ] && [ "$DISK_FREE_GB" -ge 5 ]; then
-        AI_MODEL="qwen2:7b"
-    else
-        AI_MODEL="qwen2:1.5b"
-    fi
-
-    echo "[CIOS]   Hardware: ${CPU_CORES} cores, ${RAM_MB}MB RAM, score=${CPU_SCORE}"
-    echo "[CIOS]   Selected model: ${AI_MODEL}"
-    echo "[CIOS]   Downloading ${AI_MODEL}..."
-
-    if ! ollama pull "$AI_MODEL"; then
-        echo "[CIOS] ✗ FAILED to download model."
-        echo "[CIOS]   Run manually: sudo cios-setup-ai"
-        exit 1
-    fi
-
-    # Update settings for the first user
-    CIOS_USER=$(awk -F: '$3 >= 1000 && $3 < 65000 {print $1; exit}' /etc/passwd)
-    if [ -n "$CIOS_USER" ]; then
-        CIOS_HOME=$(eval echo "~$CIOS_USER")
-        mkdir -p "$CIOS_HOME/.cios"
-        echo "{\"ollama_model\": \"$AI_MODEL\"}" > "$CIOS_HOME/.cios/settings.json"
-        chown -R "$CIOS_USER:$CIOS_USER" "$CIOS_HOME/.cios"
-        chmod 600 "$CIOS_HOME/.cios/settings.json"
-    fi
-fi
-
-echo "[CIOS] ✓ AI backend ready"
-
-# ══════════════════════════════════════════════════
-#  3. Piper TTS (mandatory voice output)
-# ══════════════════════════════════════════════════
-
-echo "[CIOS] [3/6] Piper TTS (opcional)..."
-
-if ! command -v piper &>/dev/null; then
-    PIPER_VERSION="2023.11.14-2"
-    PIPER_URL="https://github.com/rhasspy/piper/releases/download/${PIPER_VERSION}/piper_linux_x86_64.tar.gz"
-    curl -fsSL "$PIPER_URL" -o /tmp/piper.tar.gz && {
-        tar -xzf /tmp/piper.tar.gz -C /usr/local/bin/ --strip-components=1 piper/piper
-        rm -f /tmp/piper.tar.gz
-
-        mkdir -p /usr/share/piper/voices
-        VOICE_URL="https://huggingface.co/rhasspy/piper-voices/resolve/main/pt/pt_BR/faber/medium/pt_BR-faber-medium.onnx"
-        curl -fsSL "$VOICE_URL" -o /usr/share/piper/voices/pt_BR-faber-medium.onnx || true
-        curl -fsSL "${VOICE_URL}.json" -o /usr/share/piper/voices/pt_BR-faber-medium.onnx.json || true
-        echo "[CIOS] ✓ Piper TTS ready"
-    } || {
-        echo "[CIOS] ⚠ Piper não instalado (sem rede ou sem espaço)."
-        echo "[CIOS]   Voz não disponível. O CIOS funciona normalmente sem TTS."
-    }
-else
-    echo "[CIOS] ✓ Piper já instalado"
-fi
-
-# ══════════════════════════════════════════════════
-#  4. Whisper STT (optional voice input)
-# ══════════════════════════════════════════════════
-
-echo "[CIOS] [4/6] Whisper STT (opcional)..."
-
-if ! command -v whisper &>/dev/null; then
-    echo "[CIOS]   Tentando instalar Whisper + PyTorch..."
-    /usr/share/cios/.venv/bin/pip install --no-cache-dir openai-whisper 2>/dev/null && {
-        ln -sf /usr/share/cios/.venv/bin/whisper /usr/local/bin/whisper
-        echo "[CIOS] ✓ Whisper STT ready"
-    } || {
-        echo "[CIOS] ⚠ Whisper não instalado (sem espaço ou sem rede)."
-        echo "[CIOS]   Voz não disponível. Instale depois: pip install openai-whisper"
-        echo "[CIOS]   O CIOS funciona normalmente sem voz."
-    }
-else
-    echo "[CIOS] ✓ Whisper já instalado"
-fi
-
-# ══════════════════════════════════════════════════
-#  5. greetd + session (Wayland-only, no X11)
-# ══════════════════════════════════════════════════
-
-echo "[CIOS] [5/6] Display manager (greetd)..."
+echo "[CIOS] [2/6] Display manager (greetd)..."
 
 # Kill and disable any other DM — they conflict with CIOS
 for dm in lightdm gdm gdm3 sddm; do
@@ -383,10 +276,10 @@ done
 echo "[CIOS] ✓ greetd configured (Wayland-only)"
 
 # ══════════════════════════════════════════════════
-#  6. Plymouth + GRUB (boot experience)
+#  3. Plymouth + GRUB (boot experience)
 # ══════════════════════════════════════════════════
 
-echo "[CIOS] [6/6] Boot experience (Plymouth + GRUB)..."
+echo "[CIOS] [3/6] Boot experience (Plymouth + GRUB)..."
 
 # Plymouth — universal approach (works on Ubuntu, Debian, Fedora)
 CIOS_PLYMOUTH="/usr/share/plymouth/themes/cios/cios.plymouth"
@@ -441,6 +334,48 @@ if [ -f /etc/default/grub ]; then
 fi
 
 echo "[CIOS] ✓ Boot configured"
+
+# ══════════════════════════════════════════════════
+#  4-6. AI + Voice (OPTIONAL — failures don't break install)
+# ══════════════════════════════════════════════════
+
+echo "[CIOS] [4/6] AI backend (Ollama + auto-selected model)..."
+
+# Run hardware-aware model selection (non-fatal)
+if [ -x /usr/local/bin/cios-setup-ai ]; then
+    /usr/local/bin/cios-setup-ai || echo "[CIOS] ⚠ AI setup had issues (non-fatal). Run: sudo cios-setup-ai"
+else
+    echo "[CIOS] ⚠ cios-setup-ai not found, skipping AI setup"
+fi
+
+echo "[CIOS] [5/6] Piper TTS (opcional)..."
+
+if ! command -v piper &>/dev/null; then
+    PIPER_VERSION="2023.11.14-2"
+    PIPER_URL="https://github.com/rhasspy/piper/releases/download/${PIPER_VERSION}/piper_linux_x86_64.tar.gz"
+    curl -fsSL "$PIPER_URL" -o /tmp/piper.tar.gz && {
+        tar -xzf /tmp/piper.tar.gz -C /usr/local/bin/ --strip-components=1 piper/piper
+        rm -f /tmp/piper.tar.gz
+        mkdir -p /usr/share/piper/voices
+        VOICE_URL="https://huggingface.co/rhasspy/piper-voices/resolve/main/pt/pt_BR/faber/medium/pt_BR-faber-medium.onnx"
+        curl -fsSL "$VOICE_URL" -o /usr/share/piper/voices/pt_BR-faber-medium.onnx || true
+        curl -fsSL "${VOICE_URL}.json" -o /usr/share/piper/voices/pt_BR-faber-medium.onnx.json || true
+        echo "[CIOS] ✓ Piper TTS ready"
+    } || echo "[CIOS] ⚠ Piper não instalado (não afeta o sistema)"
+else
+    echo "[CIOS] ✓ Piper já instalado"
+fi
+
+echo "[CIOS] [6/6] Whisper STT (opcional)..."
+
+if ! command -v whisper &>/dev/null; then
+    /usr/share/cios/.venv/bin/pip install --no-cache-dir openai-whisper 2>/dev/null && {
+        ln -sf /usr/share/cios/.venv/bin/whisper /usr/local/bin/whisper
+        echo "[CIOS] ✓ Whisper STT ready"
+    } || echo "[CIOS] ⚠ Whisper não instalado (não afeta o sistema)"
+else
+    echo "[CIOS] ✓ Whisper já instalado"
+fi
 
 # ══════════════════════════════════════════════════
 #  OS Identity

@@ -310,7 +310,6 @@ class TestConversationContextPendingQuestion:
             with (
                 patch("cios.core.bridge.parse_intent", return_value=intent),
                 patch("cios.core.bridge.classify_intent", return_value=None),
-                patch("cios.core.bridge.resolve_unknown_intent", return_value=None),
             ):
                 result = bridge.execute_command("abrir")
 
@@ -380,7 +379,6 @@ class TestConversationContextPendingQuestion:
             with (
                 patch("cios.core.bridge.parse_intent", return_value=intent),
                 patch("cios.core.bridge.classify_intent", return_value=None),
-                patch("cios.core.bridge.resolve_unknown_intent", return_value=None),
             ):
                 result = bridge.execute_command("matar processo")
 
@@ -450,7 +448,6 @@ class TestConversationContextPendingQuestion:
             with (
                 patch("cios.core.bridge.parse_intent", return_value=intent),
                 patch("cios.core.bridge.classify_intent", return_value=None),
-                patch("cios.core.bridge.resolve_unknown_intent", return_value=None),
             ):
                 result = bridge.execute_command("organizar")
 
@@ -524,7 +521,6 @@ class TestConversationContextPendingQuestion:
             with (
                 patch("cios.core.bridge.parse_intent", return_value=intent),
                 patch("cios.core.bridge.classify_intent", return_value=None),
-                patch("cios.core.bridge.resolve_unknown_intent", return_value=None),
             ):
                 bridge.execute_command(intent.raw_input)
 
