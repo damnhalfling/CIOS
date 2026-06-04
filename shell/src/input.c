@@ -477,6 +477,22 @@ static void handle_new_keyboard(struct CiosServer *server,
     wlr_seat_set_keyboard(server->seat, keyboard);
 
     LOG_INFO("keyboard configured: %s", device->name ? device->name : "(unnamed)");
+
+    /* If there's a focused surface waiting for keyboard, send enter now.
+     * This fixes the race condition where a surface maps before any keyboard
+     * is configured — the greeter gets focus but no keyboard_enter. */
+    if (server->focused) {
+        struct wlr_surface *focused_wlr = NULL;
+        if (server->focused->xdg_toplevel) {
+            focused_wlr = server->focused->xdg_toplevel->base->surface;
+        } else if (server->focused->xsurface && server->focused->xsurface->surface) {
+            focused_wlr = server->focused->xsurface->surface;
+        }
+        if (focused_wlr) {
+            wlr_seat_keyboard_notify_enter(server->seat, focused_wlr,
+                keyboard->keycodes, keyboard->num_keycodes, &keyboard->modifiers);
+        }
+    }
 }
 
 /*

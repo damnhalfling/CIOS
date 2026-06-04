@@ -208,6 +208,12 @@ void server_focus_xdg_surface(struct CiosServer *server, struct CiosSurface *sur
     if (keyboard) {
         wlr_seat_keyboard_notify_enter(server->seat, wlr_surface,
             keyboard->keycodes, keyboard->num_keycodes, &keyboard->modifiers);
+    } else {
+        /* Keyboard may not be ready yet (race condition during boot).
+         * Set pointer focus as fallback — keyboard focus will be set
+         * when the next key event arrives (input.c forwards to focused surface). */
+        wlr_seat_pointer_notify_enter(server->seat, wlr_surface, 0, 0);
+        LOG_INFO("xdg focus: keyboard not ready, set pointer focus as fallback");
     }
 }
 
