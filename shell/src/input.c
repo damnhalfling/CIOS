@@ -294,13 +294,18 @@ static void handle_cursor_button(struct wl_listener *listener, void *data) {
                 } else if (hit == CIOS_DECO_MAXIMIZE) {
                     LOG_INFO("decoration click: maximize s_%u", surf->id);
                     struct CiosOutput *primary = output_get_primary(server);
-                    if (primary && surf->xsurface) {
+                    if (primary) {
                         int y_off = CIOS_TITLEBAR_HEIGHT;
                         wlr_scene_node_set_position(&surf->scene_tree->node,
                             primary->usable_x, primary->usable_y + y_off);
-                        wlr_xwayland_surface_configure(surf->xsurface,
-                            primary->usable_x, primary->usable_y + y_off,
-                            primary->usable_width, primary->usable_height - y_off);
+                        if (surf->xsurface) {
+                            wlr_xwayland_surface_configure(surf->xsurface,
+                                primary->usable_x, primary->usable_y + y_off,
+                                primary->usable_width, primary->usable_height - y_off);
+                        } else if (surf->xdg_toplevel) {
+                            wlr_xdg_toplevel_set_size(surf->xdg_toplevel,
+                                primary->usable_width, primary->usable_height - y_off);
+                        }
                         decorations_update_size(surf, primary->usable_width);
                     }
                     return;
