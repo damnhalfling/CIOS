@@ -240,11 +240,11 @@ static void handle_cursor_button(struct wl_listener *listener, void *data) {
         double sx, sy;
         struct wlr_surface *wlr_surface = NULL;
 
-        /* Super+Left click: start drag on any surface (no titlebar needed) */
+        /* Super+Left click OR Alt+Left click: start drag on any surface */
         if (event->button == BTN_LEFT) {
             struct wlr_keyboard *kb = wlr_seat_get_keyboard(server->seat);
             uint32_t mods = kb ? wlr_keyboard_get_modifiers(kb) : 0;
-            if (mods & WLR_MODIFIER_LOGO) {
+            if ((mods & WLR_MODIFIER_LOGO) || (mods & WLR_MODIFIER_ALT)) {
                 struct CiosSurface *surface = surface_at(server,
                     server->cursor->x, server->cursor->y,
                     &wlr_surface, &sx, &sy);
