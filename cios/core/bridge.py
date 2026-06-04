@@ -347,33 +347,25 @@ class CIOSBridge:
                 except Exception as e:
                     logger.debug("Intelligence query failed: %s", e)
 
-            # Priority 2: Try local classifier (cache + Ollama)
+            # Priority 2: Try local classifier (cache + Ollama for CLASSIFICATION only)
             signal_topbar_processing("Classificando…")
             classified = classify_intent(resolved_input)
             if classified:
                 intent = classified
-            elif is_any_provider_available():
-                if self._cancelled:
-                    raise _CancelledError()
-                signal_topbar_processing("Consultando IA…")
-                resolved = resolve_unknown_intent(resolved_input)
-                if self._cancelled:
-                    raise _CancelledError()
-                if resolved:
-                    intent = resolved
-                else:
-                    if has_external_provider():
-                        signal_topbar_processing("Gerando plano…")
-                        plan = request_execution_plan(resolved_input)
-                        if self._cancelled:
-                            raise _CancelledError()
-                        if plan:
-                            signal_topbar_idle()
-                            return self._execution_plan_response(plan)
-                    signal_topbar_idle()
-                    return self._unknown_intent_response()
             else:
+                # No Intelligence + classifier couldn't resolve = can't help
+                # Ollama is ONLY for classification, NEVER for generating answers
                 signal_topbar_idle()
+                if not intelligence.is_logged_in:
+                    return {
+                        "steps": [],
+                        "result": "Não consegui entender como comando. "
+                        "Para perguntas e conversas, conecte ao CIOS Intelligence "
+                        "(área de login na sidebar).",
+                        "status": "info",
+                        "confirm": None,
+                        "voice_mode": "full",
+                    }
                 return self._unknown_intent_response()
 
         # (#75) Check if intent needs clarification
@@ -495,17 +487,19 @@ class CIOSBridge:
             classified = classify_intent(resolved_input)
             if classified:
                 intent = classified
-            elif is_any_provider_available():
-                if on_step:
-                    on_step("Consultando IA…", 1, 0)
-                resolved = resolve_unknown_intent(resolved_input)
-                if resolved:
-                    intent = resolved
-                else:
-                    signal_topbar_idle()
-                    return self._unknown_intent_response()
             else:
+                # No Intelligence + classifier couldn't resolve = can't help
                 signal_topbar_idle()
+                if not intelligence.is_logged_in:
+                    return {
+                        "steps": [],
+                        "result": "Não consegui entender como comando. "
+                        "Para perguntas e conversas, conecte ao CIOS Intelligence "
+                        "(área de login na sidebar).",
+                        "status": "info",
+                        "confirm": None,
+                        "voice_mode": "full",
+                    }
                 return self._unknown_intent_response()
 
         # (#75) Clarification
