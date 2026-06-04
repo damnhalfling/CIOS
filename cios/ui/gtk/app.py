@@ -700,9 +700,7 @@ class CIOSApplication(Gtk.Application):
 
                         # Background task (e.g. apt install after sudo)
                         if status == "background" and task_id:
-                            GLib.idle_add(
-                                self._finish_streaming_background, result, task_id
-                            )
+                            GLib.idle_add(self._finish_streaming_background, result, task_id)
                             GLib.idle_add(self._remove_bubble, progress)
                             return
                     except Exception as e:
