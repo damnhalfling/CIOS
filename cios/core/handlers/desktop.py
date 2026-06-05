@@ -237,7 +237,9 @@ def handle_briefing(intent: Intent, executor: Executor, memory: Memory) -> PlanR
     # Emails
     emails = data.get("emails", [])
     if emails:
-        lines.append(f"📧 {len(emails)} email{'s' if len(emails) > 1 else ''} importante{'s' if len(emails) > 1 else ''}:")
+        lines.append(
+            f"📧 {len(emails)} email{'s' if len(emails) > 1 else ''} importante{'s' if len(emails) > 1 else ''}:"
+        )
         for e in emails:
             priority_marker = "●" if e.get("priority") == "high" else "○"
             lines.append(f"   {priority_marker} {e['subject'][:50]} — {e.get('from', '')[:30]}")

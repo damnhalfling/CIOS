@@ -377,25 +377,50 @@ class Sidebar(Gtk.Box):
         try:
             from cios.core.intelligence import intelligence
 
+            # Get the intelligence card frame for styling
+            login_frame = self._intelligence_status.get_parent().get_parent()
+
             if intelligence.is_logged_in:
                 name = intelligence.user.name if intelligence.user else "online"
                 self._intelligence_status.set_label(name or "online")
+                self._intelligence_status.add_css_class("intelligence-status-on")
+                self._intelligence_status.remove_css_class("intelligence-status-off")
                 self._ai_metric["value"].set_label("on")
                 self._ai_metric["frame"].remove_css_class("metric-card-warn")
+                if login_frame:
+                    login_frame.remove_css_class("intelligence-card-offline")
+                    login_frame.add_css_class("intelligence-card-online")
             else:
+                self._intelligence_status.set_label("offline")
+                self._intelligence_status.add_css_class("intelligence-status-off")
+                self._intelligence_status.remove_css_class("intelligence-status-on")
                 self._ai_metric["value"].set_label("off")
+                self._ai_metric["frame"].add_css_class("metric-card-warn")
+                if login_frame:
+                    login_frame.add_css_class("intelligence-card-offline")
+                    login_frame.remove_css_class("intelligence-card-online")
         except Exception:
             pass
 
     def _on_intelligence_click(self, gesture, n_press, x, y):
-        """Start Intelligence device auth flow."""
+        """Toggle Intelligence login/logout."""
         import threading
 
         from cios.core.intelligence import intelligence
 
         if intelligence.is_logged_in:
-            name = intelligence.user.name if intelligence.user else "online"
-            self._intelligence_status.set_label(name or "online")
+            # Logout
+            intelligence.logout()
+            self._intelligence_status.set_label("offline")
+            self._intelligence_status.add_css_class("intelligence-status-off")
+            self._intelligence_status.remove_css_class("intelligence-status-on")
+            self._ai_metric["value"].set_label("off")
+            self._ai_metric["frame"].add_css_class("metric-card-warn")
+            # Update card border to offline style
+            login_frame = self._intelligence_status.get_parent().get_parent()
+            if login_frame:
+                login_frame.add_css_class("intelligence-card-offline")
+                login_frame.remove_css_class("intelligence-card-online")
             return
 
         self._intelligence_status.set_label("conectando…")
@@ -463,7 +488,20 @@ class Sidebar(Gtk.Box):
                     intelligence.save_auth(token, user_data)
                     name = user_data.get("name", "online")
                     GLib.idle_add(self._intelligence_status.set_label, name)
+                    GLib.idle_add(self._intelligence_status.add_css_class, "intelligence-status-on")
+                    GLib.idle_add(
+                        self._intelligence_status.remove_css_class, "intelligence-status-off"
+                    )
                     GLib.idle_add(self._ai_metric["value"].set_label, "on")
+                    GLib.idle_add(self._ai_metric["frame"].remove_css_class, "metric-card-warn")
+
+                    def _update_card_online():
+                        login_frame = self._intelligence_status.get_parent().get_parent()
+                        if login_frame:
+                            login_frame.remove_css_class("intelligence-card-offline")
+                            login_frame.add_css_class("intelligence-card-online")
+
+                    GLib.idle_add(_update_card_online)
                     if self._artifact_panel:
                         GLib.idle_add(self._artifact_panel.close)
                     return
@@ -638,5 +676,29 @@ class Sidebar(Gtk.Box):
             .intelligence-status {{
                 color: {FG_DIM};
                 font-size: 10px;
+            }}
+            .intelligence-status-off {{
+                color: #ff1744;
+                font-weight: bold;
+            }}
+            .intelligence-status-on {{
+                color: #00e676;
+                font-weight: bold;
+            }}
+            .intelligence-card-offline {{
+                border-color: rgba(255,23,68,0.4);
+                box-shadow: 0 0 10px rgba(255,23,68,0.1);
+            }}
+            .intelligence-card-offline:hover {{
+                border-color: rgba(255,23,68,0.6);
+                box-shadow: 0 0 18px rgba(255,23,68,0.15);
+            }}
+            .intelligence-card-online {{
+                border-color: rgba(0,230,118,0.3);
+                box-shadow: 0 0 10px rgba(0,230,118,0.08);
+            }}
+            .intelligence-card-online:hover {{
+                border-color: rgba(0,230,118,0.5);
+                box-shadow: 0 0 18px rgba(0,230,118,0.15);
             }}
         """
