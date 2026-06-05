@@ -25,6 +25,7 @@
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_seat.h>
 #include <wlr/types/wlr_xcursor_manager.h>
+#include <wlr/types/wlr_xdg_shell.h>
 #include <xkbcommon/xkbcommon.h>
 
 #include "log.h"
@@ -33,13 +34,34 @@
 /* Default xcursor theme size */
 #define XCURSOR_SIZE 24
 
-/* Drag state for titlebar window move */
+/* Interaction modes */
+enum CiosInteractMode {
+    CIOS_INTERACT_NONE = 0,
+    CIOS_INTERACT_MOVE,
+    CIOS_INTERACT_RESIZE,
+};
+
+/* Resize edges */
+enum CiosResizeEdge {
+    CIOS_EDGE_NONE = 0,
+    CIOS_EDGE_TOP = 1,
+    CIOS_EDGE_BOTTOM = 2,
+    CIOS_EDGE_LEFT = 4,
+    CIOS_EDGE_RIGHT = 8,
+};
+
+/* Resize grab zone in pixels from each edge */
+#define RESIZE_GRAB_ZONE 6
+
+/* Interaction state for window move/resize */
 static struct {
     struct CiosSurface *surface;
     double grab_x, grab_y;      /* cursor position at grab start */
     int orig_x, orig_y;         /* surface position at grab start */
-    bool active;
-} drag_state = {0};
+    int orig_width, orig_height;/* surface size at grab start (resize) */
+    enum CiosInteractMode mode;
+    uint32_t resize_edges;      /* bitmask of edges being resized */
+} interact_state = {0};
 
 /* Keyboard wrapper — holds listeners and back-pointer to server */
 struct CiosKeyboard {
@@ -173,15 +195,138 @@ static struct CiosSurface *surface_at(struct CiosServer *server,
  * ═══════════════════════════════════════════════════════════════ */
 
 /*
+ * Find the CiosSurface under cursor by bounding box check.
+ * Used as fallback when surface_at() fails (e.g., click on decoration rect).
+ * Checks if cursor is within the surface's scene_tree bounding area.
+ */
+static struct CiosSurface *surface_at_bbox(struct CiosServer *server,
+        double lx, double ly) {
+    struct CiosSurface *surf;
+    wl_list_for_each(surf, &server->surfaces, link) {
+        if (!surf->visible || !surf->scene_tree) {
+            continue;
+        }
+        int surf_x, surf_y;
+        wlr_scene_node_coords(&surf->scene_tree->node, &surf_x, &surf_y);
+
+        /* Get surface dimensions */
+        int width = 800, height = 600;
+        if (surf->xsurface) {
+            width = surf->xsurface->width > 0 ? surf->xsurface->width : 800;
+            height = surf->xsurface->height > 0 ? surf->xsurface->height : 600;
+        } else if (surf->xdg_toplevel && surf->xdg_toplevel->base->surface) {
+            struct wlr_box geo;
+            wlr_xdg_surface_get_geometry(surf->xdg_toplevel->base, &geo);
+            if (geo.width > 0) width = geo.width;
+            if (geo.height > 0) height = geo.height;
+        }
+
+        /* Include titlebar area in the bounding box */
+        int top_y = surf->decorated ? surf_y - CIOS_TITLEBAR_HEIGHT : surf_y;
+
+        if ((int)lx >= surf_x && (int)lx < surf_x + width &&
+            (int)ly >= top_y && (int)ly < surf_y + height) {
+            return surf;
+        }
+    }
+    return NULL;
+}
+
+/*
+ * Detect which resize edge(s) the cursor is near for a given surface.
+ * Returns bitmask of CiosResizeEdge values, or 0 if not near any edge.
+ */
+static uint32_t detect_resize_edge(struct CiosSurface *surf, double lx, double ly) {
+    if (!surf || !surf->scene_tree) return 0;
+
+    int surf_x, surf_y;
+    wlr_scene_node_coords(&surf->scene_tree->node, &surf_x, &surf_y);
+
+    int width = 800, height = 600;
+    if (surf->xsurface) {
+        width = surf->xsurface->width > 0 ? surf->xsurface->width : 800;
+        height = surf->xsurface->height > 0 ? surf->xsurface->height : 600;
+    } else if (surf->xdg_toplevel && surf->xdg_toplevel->base->surface) {
+        struct wlr_box geo;
+        wlr_xdg_surface_get_geometry(surf->xdg_toplevel->base, &geo);
+        if (geo.width > 0) width = geo.width;
+        if (geo.height > 0) height = geo.height;
+    }
+
+    int rel_x = (int)lx - surf_x;
+    int rel_y = (int)ly - surf_y;
+
+    uint32_t edges = CIOS_EDGE_NONE;
+
+    /* Only detect edges if cursor is within or very near the surface bounds */
+    if (rel_x < -RESIZE_GRAB_ZONE || rel_x > width + RESIZE_GRAB_ZONE ||
+        rel_y < -RESIZE_GRAB_ZONE || rel_y > height + RESIZE_GRAB_ZONE) {
+        return 0;
+    }
+
+    if (rel_x <= RESIZE_GRAB_ZONE) edges |= CIOS_EDGE_LEFT;
+    if (rel_x >= width - RESIZE_GRAB_ZONE) edges |= CIOS_EDGE_RIGHT;
+    if (rel_y <= RESIZE_GRAB_ZONE) edges |= CIOS_EDGE_TOP;
+    if (rel_y >= height - RESIZE_GRAB_ZONE) edges |= CIOS_EDGE_BOTTOM;
+
+    return edges;
+}
+
+/*
  * Process cursor motion — find surface under cursor, forward pointer,
  * and set cursor image.
  */
 static void process_cursor_motion(struct CiosServer *server, uint32_t time_msec) {
-    /* Handle active drag (titlebar move) */
-    if (drag_state.active && drag_state.surface) {
-        int new_x = drag_state.orig_x + (int)(server->cursor->x - drag_state.grab_x);
-        int new_y = drag_state.orig_y + (int)(server->cursor->y - drag_state.grab_y);
-        wlr_scene_node_set_position(&drag_state.surface->scene_tree->node, new_x, new_y);
+    /* Handle active move/resize interaction */
+    if (interact_state.mode == CIOS_INTERACT_MOVE && interact_state.surface) {
+        int new_x = interact_state.orig_x + (int)(server->cursor->x - interact_state.grab_x);
+        int new_y = interact_state.orig_y + (int)(server->cursor->y - interact_state.grab_y);
+        wlr_scene_node_set_position(&interact_state.surface->scene_tree->node, new_x, new_y);
+        return;
+    }
+
+    if (interact_state.mode == CIOS_INTERACT_RESIZE && interact_state.surface) {
+        int dx = (int)(server->cursor->x - interact_state.grab_x);
+        int dy = (int)(server->cursor->y - interact_state.grab_y);
+        int new_x = interact_state.orig_x;
+        int new_y = interact_state.orig_y;
+        int new_w = interact_state.orig_width;
+        int new_h = interact_state.orig_height;
+
+        if (interact_state.resize_edges & CIOS_EDGE_RIGHT) {
+            new_w = interact_state.orig_width + dx;
+        }
+        if (interact_state.resize_edges & CIOS_EDGE_LEFT) {
+            new_w = interact_state.orig_width - dx;
+            new_x = interact_state.orig_x + dx;
+        }
+        if (interact_state.resize_edges & CIOS_EDGE_BOTTOM) {
+            new_h = interact_state.orig_height + dy;
+        }
+        if (interact_state.resize_edges & CIOS_EDGE_TOP) {
+            new_h = interact_state.orig_height - dy;
+            new_y = interact_state.orig_y + dy;
+        }
+
+        /* Enforce minimum size */
+        if (new_w < 100) new_w = 100;
+        if (new_h < 60) new_h = 60;
+
+        /* Apply position change (for left/top edge resize) */
+        wlr_scene_node_set_position(&interact_state.surface->scene_tree->node, new_x, new_y);
+
+        /* Resize the surface */
+        if (interact_state.surface->xsurface) {
+            wlr_xwayland_surface_configure(interact_state.surface->xsurface,
+                new_x, new_y, new_w, new_h);
+        } else if (interact_state.surface->xdg_toplevel) {
+            wlr_xdg_toplevel_set_size(interact_state.surface->xdg_toplevel, new_w, new_h);
+        }
+
+        /* Update decorations if present */
+        if (interact_state.surface->decorated) {
+            decorations_update_size(interact_state.surface, new_w);
+        }
         return;
     }
 
@@ -231,6 +376,8 @@ static void handle_cursor_motion_absolute(struct wl_listener *listener, void *da
 /*
  * Handle pointer button event — forward to surface under cursor.
  * Also focus the surface on click.
+ * Supports: Alt/Super+drag (move), titlebar drag (move),
+ *           Alt/Super+right-click drag (resize), edge drag (resize).
  */
 static void handle_cursor_button(struct wl_listener *listener, void *data) {
     struct CiosServer *server = wl_container_of(listener, server, cursor_button);
@@ -240,31 +387,89 @@ static void handle_cursor_button(struct wl_listener *listener, void *data) {
         double sx, sy;
         struct wlr_surface *wlr_surface = NULL;
 
-        /* Super+Left click OR Alt+Left click: start drag on any surface */
-        if (event->button == BTN_LEFT) {
-            struct wlr_keyboard *kb = wlr_seat_get_keyboard(server->seat);
-            uint32_t mods = kb ? wlr_keyboard_get_modifiers(kb) : 0;
-            if ((mods & WLR_MODIFIER_LOGO) || (mods & WLR_MODIFIER_ALT)) {
-                struct CiosSurface *surface = surface_at(server,
-                    server->cursor->x, server->cursor->y,
-                    &wlr_surface, &sx, &sy);
-                if (surface && surface->scene_tree) {
+        struct wlr_keyboard *kb = wlr_seat_get_keyboard(server->seat);
+        uint32_t mods = kb ? wlr_keyboard_get_modifiers(kb) : 0;
+        bool has_mod = (mods & WLR_MODIFIER_LOGO) || (mods & WLR_MODIFIER_ALT);
+
+        /* Super/Alt + Left click: start MOVE on any surface */
+        if (event->button == BTN_LEFT && has_mod) {
+            /* Try surface_at first, fall back to bbox */
+            struct CiosSurface *surface = surface_at(server,
+                server->cursor->x, server->cursor->y,
+                &wlr_surface, &sx, &sy);
+            if (!surface) {
+                surface = surface_at_bbox(server, server->cursor->x, server->cursor->y);
+            }
+            if (surface && surface->scene_tree) {
+                if (surface->xdg_toplevel) {
+                    server_focus_xdg_surface(server, surface);
+                } else {
                     server_focus_surface(server, surface);
-                    int surf_x, surf_y;
-                    wlr_scene_node_coords(&surface->scene_tree->node, &surf_x, &surf_y);
-                    drag_state.surface = surface;
-                    drag_state.grab_x = server->cursor->x;
-                    drag_state.grab_y = server->cursor->y;
-                    drag_state.orig_x = surf_x;
-                    drag_state.orig_y = surf_y;
-                    drag_state.active = true;
-                    return;
                 }
+                int surf_x, surf_y;
+                wlr_scene_node_coords(&surface->scene_tree->node, &surf_x, &surf_y);
+                interact_state.surface = surface;
+                interact_state.grab_x = server->cursor->x;
+                interact_state.grab_y = server->cursor->y;
+                interact_state.orig_x = surf_x;
+                interact_state.orig_y = surf_y;
+                interact_state.mode = CIOS_INTERACT_MOVE;
+                return;
             }
         }
 
-        /* Check for decoration clicks (left button only) */
-        if (event->button == BTN_LEFT) {
+        /* Super/Alt + Right click: start RESIZE on any surface */
+        if (event->button == BTN_RIGHT && has_mod) {
+            struct CiosSurface *surface = surface_at(server,
+                server->cursor->x, server->cursor->y,
+                &wlr_surface, &sx, &sy);
+            if (!surface) {
+                surface = surface_at_bbox(server, server->cursor->x, server->cursor->y);
+            }
+            if (surface && surface->scene_tree) {
+                if (surface->xdg_toplevel) {
+                    server_focus_xdg_surface(server, surface);
+                } else {
+                    server_focus_surface(server, surface);
+                }
+                int surf_x, surf_y;
+                wlr_scene_node_coords(&surface->scene_tree->node, &surf_x, &surf_y);
+
+                int width = 800, height = 600;
+                if (surface->xsurface) {
+                    width = surface->xsurface->width > 0 ? surface->xsurface->width : 800;
+                    height = surface->xsurface->height > 0 ? surface->xsurface->height : 600;
+                } else if (surface->xdg_toplevel && surface->xdg_toplevel->base->surface) {
+                    struct wlr_box geo;
+                    wlr_xdg_surface_get_geometry(surface->xdg_toplevel->base, &geo);
+                    if (geo.width > 0) width = geo.width;
+                    if (geo.height > 0) height = geo.height;
+                }
+
+                /* Determine which quadrant the cursor is in → resize from that corner */
+                int rel_x = (int)server->cursor->x - surf_x;
+                int rel_y = (int)server->cursor->y - surf_y;
+                uint32_t edges = 0;
+                if (rel_x < width / 2) edges |= CIOS_EDGE_LEFT;
+                else edges |= CIOS_EDGE_RIGHT;
+                if (rel_y < height / 2) edges |= CIOS_EDGE_TOP;
+                else edges |= CIOS_EDGE_BOTTOM;
+
+                interact_state.surface = surface;
+                interact_state.grab_x = server->cursor->x;
+                interact_state.grab_y = server->cursor->y;
+                interact_state.orig_x = surf_x;
+                interact_state.orig_y = surf_y;
+                interact_state.orig_width = width;
+                interact_state.orig_height = height;
+                interact_state.resize_edges = edges;
+                interact_state.mode = CIOS_INTERACT_RESIZE;
+                return;
+            }
+        }
+
+        /* Check for decoration clicks (left button only, no modifier) */
+        if (event->button == BTN_LEFT && !has_mod) {
             struct CiosSurface *surf;
             wl_list_for_each(surf, &server->surfaces, link) {
                 if (!surf->decorated || !surf->visible || !surf->scene_tree) {
@@ -311,17 +516,63 @@ static void handle_cursor_button(struct wl_listener *listener, void *data) {
                     return;
                 } else if (hit == CIOS_DECO_TITLEBAR) {
                     /* Click on titlebar — start drag to move window */
-                    server_focus_surface(server, surf);
-                    int surf_x, surf_y_pos;
-                    wlr_scene_node_coords(&surf->scene_tree->node, &surf_x, &surf_y_pos);
-                    drag_state.surface = surf;
-                    drag_state.grab_x = server->cursor->x;
-                    drag_state.grab_y = server->cursor->y;
-                    drag_state.orig_x = surf_x;
-                    drag_state.orig_y = surf_y_pos;
-                    drag_state.active = true;
+                    if (surf->xdg_toplevel) {
+                        server_focus_xdg_surface(server, surf);
+                    } else {
+                        server_focus_surface(server, surf);
+                    }
+                    int s_x, s_y;
+                    wlr_scene_node_coords(&surf->scene_tree->node, &s_x, &s_y);
+                    interact_state.surface = surf;
+                    interact_state.grab_x = server->cursor->x;
+                    interact_state.grab_y = server->cursor->y;
+                    interact_state.orig_x = s_x;
+                    interact_state.orig_y = s_y;
+                    interact_state.mode = CIOS_INTERACT_MOVE;
                     wlr_seat_pointer_notify_button(server->seat,
                         event->time_msec, event->button, event->state);
+                    return;
+                }
+            }
+
+            /* Edge resize detection (no modifier, left click on window border) */
+            struct CiosSurface *surface = surface_at(server,
+                server->cursor->x, server->cursor->y,
+                &wlr_surface, &sx, &sy);
+            if (!surface) {
+                surface = surface_at_bbox(server, server->cursor->x, server->cursor->y);
+            }
+            if (surface && surface->scene_tree) {
+                uint32_t edges = detect_resize_edge(surface, server->cursor->x, server->cursor->y);
+                if (edges != CIOS_EDGE_NONE) {
+                    if (surface->xdg_toplevel) {
+                        server_focus_xdg_surface(server, surface);
+                    } else {
+                        server_focus_surface(server, surface);
+                    }
+                    int surf_x, surf_y;
+                    wlr_scene_node_coords(&surface->scene_tree->node, &surf_x, &surf_y);
+
+                    int width = 800, height = 600;
+                    if (surface->xsurface) {
+                        width = surface->xsurface->width > 0 ? surface->xsurface->width : 800;
+                        height = surface->xsurface->height > 0 ? surface->xsurface->height : 600;
+                    } else if (surface->xdg_toplevel && surface->xdg_toplevel->base->surface) {
+                        struct wlr_box geo;
+                        wlr_xdg_surface_get_geometry(surface->xdg_toplevel->base, &geo);
+                        if (geo.width > 0) width = geo.width;
+                        if (geo.height > 0) height = geo.height;
+                    }
+
+                    interact_state.surface = surface;
+                    interact_state.grab_x = server->cursor->x;
+                    interact_state.grab_y = server->cursor->y;
+                    interact_state.orig_x = surf_x;
+                    interact_state.orig_y = surf_y;
+                    interact_state.orig_width = width;
+                    interact_state.orig_height = height;
+                    interact_state.resize_edges = edges;
+                    interact_state.mode = CIOS_INTERACT_RESIZE;
                     return;
                 }
             }
@@ -345,10 +596,11 @@ static void handle_cursor_button(struct wl_listener *listener, void *data) {
         }
     }
 
-    /* End drag on button release */
-    if (event->state == WL_POINTER_BUTTON_STATE_RELEASED && drag_state.active) {
-        drag_state.active = false;
-        drag_state.surface = NULL;
+    /* End interaction on button release */
+    if (event->state == WL_POINTER_BUTTON_STATE_RELEASED && interact_state.mode != CIOS_INTERACT_NONE) {
+        interact_state.mode = CIOS_INTERACT_NONE;
+        interact_state.surface = NULL;
+        interact_state.resize_edges = CIOS_EDGE_NONE;
     }
 
     /* Notify the seat of the button event */
