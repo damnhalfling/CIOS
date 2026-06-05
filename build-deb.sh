@@ -136,7 +136,7 @@ Version: ${VERSION}
 Section: x11
 Priority: optional
 Architecture: amd64
-Depends: python3 (>= 3.10), python3-pip, python3-venv, python3-gi, python3-gi-cairo, gir1.2-gtk-4.0, gir1.2-pango-1.0, sudo, libxkbcommon0, libinput10, libseat1, seatd, libpixman-1-0, libdrm2, libgles2, libegl1, libgbm1, libcap2, plymouth, curl, network-manager, pipewire, pipewire-pulse, foot
+Depends: python3 (>= 3.10), python3-pip, python3-venv, python3-gi, python3-gi-cairo, gir1.2-gtk-4.0, gir1.2-pango-1.0, sudo, libxkbcommon0, libinput10, libseat1, seatd, libpixman-1-0, libdrm2, libgles2, libegl1, libgbm1, libcap2, plymouth, curl, network-manager, pipewire, pipewire-pulse, foot, gnome-keyring, libpam-gnome-keyring
 Recommends: xwayland, wl-clipboard
 Conflicts: lightdm, gdm3, sddm
 Provides: x-display-manager
@@ -535,9 +535,14 @@ mkdir -p "${PKG_DIR}/etc/pam.d"
 cat > "${PKG_DIR}/etc/pam.d/greetd" << 'GREETD_PAM'
 #%PAM-1.0
 auth       include   login
+auth       optional  pam_gnome_keyring.so
+
 account    include   login
+
 password   include   login
+
 session    include   login
+session    optional  pam_gnome_keyring.so auto_start
 GREETD_PAM
 
 # ── Override plymouth-quit-wait to not block forever ──
@@ -634,6 +639,10 @@ LOGFILE="$HOME/.cios/session.log"
 mkdir -p "$HOME/.cios"
 
 echo "=== CIOS session $(date) ===" >> "$LOGFILE"
+
+# Unlock gnome-keyring (Chrome, secrets storage)
+eval $(gnome-keyring-daemon --start --components=pkcs11,secrets,ssh 2>/dev/null)
+export SSH_AUTH_SOCK GNOME_KEYRING_CONTROL
 
 # Find Python
 VENV="/usr/share/cios/.venv/bin/python3"

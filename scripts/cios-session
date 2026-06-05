@@ -1,0 +1,37 @@
+#!/bin/bash
+# CIOS Session — Wayland compositor + AI runtime
+# Launched by greetd after authentication.
+
+export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+export XDG_SESSION_TYPE=wayland
+export GDK_BACKEND=wayland
+export WLR_NO_HARDWARE_CURSORS=1
+export LIBSEAT_BACKEND=seatd
+export XKB_DEFAULT_LAYOUT="${XKB_DEFAULT_LAYOUT:-us}"
+export LD_LIBRARY_PATH="/usr/lib/cios:${LD_LIBRARY_PATH:-}"
+export PYTHONPATH="/usr/share/cios:${PYTHONPATH:-}"
+export NO_AT_BRIDGE=1
+export GTK_A11Y=none
+
+LOGFILE="$HOME/.cios/session.log"
+mkdir -p "$HOME/.cios"
+
+echo "=== CIOS session $(date) ===" >> "$LOGFILE"
+
+# Unlock gnome-keyring (Chrome, secrets)
+eval $(gnome-keyring-daemon --start --components=pkcs11,secrets,ssh 2>/dev/null)
+export SSH_AUTH_SOCK GNOME_KEYRING_CONTROL
+
+# Find Python
+VENV="/usr/share/cios/.venv/bin/python3"
+if [ ! -x "$VENV" ] || ! "$VENV" -c "import gi" 2>/dev/null; then
+    VENV=$(which python3 2>/dev/null)
+fi
+
+[ -z "$VENV" ] && { echo "FATAL: No python3" >> "$LOGFILE"; exit 1; }
+$VENV -c "import cios" 2>/dev/null || { echo "FATAL: Cannot import cios" >> "$LOGFILE"; exit 1; }
+
+# Launch compositor — NO restart loop.
+# If it crashes, greetd handles the restart (with its own limits).
+exec /usr/bin/cios-shell --runtime "$VENV -m cios.main" >> "$LOGFILE" 2>&1
