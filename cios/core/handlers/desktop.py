@@ -187,3 +187,94 @@ def handle_trash(intent: Intent, executor: Executor, memory: Memory) -> PlanResu
             outcome="success",
             summary=summary,
         )
+
+
+def handle_briefing(intent: Intent, executor: Executor, memory: Memory) -> PlanResult:
+    """Handle daily briefing intent: 'meu dia', 'briefing', 'como está meu dia'."""
+    from cios.core.intelligence import intelligence
+
+    if not intelligence.is_logged_in:
+        return PlanResult(
+            plan_steps=["Verificando briefing"],
+            results=[],
+            outcome="failure",
+            summary="Faça login no CIOS Intelligence para ver seu briefing diário.",
+        )
+
+    data = intelligence.briefing()
+    if not data:
+        return PlanResult(
+            plan_steps=["Buscando briefing"],
+            results=[],
+            outcome="failure",
+            summary="Não foi possível carregar o briefing. Verifique a conexão.",
+        )
+
+    # Format briefing for terminal/UI display
+    lines = []
+
+    # Greeting + Focus
+    lines.append(data.get("greeting", ""))
+    if data.get("focus_suggestion"):
+        lines.append(f"🎯 {data['focus_suggestion']}")
+    if data.get("next_meeting_in_minutes") is not None:
+        lines.append(f"⏰ Próxima reunião em {data['next_meeting_in_minutes']} min")
+
+    lines.append("")
+
+    # Meetings
+    meetings = data.get("meetings", [])
+    if meetings:
+        lines.append(f"📅 {len(meetings)} reunião{'ões' if len(meetings) > 1 else ''}:")
+        for m in meetings:
+            time_str = m.get("time", "")
+            if "T" in time_str:
+                time_str = time_str.split("T")[1][:5]
+            duration = f" ({m['duration']}min)" if m.get("duration") else ""
+            lines.append(f"   {time_str}{duration} — {m['title']}")
+        lines.append("")
+
+    # Emails
+    emails = data.get("emails", [])
+    if emails:
+        lines.append(f"📧 {len(emails)} email{'s' if len(emails) > 1 else ''} importante{'s' if len(emails) > 1 else ''}:")
+        for e in emails:
+            priority_marker = "●" if e.get("priority") == "high" else "○"
+            lines.append(f"   {priority_marker} {e['subject'][:50]} — {e.get('from', '')[:30]}")
+        lines.append("")
+
+    # Last context
+    last_ctx = data.get("last_context")
+    if last_ctx:
+        lines.append(f"🧠 Onde parou: {last_ctx['summary'][:60]}")
+        lines.append("")
+
+    # Playlist
+    playlist = data.get("playlist")
+    if playlist:
+        lines.append(f"🎵 {playlist['title']}")
+        lines.append("")
+
+    # Insights
+    insights = data.get("insights", [])
+    if insights:
+        lines.append("💡 Descobertas:")
+        for ins in insights:
+            lines.append(f"   {ins['topic']}: {ins['summary'][:60]}")
+        lines.append("")
+
+    # Time blocks
+    blocks = data.get("time_blocks", [])
+    if blocks:
+        lines.append("⏱️ Blocos:")
+        for b in blocks:
+            lines.append(f"   {b['start']}–{b['end']} {b['label']}")
+
+    summary = "\n".join(lines).strip()
+
+    return PlanResult(
+        plan_steps=["Montando briefing do dia"],
+        results=[],
+        outcome="success",
+        summary=summary,
+    )

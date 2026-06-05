@@ -14,6 +14,7 @@ from cios.core.handlers._common import PlanResult
 from cios.core.handlers.apps import handle_app_launch, handle_explore_system, handle_list_apps
 from cios.core.handlers.audio import handle_audio
 from cios.core.handlers.desktop import (
+    handle_briefing,
     handle_firewall,
     handle_scheduler,
     handle_theming,
@@ -149,6 +150,7 @@ _HANDLER_MAP = {
     IntentType.VPN: handle_vpn,
     IntentType.FIREWALL: handle_firewall,
     IntentType.TRASH: handle_trash,
+    IntentType.BRIEFING: handle_briefing,
     IntentType.HISTORY_SEARCH: None,  # Handled directly in bridge
 }
 

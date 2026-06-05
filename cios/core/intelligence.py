@@ -517,6 +517,31 @@ class IntelligenceClient:
 
         threading.Thread(target=_fetch, daemon=True).start()
 
+    def briefing(self) -> dict | None:
+        """Fetch the daily briefing from the Intelligence API.
+
+        Returns the briefing dict or None if unavailable.
+        """
+        if not self.is_logged_in:
+            return None
+
+        headers = {
+            "Authorization": f"Bearer {self._user.token}",
+        }
+
+        req = urllib.request.Request(
+            f"{API_BASE}/v1/briefing",
+            headers=headers,
+            method="GET",
+        )
+
+        try:
+            with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
+                return json.loads(resp.read())
+        except Exception as e:
+            logger.warning("Briefing fetch failed: %s", e)
+            return None
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  SYSTEM CONTEXT (sent with every API call from OS)

@@ -56,6 +56,7 @@ class IntentType(Enum):
     VPN = "vpn"
     FIREWALL = "firewall"
     TRASH = "trash"
+    BRIEFING = "briefing"
     UNKNOWN = "unknown"
 
 
@@ -1920,12 +1921,27 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
         lambda m: {"action": "add_to_album", "album_name": m.group(1).strip()},
         0.95,
     ),
+    # --- daily briefing / meu dia (PT + EN) ---
+    (
+        re.compile(
+            r"(?:(?:meu|como\s+(?:est[aá]|tá)\s+(?:meu|o))\s+dia|"
+            r"daily\s*briefing|morning\s*briefing|"
+            r"(?:mostr[ae]|ver|exib[ei]r?)\s+(?:meu\s+)?(?:dia|briefing|planejamento)|"
+            r"(?:o\s+que\s+(?:tenho|tem)\s+(?:pra\s+)?hoje)|"
+            r"(?:como\s+(?:est[aá]|tá)\s+(?:minha\s+)?(?:agenda|dia))|"
+            r"(?:resuma?|resume)\s+(?:meu\s+)?dia)",
+            re.IGNORECASE,
+        ),
+        IntentType.BRIEFING,
+        lambda m: {},
+        0.95,
+    ),
     # --- intelligence: news (PT + EN) ---
     (
         re.compile(
             r"(?:not[ií]cias|news|o\s+que\s+(?:est[aá]\s+acontecendo|aconteceu\s+(?:hoje|no\s+mundo))|"
             r"resum[ao]\s+(?:as\s+)?not[ií]cias|what(?:'s|\s+is)\s+happening|"
-            r"headlines|manchetes|briefing|novidades\s+(?:do\s+dia|de\s+hoje))",
+            r"headlines|manchetes|novidades\s+(?:do\s+dia|de\s+hoje))",
             re.IGNORECASE,
         ),
         IntentType.INTELLIGENCE,

@@ -1,6 +1,6 @@
 # CIOS — Desenvolvimento
 
-> v2.0.0-rc59 — Maio 2026
+> v3.0.0-rc6 — Junho 2026
 
 ---
 
@@ -55,7 +55,7 @@ Tag push → Lint (ruff + mypy) → Test (pytest) → Build compositor → Build
 
 ### Testes
 - `pytest --cov=cios` — threshold 45%
-- 415 testes, 40 property-based (Hypothesis)
+- 839 testes, property-based (Hypothesis)
 - Timeout: 30s por teste
 
 ---
@@ -154,7 +154,7 @@ ruff format --check cios/ tests/
 mypy cios/core/ --ignore-missing-imports --exclude "(intent_parser|mcp|intelligence|bridge)\.py"
 
 # Build .deb
-bash build-deb.sh 2.0.0-rc58
+bash build-deb.sh 3.0.0-rc6
 
 # Testar em VM (QEMU)
 qemu-system-x86_64 -m 4096 -smp 2 -enable-kvm \
@@ -164,7 +164,7 @@ qemu-system-x86_64 -m 4096 -smp 2 -enable-kvm \
 
 # Instalar na VM
 ssh -p 2222 user@localhost
-sudo apt install ./cios_2.0.0-rc58_amd64.deb
+sudo apt install ./cios_3.0.0-rc6_amd64.deb
 
 # Instalar componentes de IA
 sudo cios-setup-ai

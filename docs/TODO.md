@@ -1,6 +1,6 @@
 # CIOS — TODO
 
-> v2.0.0-rc59 — Maio 2026
+> v3.0.0-rc6 — Junho 2026
 
 ---
 

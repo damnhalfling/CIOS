@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://github.com/damnhalfling/cios/releases"><img src="https://img.shields.io/github/v/release/damnhalfling/cios" alt="Release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/damnhalfling/cios" alt="License" /></a>
-  <img src="https://img.shields.io/badge/tests-415%20passing-brightgreen" alt="Tests" />
+  <img src="https://img.shields.io/badge/tests-839%20passing-brightgreen" alt="Tests" />
 </p>
 
 <p align="center">
@@ -106,9 +106,9 @@ No wasted steps. No wrong guesses.
 
 ### Skills
 
-Real system execution. 28 skills, zero abstraction.
+Real system execution. 46 skills, zero abstraction.
 
-Wi-Fi (nmcli) · Audio (pactl) · Files · Processes · Packages (apt) · Windows (compositor IPC) · Clipboard (wl-clipboard) · Battery · Brightness · Dev environments · Disk analysis · Auto-learning · File search · Workflow start · Explore system · Gallery management · Favorites & albums · Duplicate detection · Face clustering · Screen capture · Image editing · Spreadsheets (CSV/XLSX)
+Wi-Fi (nmcli) · Audio (pactl) · Files · Processes · Packages (apt) · Windows (compositor IPC) · Clipboard (wl-clipboard) · Battery · Brightness · Dev environments · Disk analysis · Auto-learning · File search · Workflow start · Explore system · Gallery management · Favorites & albums · Duplicate detection · Face clustering · Screen capture · Image editing · Spreadsheets (CSV/XLSX) · Theming · Notifications · Scheduler · Automount · VPN · Firewall · Keyring · Trash · Display settings · Night light · Printer · Backup · Locale · Google Workspace (Gmail, Drive, Calendar, Chat)
 
 **No LLM for critical actions.** Pattern matching handles 80%+ of intents. Hybrid classifier (regex → cache → LLM) ensures natural language works while keeping latency low.
 
@@ -270,8 +270,8 @@ All commands work in **English** and **Portuguese**.
 
 ```bash
 # Download the .deb from releases
-wget https://github.com/damnhalfling/CIOS/releases/latest/download/cios_2.0.0-rc59_amd64.deb
-sudo apt install ./cios_2.0.0-rc59_amd64.deb
+wget https://github.com/damnhalfling/CIOS/releases/latest/download/cios_3.0.0-rc6_amd64.deb
+sudo apt install ./cios_3.0.0-rc6_amd64.deb
 sudo reboot
 ```
 
@@ -335,14 +335,14 @@ In practice: if no LLM is available, all regex-matched intents (the vast majorit
 - ✅ Custom Wayland compositor (wlroots 0.18) — running on real hardware
 - ✅ Server-side decorations (titlebar + close/minimize/maximize)
 - ✅ Background task queue — prompt stays free during long operations
-- ✅ 28 skills — Wi-Fi, audio, files, packages, windows, clipboard, dev environments, self-update, file search, workflow start, gallery management, duplicates, face clustering, screen capture, spreadsheets, monitor config
+- ✅ 46 skills — Wi-Fi, audio, files, packages, windows, clipboard, dev environments, self-update, file search, workflow start, gallery management, duplicates, face clustering, screen capture, spreadsheets, monitor config, theming, notifications, scheduler, automount, VPN, firewall, keyring, trash, display settings, night light, printer, backup, locale, Google Workspace (Gmail, Drive, Calendar, Chat)
 - ✅ Hybrid intent classifier — regex + LLM cache with stemming + auto-learning
 - ✅ Voice offline — STT + TTS, fully local
 - ✅ Multi-monitor — secondary screen as full interaction surface
 - ✅ Auto-learning engine
 - ✅ .deb installable package (full replacement, no fallbacks)
 - ✅ Plymouth boot splash (logo on boot, no text)
-- ✅ 415 tests passing (including 40 property-based tests)
+- ✅ 839 tests passing (including property-based tests)
 - ✅ Onboarding wizard
 - ✅ Conversational UX with 3-turn context
 - ✅ Project auto-creation ("work on project X" creates it if not found)
@@ -353,11 +353,16 @@ In practice: if no LLM is available, all regex-matched intents (the vast majorit
 - ✅ VT switching (Ctrl+Alt+Fn) for TTY access
 - ✅ greetd bundled (no dependency on external repos)
 - ✅ CIOS Intelligence — cloud cognitive layer (auth, streaming, memory, cross-device sync)
-- 🔜 Self-improving skills — solutions become reusable shortcuts
-- 🔜 Natural language cron — scheduled automations via daemon
-- 🔜 Project context files (`.cios.yml`) — declarative workflow config
-- 🔜 Parallel task delegation — complex intents split into concurrent sub-tasks
-- 🔜 Persistence nudges — proactive knowledge capture after complex sessions
+- ✅ Notifications system — events, apps, timers, progress
+- ✅ Scheduled tasks — natural language cron ("every morning, check updates")
+- ✅ Theming — dark/light mode via intent
+- ✅ Automount — USB, SD card, external drives
+- ✅ VPN — WireGuard + OpenVPN via intent
+- ✅ Firewall — ufw via intent
+- ✅ Keyring / secrets management
+- ✅ Trash / recycle bin (XDG Trash spec)
+- ✅ Display settings — resolution, scaling, refresh rate, monitor arrangement
+- ✅ Google Workspace integration — Gmail, Drive, Calendar, Chat via intent
 
 **This is not a prototype. It runs on real hardware.**
 
@@ -366,11 +371,15 @@ In practice: if no LLM is available, all regex-matched intents (the vast majorit
 - ✅ ~~CIOS Intelligence integration~~ — done (cloud API, auth, streaming)
 - ✅ ~~Wayland compositor~~ — done (wlroots 0.18, XWayland, layer-shell)
 - ✅ ~~Custom Debian-based distribution~~ — done (greetd, Plymouth, ISO)
+- ✅ ~~Notifications system~~ — done (events, apps, timers)
+- ✅ ~~Natural language cron~~ — done (scheduler skill)
+- ✅ ~~Theming~~ — done (dark/light via intent)
+- ✅ ~~VPN + Firewall~~ — done (WireGuard, OpenVPN, ufw)
+- ✅ ~~Google Workspace~~ — done (Gmail, Drive, Calendar, Chat)
 - ⏳ Voice module (STT/TTS as alternative I/O)
-- ⏳ Cognitive memory (intent graph, semantic indexing) — via Intelligence
+- ⏳ Cognitive memory advanced (intent graph, semantic indexing) — via Intelligence
 - ⏳ Self-improving skills — skills that refine themselves from usage patterns
 - ⏳ Project context files (`.cios.yml`) — declarative project config for instant workflow start
-- ⏳ Natural language cron — scheduled automations ("every morning, check updates")
 - ⏳ Parallel task delegation — split complex intents into concurrent sub-tasks
 - ⏳ Persistence nudges — proactive suggestions to save knowledge after complex sessions
 
@@ -379,7 +388,7 @@ In practice: if no LLM is available, all regex-matched intents (the vast majorit
 ```
 User Input → Intent Parser → Classifier → MCO → Planner → Executor → Humanizer → UI
                   │              │          │       │          │            │
-            201 Patterns     Cache +      MCP     28 Skills   Shell      Translates
+            201 Patterns     Cache +      MCP     46 Skills   Shell      Translates
             (PT/EN)         LLM +       (live    + Auto-     Control    to human
                            Stemming     state)   Learner      │        language
                                                    │        Memory
@@ -401,7 +410,7 @@ User Input → Intent Parser → Classifier → MCO → Planner → Executor →
 - **Task Queue** — Background execution for long operations (apt install, upgrades). Tasks grouped by context, sequential within context, parallel across contexts. Prompt stays free.
 - **MCP** — Live system state with reactive watchers (nmcli monitor, pactl subscribe) + adaptive polling (1s/5s/15s)
 - **MCO** — Decision layer: resolves from MCP state instantly when possible
-- **Planner** — 30 handlers with context-aware execution and `_resilient_call()` retry
+- **Planner** — Handlers with context-aware execution and `_resilient_call()` retry
 - **Executor** — Safe shell execution with timeout, blocked command list, background processes
 - **Humanizer** — 260+ translations PT/EN, all technical output becomes plain language
 - **Intelligence** — Cloud cognitive layer: memory across sessions, user modeling, semantic search, skill self-improvement
@@ -428,7 +437,7 @@ cios-os/
 │   │   ├── bridge.py           # UI ↔ backend (sync + streaming + conversation)
 │   │   ├── intent_parser.py    # 201 regex patterns PT/EN
 │   │   ├── intent_classifier.py # Hybrid LLM classifier + cache + stemming
-│   │   ├── planner.py          # 30 handlers + MCO + _resilient_call()
+│   │   ├── planner.py          # 43 handlers + MCO + _resilient_call()
 │   │   ├── task_queue.py       # Background task execution (TaskManager + TaskThread)
 │   │   ├── thread_manager.py   # Conversation thread state + classification
 │   │   ├── intelligence.py     # Cloud cognitive layer (memory, user model, commands)
@@ -441,7 +450,7 @@ cios-os/
 │   │   ├── config.py           # Persistent settings (~/.cios/) + XDG dirs
 │   │   ├── memory.py           # SQLite history
 │   │   └── error_recovery.py   # 19 error types + actionable suggestions
-│   ├── skills/                 # 28 system skills
+│   ├── skills/                 # 46 system skills
 │   │   ├── package_manager.py  # apt install/remove/search (background-capable)
 │   │   ├── app_launcher.py     # .desktop scan + aliases (foot, chrome, etc.)
 │   │   ├── gallery_store.py    # Favorites, albums, trash (SQLite)
@@ -463,7 +472,7 @@ cios-os/
 │   │   └── ipc.c              # Unix socket JSON protocol
 │   └── meson.build
 ├── session/                    # Wayland session config
-├── tests/                      # 415 tests
+├── tests/                      # 839 tests
 ├── .github/workflows/          # CI: lint → test → build compositor → build .deb → release
 ├── build-deb.sh                # .deb builder (mandatory compositor, no fallbacks)
 └── pyproject.toml
@@ -478,7 +487,7 @@ cd cios-os
 python3 -m venv .venv
 .venv/bin/pip install -e ".[test]"
 .venv/bin/cios              # GUI
-.venv/bin/pytest tests/ -v      # 415 tests
+.venv/bin/pytest tests/ -v      # 839 tests
 ```
 
 **Requirements:** Python 3.10+ · Linux (Ubuntu/Debian) · Optional: Ollama, wl-clipboard, brightnessctl
@@ -626,8 +635,8 @@ CIOS: Conectado na Starlink (192.168.1.42)
 
 ```bash
 # Baixe o .deb da release
-wget https://github.com/damnhalfling/CIOS/releases/latest/download/cios_2.0.0-rc59_amd64.deb
-sudo apt install ./cios_2.0.0-rc59_amd64.deb
+wget https://github.com/damnhalfling/CIOS/releases/latest/download/cios_3.0.0-rc6_amd64.deb
+sudo apt install ./cios_3.0.0-rc6_amd64.deb
 sudo reboot
 ```
 
@@ -659,4 +668,4 @@ cios --setup      # Re-executar setup
 
 ---
 
-*CIOS v2.0.0-rc59 — May 2026*
+*CIOS v3.0.0-rc6 — June 2026*
