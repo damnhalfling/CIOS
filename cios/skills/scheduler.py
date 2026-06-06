@@ -231,7 +231,7 @@ def parse_time_expression(text: str) -> datetime | None:
         return target
 
     # "amanhã" / "tomorrow"
-    if "amanhã" in text_lower or "tomorrow" in text_lower:
+    if "amanhã" in text_lower or "amanha" in text_lower or "tomorrow" in text_lower:
         m = re.search(r"(\d{1,2})(?::(\d{2}))?(?:\s*h)?", text_lower)
         if m:
             hour = int(m.group(1))

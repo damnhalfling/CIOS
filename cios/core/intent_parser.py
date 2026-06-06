@@ -1418,7 +1418,7 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
     ),
     (
         re.compile(
-            r"(?:desmutar?|unmute|tirar?\s+(?:o\s+)?mute|ativar?\s+(?:o\s+)?som)",
+            r"(?:desmutar?|unmute|(?:tirar?|retir[ae]r?|remover?)\s+(?:o\s+)?mute|ativar?\s+(?:o\s+)?som)",
             re.IGNORECASE,
         ),
         IntentType.AUDIO,
@@ -1427,7 +1427,7 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
     ),
     (
         re.compile(
-            r"(?:silenciar?|mutar?|mute|calar?|silêncio)\s*(?:o\s+)?(?:volume|som|[aá]udio|tudo)?",
+            r"(?:silenciar?|mutar?|(?<!\w)mute(?!\w)|calar?|silêncio)\s*(?:o\s+)?(?:volume|som|[aá]udio|tudo)?",
             re.IGNORECASE,
         ),
         IntentType.AUDIO,
@@ -1445,12 +1445,21 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
     ),
     (
         re.compile(
-            r"(?:qual|quanto|what|how)\s+(?:é\s+)?(?:o\s+)?(?:volume|som)",
+            r"(?:qual|quanto|what|how)\s+(?:\w+\s+){0,3}(?:volume|som)",
             re.IGNORECASE,
         ),
         IntentType.AUDIO,
         lambda m: {"action": "status"},
         0.90,
+    ),
+    (
+        re.compile(
+            r"^(?:volume|som|áudio|audio)$",
+            re.IGNORECASE,
+        ),
+        IntentType.AUDIO,
+        lambda m: {"action": "status"},
+        0.85,
     ),
     # --- screen capture (PT + EN) — MUST be before session control ---
     (
