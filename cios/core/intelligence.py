@@ -148,28 +148,34 @@ class IntelligenceClient:
         # Check if access token is expired
         if self._is_token_expired(self._user.token):
             # Has refresh token? Still considered logged in (will auto-refresh)
-            if self._user.refresh_token:
-                return True
             # No refresh token and access expired = not logged in
-            return False
+            return bool(self._user.refresh_token)
 
         return True
 
     def _is_token_expired(self, token: str) -> bool:
-        """Check if a JWT token is expired by decoding payload (no signature verification)."""
+        """Check if a JWT token is expired by decoding payload (no signature verification).
+
+        Returns False (not expired) if token can't be parsed as JWT — this handles
+        test tokens and non-standard formats gracefully (fail-open for local check).
+        The server will reject truly invalid tokens with 401 anyway.
+        """
         try:
             import base64
+
             # JWT = header.payload.signature — decode payload
             parts = token.split(".")
             if len(parts) != 3:
-                return True
+                return False  # Not a JWT structure — assume valid
             # Add padding
             payload_b64 = parts[1] + "=" * (4 - len(parts[1]) % 4)
             payload = json.loads(base64.b64decode(payload_b64))
             exp = payload.get("exp", 0)
+            if exp == 0:
+                return False  # No expiry claim — assume valid
             return time.time() > exp
         except Exception:
-            return True  # Can't parse = treat as expired
+            return False  # Can't parse = assume valid (server will validate)
 
     @property
     def user(self) -> UserProfile | None:
@@ -519,9 +525,7 @@ class IntelligenceClient:
             # Try auto-refresh before giving up
             if self._try_refresh_token():
                 logger.info("Token refreshed successfully, retry needed")
-                return IntelligenceResult(
-                    success=False, error="token_refreshed", text=""
-                )
+                return IntelligenceResult(success=False, error="token_refreshed", text="")
             logger.warning("Intelligence token expired and refresh failed")
             return IntelligenceResult(
                 success=False, error="token_expired", text="Sessão expirada. Faça login novamente."

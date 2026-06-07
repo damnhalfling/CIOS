@@ -299,15 +299,18 @@ def handle_window(intent: Intent, executor: Executor, memory: Memory) -> PlanRes
             )
         # Strip common PT/EN articles from target
         import re as _re
+
         target = _re.sub(r"^(?:o|a|os|as|the)\s+", "", target.strip())
 
         window = window_skill.find_window(target)
         if not window:
             # Fallback: try killing by process name
             import subprocess
+
             proc_result = subprocess.run(
                 ["pkill", "-f", target],
-                capture_output=True, timeout=5,
+                capture_output=True,
+                timeout=5,
             )
             if proc_result.returncode == 0:
                 return PlanResult(
