@@ -60,6 +60,7 @@ class UserProfile:
     picture: str = ""
     plan: str = "free"
     token: str = ""
+    refresh_token: str = ""
 
 
 @dataclass
@@ -166,6 +167,7 @@ class IntelligenceClient:
                 picture=data.get("picture", ""),
                 plan=data.get("plan", "free"),
                 token=data.get("token", ""),
+                refresh_token=data.get("refresh_token", ""),
             )
             self._usage.plan = self._user.plan
             self._usage.limit_today = _plan_limit(self._user.plan)
@@ -203,7 +205,7 @@ class IntelligenceClient:
         self._save_session()
         logger.info("New conversation started")
 
-    def save_auth(self, token: str, user_data: dict) -> None:
+    def save_auth(self, token: str, user_data: dict, refresh_token: str = "") -> None:
         """Save authentication after successful login."""
         self._user = UserProfile(
             id=user_data.get("id", 0),
@@ -212,6 +214,7 @@ class IntelligenceClient:
             picture=user_data.get("picture", ""),
             plan=user_data.get("plan", "free"),
             token=token,
+            refresh_token=refresh_token,
         )
         self._usage.plan = self._user.plan
         self._usage.limit_today = _plan_limit(self._user.plan)
@@ -226,6 +229,7 @@ class IntelligenceClient:
                     "picture": self._user.picture,
                     "plan": self._user.plan,
                     "token": token,
+                    "refresh_token": refresh_token,
                 },
                 indent=2,
             )
@@ -272,6 +276,7 @@ class IntelligenceClient:
         3. Call /v1/chat with intent, client, conversation_id
         5. Parse cognitive_state + memory_sources
         6. Update usage and session
+        7. If 401 → auto-refresh token and retry once
         """
         if not self.is_logged_in:
             return IntelligenceResult(
@@ -290,10 +295,12 @@ class IntelligenceClient:
 
         result = self._call_chat(text, intent)
 
+        # Auto-retry after token refresh
+        if result.error == "token_refreshed":
+            result = self._call_chat(text, intent)
+
         if result.success:
             self._usage.used_today += 1
-            # OS: don't persist conversation_id between queries
-            # Each query is independent (no stale context)
             if result.cognitive_state:
                 self._last_cognitive_state = result.cognitive_state
 
@@ -476,7 +483,13 @@ class IntelligenceClient:
     def _handle_http_error(self, e: urllib.error.HTTPError) -> IntelligenceResult:
         """Handle HTTP errors from the API."""
         if e.code == 401:
-            logger.warning("Intelligence token expired")
+            # Try auto-refresh before giving up
+            if self._try_refresh_token():
+                logger.info("Token refreshed successfully, retry needed")
+                return IntelligenceResult(
+                    success=False, error="token_refreshed", text=""
+                )
+            logger.warning("Intelligence token expired and refresh failed")
             return IntelligenceResult(
                 success=False, error="token_expired", text="Sessão expirada. Faça login novamente."
             )
@@ -491,6 +504,49 @@ class IntelligenceClient:
             return IntelligenceResult(
                 success=False, error="api_error", text="Erro no serviço. Tente novamente."
             )
+
+    def _try_refresh_token(self) -> bool:
+        """Attempt to refresh the access token using the stored refresh_token.
+
+        Returns True if refresh succeeded and self._user.token is updated.
+        """
+        if not self._user or not self._user.refresh_token:
+            return False
+
+        try:
+            payload = json.dumps({"refresh_token": self._user.refresh_token}).encode()
+            req = urllib.request.Request(
+                f"{API_BASE}/v1/auth/refresh",
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read())
+
+            new_token = data.get("token", "")
+            if not new_token:
+                return False
+
+            # Update in-memory and on-disk
+            self._user.token = new_token
+            self.save_auth(
+                new_token,
+                {
+                    "id": self._user.id,
+                    "email": self._user.email,
+                    "name": self._user.name,
+                    "picture": self._user.picture,
+                    "plan": self._user.plan,
+                },
+                refresh_token=self._user.refresh_token,
+            )
+            logger.info("Token auto-refreshed for %s", self._user.email)
+            return True
+
+        except Exception as e:
+            logger.debug("Token refresh failed: %s", e)
+            return False
 
     # ─── Usage Check ──────────────────────────────────────────────────
 
@@ -602,11 +658,12 @@ def start_auth_flow(on_complete: Callable[[bool, str], None] | None = None) -> N
                 params = parse_qs(parsed.query)
                 token = params.get("token", [""])[0]
                 user_json = params.get("user", [""])[0]
+                refresh_tok = params.get("refresh_token", [""])[0]
 
                 if token and user_json:
                     try:
                         user_data = json.loads(user_json)
-                        intelligence.save_auth(token, user_data)
+                        intelligence.save_auth(token, user_data, refresh_token=refresh_tok)
                         result_holder["success"] = True
                         result_holder["message"] = f"Bem-vindo, {user_data.get('name', '')}!"
 
