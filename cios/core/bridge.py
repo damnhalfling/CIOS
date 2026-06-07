@@ -318,30 +318,20 @@ class CIOSBridge:
                         signal_topbar_idle()
                         cmd = intel_result.os_command
 
-                        # Handle display_mode from orchestrator
+                        # Multi-step execution loop
+                        if cmd.get("has_next"):
+                            return self._execute_multi_step(cmd, resolved_input)
+
+                        # Single-step: handle display_mode and execute
                         display_mode = cmd.get("display_mode", "foreground")
 
-                        # Handle multi-step execution info
-                        step_info = None
-                        if cmd.get("has_next") or cmd.get("step"):
-                            step_info = {
-                                "step": cmd.get("step", 1),
-                                "total": cmd.get("total_steps", 1),
-                                "has_next": cmd.get("has_next", False),
-                            }
-
-                        # Show explanation if provided
-
-                        # Re-parse as local intent and execute
                         try:
                             cmd_type = IntentType(cmd["intent"])
                         except ValueError:
                             cmd_type = IntentType.UNKNOWN
 
-                        # Store display_mode in params for the handler to use
                         params = cmd.get("params", {})
                         params["_display_mode"] = display_mode
-                        params["_step_info"] = step_info
 
                         intent = Intent(
                             type=cmd_type,
@@ -603,6 +593,100 @@ class CIOSBridge:
             learn_from_success(user_input, intent)
 
         return result
+
+    def _execute_multi_step(self, first_cmd: dict, original_input: str) -> dict:
+        """Execute a multi-step orchestrated command sequence.
+
+        Loop:
+        1. Execute current step locally
+        2. Report result back to Maestro (via intelligence.query with exec_result)
+        3. Maestro returns next step (or done)
+        4. Repeat until no more steps
+
+        The user sees progress at each step. If a step needs confirmation,
+        it's handled by the normal confirmation flow.
+        """
+        from cios.core.intelligence import intelligence
+
+        cmd = first_cmd
+        all_steps = []
+        max_steps = 10  # Safety limit
+
+        for iteration in range(max_steps):
+            step_num = cmd.get("step", iteration + 1)
+            total = cmd.get("total_steps", "?")
+            intent_name = cmd.get("intent", "exec")
+            display_mode = cmd.get("display_mode", "foreground")
+
+            logger.info("Multi-step [%s/%s]: intent=%s", step_num, total, intent_name)
+
+            # Execute this step locally
+            try:
+                cmd_type = IntentType(intent_name)
+            except ValueError:
+                cmd_type = IntentType.UNKNOWN
+
+            params = cmd.get("params", {})
+            params["_display_mode"] = display_mode
+
+            intent = Intent(
+                type=cmd_type,
+                params=params,
+                raw_input=original_input,
+                confidence=1.0,
+            )
+
+            # Execute via planner
+            plan_result = self._execute_with_retry(intent)
+            steps, summary, outcome, voice_mode = humanize_result(plan_result)
+            all_steps.extend(steps)
+
+            # If this was the last step, we're done
+            if not cmd.get("has_next"):
+                return {
+                    "steps": all_steps,
+                    "result": summary or cmd.get("explanation", "Concluído."),
+                    "status": outcome,
+                    "confirm": None,
+                    "voice_mode": voice_mode,
+                    "display_mode": display_mode,
+                }
+
+            # Report result back to Maestro for next step
+            exec_result_msg = (
+                f"[exec_result] step={step_num} outcome={outcome} " f"output={summary[:200]}"
+            )
+
+            try:
+                next_result = intelligence.query(exec_result_msg, intent="chat")
+                if next_result.os_command:
+                    cmd = next_result.os_command
+                    # Continue loop with next step
+                else:
+                    # Maestro decided no more steps (or returned text)
+                    final_text = next_result.text or summary
+                    return {
+                        "steps": all_steps,
+                        "result": final_text,
+                        "status": "success",
+                        "confirm": None,
+                    }
+            except Exception as e:
+                logger.warning("Multi-step: failed to get next step: %s", e)
+                return {
+                    "steps": all_steps,
+                    "result": f"Completei {step_num} etapa(s). Erro ao continuar: {summary}",
+                    "status": outcome,
+                    "confirm": None,
+                }
+
+        # Safety: hit max iterations
+        return {
+            "steps": all_steps,
+            "result": "Execução multi-step atingiu limite de segurança.",
+            "status": "error",
+            "confirm": None,
+        }
 
     def _execute_intent(self, intent: Intent, context) -> dict:
         """Execute an intent with retry, validation, and error enrichment.

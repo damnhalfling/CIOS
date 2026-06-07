@@ -135,6 +135,12 @@ CREATE TABLE IF NOT EXISTS cios_meta (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS session_state (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at REAL NOT NULL
+);
 """
 
 
@@ -776,6 +782,36 @@ class ThreadStore:
             except Exception as e:
                 logger.error("ThreadStore: search failed for '%s': %s", query, e)
                 return []
+
+    def save_session_state(self, key: str, value: dict) -> None:
+        """Persist a session state key-value pair."""
+        import json as _json
+
+        with self._lock:
+            try:
+                self._conn.execute(
+                    """INSERT OR REPLACE INTO session_state (key, value, updated_at)
+                       VALUES (?, ?, ?)""",
+                    (key, _json.dumps(value), time.time()),
+                )
+                self._conn.commit()
+            except Exception as e:
+                logger.debug("ThreadStore: failed to save session state: %s", e)
+
+    def load_session_state(self, key: str) -> dict | None:
+        """Load a session state value by key."""
+        import json as _json
+
+        with self._lock:
+            try:
+                row = self._conn.execute(
+                    "SELECT value FROM session_state WHERE key = ?", (key,)
+                ).fetchone()
+                if row:
+                    return _json.loads(row[0])
+            except Exception as e:
+                logger.debug("ThreadStore: failed to load session state: %s", e)
+        return None
 
     def close(self) -> None:
         """Close the database connection."""
