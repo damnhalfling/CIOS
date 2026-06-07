@@ -228,29 +228,50 @@ def handle_media_play(intent: Intent, executor: Executor, memory: Memory) -> Pla
                     summary=msg,
                 )
 
-        # Fallback: open YouTube search in browser
+        # Fallback: open YouTube search in browser (Chrome/Firefox)
         import urllib.parse
 
         yt_url = f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}"
         try:
-            subprocess.Popen(
-                ["xdg-open", yt_url],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                start_new_session=True,
-            )
+            # Try Chrome first (most common), then firefox, then xdg-open
+            browser = None
+            for candidate in [
+                "google-chrome-stable",
+                "google-chrome",
+                "chromium-browser",
+                "chromium",
+                "firefox",
+            ]:
+                if shutil.which(candidate):
+                    browser = candidate
+                    break
+
+            if browser:
+                subprocess.Popen(
+                    [browser, yt_url],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True,
+                )
+            else:
+                subprocess.Popen(
+                    ["xdg-open", yt_url],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True,
+                )
             return PlanResult(
-                plan_steps=["Abrindo busca no YouTube"],
+                plan_steps=["Abrindo YouTube"],
                 results=[],
                 outcome="success",
-                summary=f"Buscando: {query}",
+                summary=f"Buscando no YouTube: {query}",
             )
         except Exception as e:
             return PlanResult(
                 plan_steps=["Reproduzindo"],
                 results=[],
                 outcome="failure",
-                summary=f"Erro: {e}",
+                summary=f"Não consegui abrir o navegador: {e}",
             )
 
     return PlanResult(
