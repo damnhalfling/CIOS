@@ -600,11 +600,9 @@ class CIOSBridge:
         Loop:
         1. Execute current step locally
         2. Report result back to Maestro (via intelligence.query with exec_result)
-        3. Maestro returns next step (or done)
-        4. Repeat until no more steps
-
-        The user sees progress at each step. If a step needs confirmation,
-        it's handled by the normal confirmation flow.
+        3. Maestro returns next step, or a question for the user, or done
+        4. If question → pause, set pending_question, resume on user answer
+        5. Repeat until no more steps
         """
         from cios.core.intelligence import intelligence
 
@@ -662,13 +660,59 @@ class CIOSBridge:
                 if next_result.os_command:
                     cmd = next_result.os_command
                     # Continue loop with next step
+                elif next_result.success and next_result.text:
+                    text = next_result.text.strip()
+
+                    # Detect if Maestro is asking the user a question
+                    is_question = (
+                        text.endswith("?")
+                        or "qual " in text.lower()
+                        or "escolha" in text.lower()
+                        or "deseja" in text.lower()
+                        or "informe" in text.lower()
+                        or "which " in text.lower()
+                    )
+
+                    if is_question:
+                        # Pause execution — ask user, resume when they answer
+                        orchestrator_intent = Intent(
+                            type=IntentType.UNKNOWN,
+                            params={
+                                "_orchestrator_resume": True,
+                                "_steps_done": all_steps,
+                                "_original_input": original_input,
+                            },
+                            raw_input=original_input,
+                            confidence=1.0,
+                        )
+                        self._thread_manager.set_pending_question(
+                            PendingQuestion(
+                                intent=orchestrator_intent,
+                                question_type="orchestrator_input",
+                                timestamp=time.time(),
+                            )
+                        )
+                        return {
+                            "steps": all_steps,
+                            "result": text,
+                            "status": "question",
+                            "confirm": None,
+                            "voice_mode": "full",
+                        }
+                    else:
+                        # Final text from Maestro (summary, no more steps)
+                        return {
+                            "steps": all_steps,
+                            "result": text,
+                            "status": "success",
+                            "confirm": None,
+                        }
                 else:
-                    # Maestro decided no more steps (or returned text)
-                    final_text = next_result.text or summary
+                    # Maestro returned nothing useful
                     return {
                         "steps": all_steps,
-                        "result": final_text,
-                        "status": "success",
+                        "result": summary or "Concluído parcialmente.",
+                        "status": outcome,
                         "confirm": None,
                     }
             except Exception as e:
@@ -1062,6 +1106,58 @@ class CIOSBridge:
         # --- Multi-step guided flow path ---
         if question.flow_steps is not None:
             return self._advance_guided_flow(question, answer_clean, confirmed)
+
+        # --- Orchestrator mid-execution input ---
+        if question.question_type == "orchestrator_input":
+            # User answered a question from the Maestro during multi-step execution.
+            # Send the answer back to Maestro and continue the execution loop.
+            from cios.core.intelligence import intelligence
+
+            try:
+                # Send user's answer to Maestro (it has the execution context)
+                result = intelligence.query(answer_clean, intent="chat")
+                if result.os_command:
+                    # Maestro returned next step(s) — continue multi-step
+                    cmd = result.os_command
+                    if cmd.get("has_next"):
+                        return self._execute_multi_step(
+                            cmd, intent.params.get("_original_input", answer_clean)
+                        )
+                    # Single step — execute directly
+                    try:
+                        cmd_type = IntentType(cmd["intent"])
+                    except ValueError:
+                        cmd_type = IntentType.UNKNOWN
+                    params = cmd.get("params", {})
+                    params["_display_mode"] = cmd.get("display_mode", "foreground")
+                    exec_intent = Intent(
+                        type=cmd_type, params=params, raw_input=answer_clean, confidence=1.0
+                    )
+                    plan_result = self._execute_with_retry(exec_intent)
+                    steps, summary, outcome, voice_mode = humanize_result(plan_result)
+                    prev_steps = intent.params.get("_steps_done", [])
+                    return {
+                        "steps": prev_steps + steps,
+                        "result": summary or "Concluído.",
+                        "status": outcome,
+                        "confirm": None,
+                        "voice_mode": voice_mode,
+                    }
+                elif result.success and result.text:
+                    return {
+                        "steps": intent.params.get("_steps_done", []),
+                        "result": result.text,
+                        "status": "success",
+                        "confirm": None,
+                    }
+            except Exception as e:
+                logger.warning("Orchestrator resume failed: %s", e)
+            return {
+                "steps": [],
+                "result": "Não consegui continuar a execução.",
+                "status": "error",
+                "confirm": None,
+            }
 
         # --- Legacy single-question path (backward compatible) ---
         # Inject answer into intent params based on question type
