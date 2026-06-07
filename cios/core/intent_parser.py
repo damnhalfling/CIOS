@@ -1219,7 +1219,7 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
     ),
     (
         re.compile(
-            r"(?:verificar?|checar?|como\s+(?:t[aá]|est[aá]))\s+(?:o\s+)?(?:sistema|computador|pc|desempenho|performance)",
+            r"(?:verificar?|checar?|como\s+(?:t[aá]|est[aá]))\s+(?:o\s+|meu\s+)?(?:sistema|computador|pc|desempenho|performance)",
             re.IGNORECASE,
         ),
         IntentType.SYSTEM_HEALTH,
