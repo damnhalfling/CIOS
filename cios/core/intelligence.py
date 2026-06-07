@@ -136,7 +136,40 @@ class IntelligenceClient:
 
     @property
     def is_logged_in(self) -> bool:
-        return self._user is not None and bool(self._user.token)
+        """Check if user is authenticated with a valid (non-expired) token.
+
+        Parses JWT expiry locally to avoid showing 'connected' with dead token.
+        If token expired but refresh_token exists, still returns True (auto-refresh will handle it).
+        If both expired, returns False.
+        """
+        if not self._user or not self._user.token:
+            return False
+
+        # Check if access token is expired
+        if self._is_token_expired(self._user.token):
+            # Has refresh token? Still considered logged in (will auto-refresh)
+            if self._user.refresh_token:
+                return True
+            # No refresh token and access expired = not logged in
+            return False
+
+        return True
+
+    def _is_token_expired(self, token: str) -> bool:
+        """Check if a JWT token is expired by decoding payload (no signature verification)."""
+        try:
+            import base64
+            # JWT = header.payload.signature — decode payload
+            parts = token.split(".")
+            if len(parts) != 3:
+                return True
+            # Add padding
+            payload_b64 = parts[1] + "=" * (4 - len(parts[1]) % 4)
+            payload = json.loads(base64.b64decode(payload_b64))
+            exp = payload.get("exp", 0)
+            return time.time() > exp
+        except Exception:
+            return True  # Can't parse = treat as expired
 
     @property
     def user(self) -> UserProfile | None:
@@ -509,6 +542,7 @@ class IntelligenceClient:
         """Attempt to refresh the access token using the stored refresh_token.
 
         Returns True if refresh succeeded and self._user.token is updated.
+        If refresh fails (expired, revoked), clears auth → user becomes disconnected.
         """
         if not self._user or not self._user.refresh_token:
             return False
@@ -526,6 +560,7 @@ class IntelligenceClient:
 
             new_token = data.get("token", "")
             if not new_token:
+                self._mark_disconnected()
                 return False
 
             # Update in-memory and on-disk
@@ -544,9 +579,43 @@ class IntelligenceClient:
             logger.info("Token auto-refreshed for %s", self._user.email)
             return True
 
+        except urllib.error.HTTPError as e:
+            if e.code == 401:
+                # Refresh token itself expired or revoked
+                self._mark_disconnected()
+            logger.debug("Token refresh failed: HTTP %d", e.code)
+            return False
         except Exception as e:
             logger.debug("Token refresh failed: %s", e)
             return False
+
+    def _mark_disconnected(self) -> None:
+        """Clear token (keep user info for re-login convenience).
+
+        After this, is_logged_in returns False and UI shows disconnected.
+        """
+        if self._user:
+            self._user.token = ""
+            self._user.refresh_token = ""
+            # Update file to reflect disconnected state
+            try:
+                AUTH_FILE.write_text(
+                    json.dumps(
+                        {
+                            "id": self._user.id,
+                            "email": self._user.email,
+                            "name": self._user.name,
+                            "picture": self._user.picture,
+                            "plan": self._user.plan,
+                            "token": "",
+                            "refresh_token": "",
+                        },
+                        indent=2,
+                    )
+                )
+            except Exception:
+                pass
+        logger.warning("Intelligence marked as disconnected (tokens expired/revoked)")
 
     # ─── Usage Check ──────────────────────────────────────────────────
 

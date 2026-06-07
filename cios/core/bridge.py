@@ -347,8 +347,7 @@ class CIOSBridge:
             if classified:
                 intent = classified
             else:
-                # No Intelligence + classifier couldn't resolve = can't help
-                # Ollama is ONLY for classification, NEVER for generating answers
+                # Neither Intelligence nor local classifier could resolve
                 signal_topbar_idle()
                 if not intelligence.is_logged_in:
                     return {
@@ -360,7 +359,15 @@ class CIOSBridge:
                         "confirm": None,
                         "voice_mode": "full",
                     }
-                return self._unknown_intent_response()
+                # Intelligence is logged in but query failed (network, server error)
+                return {
+                    "steps": [],
+                    "result": "Não consegui processar. O CIOS Intelligence está "
+                    "com problemas de conexão. Verifique sua internet ou tente novamente.",
+                    "status": "error",
+                    "confirm": None,
+                    "voice_mode": "full",
+                }
 
         # (#75) Check if intent needs clarification
         clarification = self._needs_clarification(intent)
@@ -481,7 +488,7 @@ class CIOSBridge:
             if classified:
                 intent = classified
             else:
-                # No Intelligence + classifier couldn't resolve = can't help
+                # Neither Intelligence nor local classifier could resolve
                 signal_topbar_idle()
                 if not intelligence.is_logged_in:
                     return {
@@ -493,7 +500,14 @@ class CIOSBridge:
                         "confirm": None,
                         "voice_mode": "full",
                     }
-                return self._unknown_intent_response()
+                return {
+                    "steps": [],
+                    "result": "Não consegui processar. O CIOS Intelligence está "
+                    "com problemas de conexão. Verifique sua internet ou tente novamente.",
+                    "status": "error",
+                    "confirm": None,
+                    "voice_mode": "full",
+                }
 
         # (#75) Clarification
         clarification = self._needs_clarification(intent)
