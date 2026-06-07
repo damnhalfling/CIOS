@@ -330,28 +330,51 @@ def _thumb_video(src: str, dest: Path, size: tuple) -> str | None:
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def play_media(file_path: str) -> tuple[bool, str]:
+def play_media(file_path: str, display_mode: str = "foreground") -> tuple[bool, str]:
     """Play a media file using mpv (embedded or standalone).
+
+    Args:
+        file_path: Local file path OR URL (YouTube, etc.)
+        display_mode: "sidebar" (small PIP), "fullscreen", or "foreground" (default)
 
     Returns (success, message).
     """
-    if not os.path.isfile(file_path):
+    is_url = file_path.startswith("http://") or file_path.startswith("https://")
+
+    if not is_url and not os.path.isfile(file_path):
         return False, "Arquivo não encontrado"
 
     # Check for mpv
     if not shutil.which("mpv"):
         return False, "mpv não instalado. Instale com: instalar mpv"
 
-    ext = os.path.splitext(file_path)[1].lower()
-    name = os.path.basename(file_path)
+    # For URLs, check yt-dlp
+    if is_url and not shutil.which("yt-dlp"):
+        return False, "yt-dlp não instalado. Instale com: instalar yt-dlp"
+
+    name = file_path if is_url else os.path.basename(file_path)
+    ext = "" if is_url else os.path.splitext(file_path)[1].lower()
 
     try:
-        # Launch mpv with minimal UI
+        # Launch mpv with mode-specific geometry
         cmd = ["mpv", "--force-window=yes", "--osd-level=1"]
 
-        if ext in _AUDIO_EXTS:
-            # Audio: small window with visualizer
-            cmd.extend(["--force-window=yes", "--geometry=400x100"])
+        if display_mode == "sidebar":
+            # PIP mode: small window, bottom-right, always on top
+            cmd.extend(
+                [
+                    "--geometry=400x225+20-20",  # 16:9 small, bottom-right
+                    "--ontop=yes",
+                    "--border=no",
+                    "--title=CIOS Media (sidebar)",
+                ]
+            )
+        elif display_mode == "fullscreen":
+            cmd.extend(["--fullscreen=yes"])
+        else:
+            # Foreground: normal window
+            if ext in _AUDIO_EXTS:
+                cmd.extend(["--force-window=yes", "--geometry=400x100"])
 
         cmd.append(file_path)
 
@@ -361,10 +384,39 @@ def play_media(file_path: str) -> tuple[bool, str]:
             stderr=subprocess.DEVNULL,
             start_new_session=True,
         )
-        return True, name
+
+        mode_label = {"sidebar": "em segundo plano", "fullscreen": "em tela cheia"}.get(
+            display_mode, ""
+        )
+        return True, f"Tocando {mode_label}: {name[:60]}" if mode_label else name
     except Exception as e:
         logger.warning("Failed to play %s: %s", file_path, e)
-        return False, f"Erro ao reproduzir: {name}"
+        return False, f"Erro ao reproduzir: {name[:60]}"
+
+
+def media_fullscreen() -> tuple[bool, str]:
+    """Toggle fullscreen on the active mpv instance."""
+    try:
+        # Send fullscreen toggle via mpv IPC or xdotool
+        result = subprocess.run(
+            ["xdotool", "search", "--name", "mpv", "key", "f"],
+            capture_output=True,
+            timeout=3,
+        )
+        if result.returncode == 0:
+            return True, "Tela cheia"
+        # Fallback: try via CIOS Media sidebar title
+        result = subprocess.run(
+            ["xdotool", "search", "--name", "CIOS Media", "key", "f"],
+            capture_output=True,
+            timeout=3,
+        )
+        return (
+            result.returncode == 0,
+            "Tela cheia" if result.returncode == 0 else "Nenhum media ativo",
+        )
+    except Exception:
+        return False, "Não consegui alterar o modo de exibição"
 
 
 def stop_playback() -> tuple[bool, str]:

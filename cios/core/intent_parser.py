@@ -57,6 +57,8 @@ class IntentType(Enum):
     FIREWALL = "firewall"
     TRASH = "trash"
     BRIEFING = "briefing"
+    MEDIA_PLAY = "media_play"
+    MEDIA_CONTROL = "media_control"
     UNKNOWN = "unknown"
 
 

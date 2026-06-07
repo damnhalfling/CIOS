@@ -678,7 +678,11 @@ class IntelligenceClient:
 
 
 def _get_system_context() -> dict:
-    """Gather current OS context for API escalation."""
+    """Gather current OS context for API escalation.
+
+    Provides the Maestro with full awareness of the device state
+    so it can make context-aware decisions (sidebar vs fullscreen, etc.).
+    """
     import subprocess
 
     context = {
@@ -686,6 +690,7 @@ def _get_system_context() -> dict:
         "client": "os",
     }
 
+    # Active window
     try:
         result = subprocess.run(
             ["xdotool", "getactivewindow", "getwindowname"],
@@ -695,6 +700,59 @@ def _get_system_context() -> dict:
         )
         if result.returncode == 0:
             context["active_window"] = result.stdout.strip()
+    except Exception:
+        pass
+
+    # Open apps (from compositor IPC or /proc)
+    try:
+        result = subprocess.run(
+            ["ps", "-eo", "comm", "--no-headers"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        if result.returncode == 0:
+            # Filter to known GUI apps
+            known_apps = {
+                "chrome",
+                "google-chrome",
+                "firefox",
+                "code",
+                "vscode",
+                "foot",
+                "terminal",
+                "vlc",
+                "mpv",
+                "nautilus",
+                "thunar",
+                "slack",
+                "telegram",
+                "discord",
+                "spotify",
+            }
+            running = set(result.stdout.strip().splitlines())
+            open_apps = [app for app in running if app.lower() in known_apps]
+            if open_apps:
+                context["open_apps"] = open_apps
+    except Exception:
+        pass
+
+    # Active project (check if vscode/editor has a project open)
+    active_window = context.get("active_window", "")
+    if " - " in active_window:
+        # VSCode: "file.py - project_name - Visual Studio Code"
+        parts = active_window.split(" - ")
+        if len(parts) >= 2 and "Code" in active_window:
+            context["active_project"] = parts[-2].strip()
+
+    # Basic resources
+    try:
+        import psutil
+
+        context["resources"] = {
+            "cpu": int(psutil.cpu_percent(interval=0)),
+            "ram": int(psutil.virtual_memory().percent),
+        }
     except Exception:
         pass
 

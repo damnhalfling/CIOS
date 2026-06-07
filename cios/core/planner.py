@@ -41,7 +41,13 @@ from cios.core.handlers.google_workspace import (
     handle_gchat,
 )
 from cios.core.handlers.logs import handle_fix_last_error, handle_log_analysis
-from cios.core.handlers.media import handle_intent_browse, handle_intent_media, handle_intent_write
+from cios.core.handlers.media import (
+    handle_intent_browse,
+    handle_intent_media,
+    handle_intent_write,
+    handle_media_control,
+    handle_media_play,
+)
 from cios.core.handlers.misc import handle_command_exec, handle_intelligence, handle_self_update
 from cios.core.handlers.network import handle_network
 from cios.core.handlers.packages import handle_package
@@ -151,6 +157,8 @@ _HANDLER_MAP = {
     IntentType.FIREWALL: handle_firewall,
     IntentType.TRASH: handle_trash,
     IntentType.BRIEFING: handle_briefing,
+    IntentType.MEDIA_PLAY: handle_media_play,
+    IntentType.MEDIA_CONTROL: handle_media_control,
     IntentType.HISTORY_SEARCH: None,  # Handled directly in bridge
 }
 

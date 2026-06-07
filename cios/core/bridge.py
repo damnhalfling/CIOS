@@ -317,15 +317,35 @@ class CIOSBridge:
                     if intel_result.os_command:
                         signal_topbar_idle()
                         cmd = intel_result.os_command
-                        # Re-parse as local intent and execute
 
+                        # Handle display_mode from orchestrator
+                        display_mode = cmd.get("display_mode", "foreground")
+
+                        # Handle multi-step execution info
+                        step_info = None
+                        if cmd.get("has_next") or cmd.get("step"):
+                            step_info = {
+                                "step": cmd.get("step", 1),
+                                "total": cmd.get("total_steps", 1),
+                                "has_next": cmd.get("has_next", False),
+                            }
+
+                        # Show explanation if provided
+
+                        # Re-parse as local intent and execute
                         try:
                             cmd_type = IntentType(cmd["intent"])
                         except ValueError:
                             cmd_type = IntentType.UNKNOWN
+
+                        # Store display_mode in params for the handler to use
+                        params = cmd.get("params", {})
+                        params["_display_mode"] = display_mode
+                        params["_step_info"] = step_info
+
                         intent = Intent(
                             type=cmd_type,
-                            params=cmd.get("params", {}),
+                            params=params,
                             raw_input=resolved_input,
                             confidence=1.0,
                         )
@@ -686,6 +706,14 @@ class CIOSBridge:
             "confirm": None,
             "voice_mode": voice_mode,
         }
+
+        # Pass display_mode and step_info from orchestrator to the UI
+        display_mode = intent.params.get("_display_mode")
+        step_info = intent.params.get("_step_info")
+        if display_mode:
+            result["display_mode"] = display_mode
+        if step_info:
+            result["step_info"] = step_info
 
         # Merge extra structured data (e.g., gallery signal) into response
         if plan_result.data:
