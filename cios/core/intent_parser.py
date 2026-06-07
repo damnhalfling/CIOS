@@ -1968,7 +1968,7 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
             re.IGNORECASE,
         ),
         IntentType.INTELLIGENCE,
-        lambda m: {"intent": "explain", "query": m.group(0)},
+        lambda m: {"intent": "explain"},
         0.85,
     ),
     # --- intelligence: write (PT + EN) ---
@@ -1980,7 +1980,7 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
             re.IGNORECASE,
         ),
         IntentType.INTELLIGENCE,
-        lambda m: {"intent": "write", "query": m.group(0)},
+        lambda m: {"intent": "write"},
         0.85,
     ),
     # --- intelligence: summarize (PT + EN) ---
@@ -1991,7 +1991,7 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
             re.IGNORECASE,
         ),
         IntentType.INTELLIGENCE,
-        lambda m: {"intent": "summarize", "query": m.group(0)},
+        lambda m: {"intent": "summarize"},
         0.88,
     ),
     # --- intelligence: translate (PT + EN) ---
@@ -2003,7 +2003,7 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
             re.IGNORECASE,
         ),
         IntentType.INTELLIGENCE,
-        lambda m: {"intent": "translate", "query": m.group(0)},
+        lambda m: {"intent": "translate"},
         0.88,
     ),
     # --- Personal Memory (PT + EN) → routes to Intelligence ---
@@ -2013,7 +2013,7 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
             re.IGNORECASE,
         ),
         IntentType.INTELLIGENCE,
-        lambda m: {"intent": "personal_memory", "query": m.group(0)},
+        lambda m: {"intent": "personal_memory"},
         0.95,
     ),
     (
@@ -2022,7 +2022,7 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
             re.IGNORECASE,
         ),
         IntentType.INTELLIGENCE,
-        lambda m: {"intent": "personal_memory", "query": m.group(0)},
+        lambda m: {"intent": "personal_memory"},
         0.93,
     ),
     (
@@ -2031,7 +2031,7 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
             re.IGNORECASE,
         ),
         IntentType.INTELLIGENCE,
-        lambda m: {"intent": "personal_memory", "query": m.group(0)},
+        lambda m: {"intent": "personal_memory"},
         0.93,
     ),
     (
@@ -2040,7 +2040,7 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
             re.IGNORECASE,
         ),
         IntentType.INTELLIGENCE,
-        lambda m: {"intent": "projects", "query": m.group(0)},
+        lambda m: {"intent": "projects"},
         0.92,
     ),
     # --- Theming (PT + EN) ---
