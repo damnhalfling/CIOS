@@ -322,7 +322,7 @@ class CIOSBridge:
                         if cmd.get("has_next"):
                             return self._execute_multi_step(cmd, resolved_input)
 
-                        # Single-step: handle display_mode and execute
+                        # Single-step: handle display_mode and execute directly
                         display_mode = cmd.get("display_mode", "foreground")
 
                         try:
@@ -339,7 +339,13 @@ class CIOSBridge:
                             raw_input=resolved_input,
                             confidence=1.0,
                         )
-                        # Continue to execution below (don't return)
+                        # IMPORTANT: don't fall through to Priority 2
+                        # Execute this intent directly and return
+                        result = self._execute_intent(intent, context)
+                        context.record_turn(resolved_input, intent, result)
+                        if result.get("status") in ("success", "recovered"):
+                            learn_from_success(resolved_input, intent)
+                        return result
                     elif intel_result.success and intel_result.text:
                         signal_topbar_idle()
                         return {
