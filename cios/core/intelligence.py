@@ -756,6 +756,25 @@ def _get_system_context() -> dict:
     except Exception:
         pass
 
+    # Media state (what's currently playing)
+    try:
+        from cios.skills.mpv_controller import get_media_state
+
+        media = get_media_state()
+        if media is not None:
+            context["media_state"] = {
+                "playing": media.playing,
+                "paused": media.paused,
+                "title": media.title,
+                "mode": media.mode,
+                "url": media.url,
+                "position": media.position,
+                "duration": media.duration,
+                "playlist_count": media.playlist_count,
+            }
+    except Exception:
+        pass
+
     return context
 
 

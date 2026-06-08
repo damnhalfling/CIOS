@@ -331,7 +331,7 @@ def _thumb_video(src: str, dest: Path, size: tuple) -> str | None:
 
 
 def play_media(file_path: str, display_mode: str = "foreground") -> tuple[bool, str]:
-    """Play a media file using mpv (embedded or standalone).
+    """Play a media file using mpv with IPC control.
 
     Args:
         file_path: Local file path OR URL (YouTube, etc.)
@@ -339,105 +339,40 @@ def play_media(file_path: str, display_mode: str = "foreground") -> tuple[bool, 
 
     Returns (success, message).
     """
-    is_url = (
-        file_path.startswith("http://")
-        or file_path.startswith("https://")
-        or file_path.startswith("ytdl://")
-    )
+    from cios.skills.mpv_controller import play
 
-    if not is_url and not os.path.isfile(file_path):
-        return False, "Arquivo não encontrado"
+    return play(file_path, mode=display_mode)
 
-    # Check for mpv
-    if not shutil.which("mpv"):
-        return False, "mpv não instalado. Instale com: instalar mpv"
 
-    # For URLs, check yt-dlp
-    if is_url and not shutil.which("yt-dlp"):
-        return False, "yt-dlp não instalado. Instale com: instalar yt-dlp"
+def play_media_search(
+    query: str, display_mode: str = "sidebar", count: int = 10
+) -> tuple[bool, str]:
+    """Search YouTube via yt-dlp and play results as playlist.
 
-    name = file_path if is_url else os.path.basename(file_path)
-    ext = "" if is_url else os.path.splitext(file_path)[1].lower()
+    Args:
+        query: Search terms (e.g., "techno", "lofi hip hop")
+        display_mode: "sidebar", "fullscreen", "foreground"
+        count: Number of search results to queue
 
-    try:
-        # Launch mpv with mode-specific geometry
-        cmd = ["mpv", "--force-window=yes", "--osd-level=1"]
+    Returns (success, message).
+    """
+    from cios.skills.mpv_controller import play_search
 
-        if display_mode == "sidebar":
-            # PIP mode: small window, bottom-right, always on top
-            cmd.extend(
-                [
-                    "--geometry=400x225+20-20",  # 16:9 small, bottom-right
-                    "--ontop=yes",
-                    "--border=no",
-                    "--title=CIOS Media (sidebar)",
-                ]
-            )
-        elif display_mode == "fullscreen":
-            cmd.extend(["--fullscreen=yes"])
-        else:
-            # Foreground: normal window
-            if ext in _AUDIO_EXTS:
-                cmd.extend(["--force-window=yes", "--geometry=400x100"])
-
-        cmd.append(file_path)
-
-        # Ensure WAYLAND_DISPLAY is set (compositor may not propagate to subprocess)
-        env = os.environ.copy()
-        if "WAYLAND_DISPLAY" not in env:
-            env["WAYLAND_DISPLAY"] = "wayland-1"
-        if "XDG_RUNTIME_DIR" not in env:
-            env["XDG_RUNTIME_DIR"] = f"/run/user/{os.getuid()}"
-
-        subprocess.Popen(
-            cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True,
-            env=env,
-        )
-
-        mode_label = {"sidebar": "em segundo plano", "fullscreen": "em tela cheia"}.get(
-            display_mode, ""
-        )
-        return True, f"Tocando {mode_label}: {name[:60]}" if mode_label else name
-    except Exception as e:
-        logger.warning("Failed to play %s: %s", file_path, e)
-        return False, f"Erro ao reproduzir: {name[:60]}"
+    return play_search(query, mode=display_mode, count=count)
 
 
 def media_fullscreen() -> tuple[bool, str]:
     """Toggle fullscreen on the active mpv instance."""
-    try:
-        # Send fullscreen toggle via mpv IPC or xdotool
-        result = subprocess.run(
-            ["xdotool", "search", "--name", "mpv", "key", "f"],
-            capture_output=True,
-            timeout=3,
-        )
-        if result.returncode == 0:
-            return True, "Tela cheia"
-        # Fallback: try via CIOS Media sidebar title
-        result = subprocess.run(
-            ["xdotool", "search", "--name", "CIOS Media", "key", "f"],
-            capture_output=True,
-            timeout=3,
-        )
-        return (
-            result.returncode == 0,
-            "Tela cheia" if result.returncode == 0 else "Nenhum media ativo",
-        )
-    except Exception:
-        return False, "Não consegui alterar o modo de exibição"
+    from cios.skills.mpv_controller import toggle_fullscreen
+
+    return toggle_fullscreen()
 
 
 def stop_playback() -> tuple[bool, str]:
-    """Stop any running mpv instance."""
-    try:
-        subprocess.run(["pkill", "-f", "mpv"], capture_output=True, timeout=5)
-        return True, "Reprodução parada"
-    except Exception:
-        return False, "Nenhuma reprodução ativa"
+    """Stop the CIOS-managed mpv instance (does not kill unrelated mpv)."""
+    from cios.skills.mpv_controller import stop
+
+    return stop()
 
 
 # ═══════════════════════════════════════════════════════════════════════════

@@ -15,7 +15,7 @@
 # ═══════════════════════════════════════════════════
 set -euo pipefail
 
-VERSION="${1:-2.0.0-rc5}"
+VERSION="${1:-3.0.0-rc15}"
 PKG_NAME="cios"
 PKG_DIR="${PKG_NAME}_${VERSION}_amd64"
 INSTALL_DIR="/usr/share/cios"

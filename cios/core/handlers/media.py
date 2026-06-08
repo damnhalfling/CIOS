@@ -192,16 +192,16 @@ def handle_intent_write(intent: Intent, executor: Executor, memory: Memory) -> P
 def handle_media_play(intent: Intent, executor: Executor, memory: Memory) -> PlanResult:
     """Handle media_play from the Maestro orchestrator.
 
-    Plays a URL or searches for content, respecting display_mode (sidebar/fullscreen).
-    This is the handler that makes "toca um techno" work end-to-end.
+    Plays a URL or searches for content via yt-dlp + mpv (no browser dependency).
+    Respects display_mode (sidebar/fullscreen). Uses mpv IPC for control.
     """
-    from cios.skills.media_player import play_media
+    from cios.skills.media_player import play_media, play_media_search
 
     url = intent.params.get("url", "")
     query = intent.params.get("query", "")
     display_mode = intent.params.get("_display_mode", "foreground")
 
-    # If we have a URL, play directly
+    # If we have a URL, play directly via mpv
     if url:
         ok, msg = play_media(url, display_mode=display_mode)
         return PlanResult(
@@ -211,71 +211,15 @@ def handle_media_play(intent: Intent, executor: Executor, memory: Memory) -> Pla
             summary=msg,
         )
 
-    # If we have a search query, play music
+    # If we have a search query, search via yt-dlp and play as playlist
     if query:
-        import shutil
-        import subprocess
-        import urllib.parse
-
-        # Build YouTube Music URL that auto-plays
-        # Use "watch" with a search radio (auto-generates mix from search term)
-        yt_url = f"https://music.youtube.com/search?q={urllib.parse.quote(query)}"
-
-        try:
-            browser = None
-            for candidate in [
-                "google-chrome-stable",
-                "google-chrome",
-                "chromium-browser",
-                "chromium",
-                "firefox",
-            ]:
-                if shutil.which(candidate):
-                    browser = candidate
-                    break
-
-            if not browser:
-                return PlanResult(
-                    plan_steps=[],
-                    results=[],
-                    outcome="failure",
-                    summary="Nenhum navegador encontrado.",
-                )
-
-            # Launch browser in small window (sidebar-like PIP mode)
-            cmd = [browser]
-            if "chrome" in browser or "chromium" in browser:
-                cmd.extend(
-                    [
-                        "--window-size=500,350",
-                        "--window-position=20,600",
-                        "--new-window",
-                        "--app=" + yt_url,  # App mode = no toolbar, cleaner
-                    ]
-                )
-            else:
-                cmd.append(yt_url)
-
-            subprocess.Popen(
-                cmd,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                start_new_session=True,
-            )
-
-            return PlanResult(
-                plan_steps=["Tocando música"],
-                results=[],
-                outcome="success",
-                summary=f"♫ {query} no YouTube Music",
-            )
-        except Exception as e:
-            return PlanResult(
-                plan_steps=[],
-                results=[],
-                outcome="failure",
-                summary=f"Não consegui abrir: {e}",
-            )
+        ok, msg = play_media_search(query, display_mode=display_mode, count=10)
+        return PlanResult(
+            plan_steps=["Buscando música", "Tocando playlist"],
+            results=[],
+            outcome="success" if ok else "failure",
+            summary=f"♫ {msg}" if ok else msg,
+        )
 
     return PlanResult(
         plan_steps=[],
@@ -288,14 +232,21 @@ def handle_media_play(intent: Intent, executor: Executor, memory: Memory) -> Pla
 def handle_media_control(intent: Intent, executor: Executor, memory: Memory) -> PlanResult:
     """Handle media_control from the Maestro orchestrator.
 
-    Controls active media: pause, resume, next, stop, fullscreen.
+    Controls active media via mpv IPC: pause, resume, next, stop, fullscreen, volume.
     """
-    from cios.skills.media_player import media_fullscreen, stop_playback
+    from cios.skills.mpv_controller import (
+        next_track,
+        prev_track,
+        set_volume,
+        stop,
+        toggle_fullscreen,
+        toggle_pause,
+    )
 
     action = intent.params.get("action", "")
 
     if action == "stop":
-        ok, msg = stop_playback()
+        ok, msg = stop()
         return PlanResult(
             plan_steps=["Parando"],
             results=[],
@@ -304,7 +255,7 @@ def handle_media_control(intent: Intent, executor: Executor, memory: Memory) -> 
         )
 
     if action == "fullscreen":
-        ok, msg = media_fullscreen()
+        ok, msg = toggle_fullscreen()
         return PlanResult(
             plan_steps=["Tela cheia"],
             results=[],
@@ -313,41 +264,41 @@ def handle_media_control(intent: Intent, executor: Executor, memory: Memory) -> 
         )
 
     if action in ("pause", "resume", "toggle"):
-        import subprocess
-
-        try:
-            # Send pause toggle to mpv via xdotool
-            subprocess.run(
-                ["xdotool", "search", "--name", "mpv", "key", "space"],
-                capture_output=True,
-                timeout=3,
-            )
-            return PlanResult(
-                plan_steps=["Pause/Resume"],
-                results=[],
-                outcome="success",
-                summary="Pause/Resume",
-            )
-        except Exception:
-            pass
+        ok, msg = toggle_pause()
+        return PlanResult(
+            plan_steps=["Pause/Resume"],
+            results=[],
+            outcome="success" if ok else "failure",
+            summary=msg,
+        )
 
     if action == "next":
-        import subprocess
+        ok, msg = next_track()
+        return PlanResult(
+            plan_steps=["Próxima"],
+            results=[],
+            outcome="success" if ok else "failure",
+            summary=msg,
+        )
 
-        try:
-            subprocess.run(
-                ["xdotool", "search", "--name", "mpv", "key", "greater"],
-                capture_output=True,
-                timeout=3,
-            )
-            return PlanResult(
-                plan_steps=["Próximo"],
-                results=[],
-                outcome="success",
-                summary="Próximo",
-            )
-        except Exception:
-            pass
+    if action == "prev":
+        ok, msg = prev_track()
+        return PlanResult(
+            plan_steps=["Anterior"],
+            results=[],
+            outcome="success" if ok else "failure",
+            summary=msg,
+        )
+
+    if action == "volume":
+        vol = intent.params.get("volume", 50)
+        ok, msg = set_volume(int(vol))
+        return PlanResult(
+            plan_steps=["Volume"],
+            results=[],
+            outcome="success" if ok else "failure",
+            summary=msg,
+        )
 
     return PlanResult(
         plan_steps=[],
