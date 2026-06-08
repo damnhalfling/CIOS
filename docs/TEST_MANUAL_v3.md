@@ -1,4 +1,4 @@
-# CIOS — Rotina de Testes Manuais (v3.0.0-rc6)
+# CIOS — Rotina de Testes Manuais (v3.0.0-rc14)
 
 > Executar na máquina com CIOS instalado (ThinkPad E14 Gen 6).
 > Tempo estimado: 40-50 minutos.
@@ -350,4 +350,4 @@
 
 ---
 
-*CIOS v3.0.0-rc6 — Junho 2026*
+*CIOS v3.0.0-rc14 — Junho 2026*

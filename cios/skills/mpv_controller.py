@@ -212,7 +212,11 @@ class MpvController:
         if not shutil.which("mpv"):
             return False, "mpv não instalado. Instale com: instalar mpv"
 
-        is_url = target.startswith("http://") or target.startswith("https://")
+        is_url = (
+            target.startswith("http://")
+            or target.startswith("https://")
+            or target.startswith("ytdl://")
+        )
         if is_url and not shutil.which("yt-dlp"):
             return False, "yt-dlp não instalado. Instale com: instalar yt-dlp"
 
@@ -251,7 +255,7 @@ class MpvController:
             return False, "mpv não instalado"
 
         # Use yt-dlp to search and get URLs
-        search_term = f"ytsearch{count}:{query}"
+        search_term = f"ytdl://ytsearch{count}:{query}"
 
         # Launch mpv directly with ytdl search — mpv handles yt-dlp internally
         return self._launch(search_term, mode, shuffle=False)
@@ -339,6 +343,7 @@ class MpvController:
             f"--input-ipc-server={_SOCKET_PATH}",
             "--idle=once",  # Don't quit when playlist ends (wait for next command)
             "--ytdl-raw-options=retries=3",
+            "--ytdl-format=bestvideo[height<=480]+bestaudio/best[height<=480]/best",
         ]
 
         if mode == "sidebar":

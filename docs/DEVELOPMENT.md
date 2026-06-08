@@ -1,6 +1,6 @@
 # CIOS — Desenvolvimento
 
-> v3.0.0-rc6 — Junho 2026
+> v3.0.0-rc14 — Junho 2026
 
 ---
 
@@ -154,7 +154,7 @@ ruff format --check cios/ tests/
 mypy cios/core/ --ignore-missing-imports --exclude "(intent_parser|mcp|intelligence|bridge)\.py"
 
 # Build .deb
-bash build-deb.sh 3.0.0-rc6
+bash build-deb.sh 3.0.0-rc14
 
 # Testar em VM (QEMU)
 qemu-system-x86_64 -m 4096 -smp 2 -enable-kvm \
@@ -164,7 +164,7 @@ qemu-system-x86_64 -m 4096 -smp 2 -enable-kvm \
 
 # Instalar na VM
 ssh -p 2222 user@localhost
-sudo apt install ./cios_3.0.0-rc6_amd64.deb
+sudo apt install ./cios_3.0.0-rc14_amd64.deb
 
 # Instalar componentes de IA
 sudo cios-setup-ai

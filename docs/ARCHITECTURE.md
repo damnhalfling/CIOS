@@ -1,6 +1,6 @@
 # CIOS — Arquitetura
 
-> v3.0.0-rc6 — Junho 2026
+> v3.0.0-rc14 — Junho 2026
 
 ---
 
@@ -35,7 +35,7 @@ Boot → GRUB (0s, silent) → Plymouth (splash CIOS) → greetd (login)
 ## Pipeline de intenção
 
 ```
-User Input → Parser (201+ patterns) → Classifier (regex → cache → Ollama)
+User Input → Parser (240+ patterns) → Classifier (regex → cache → Ollama)
   → MCO (decision layer) → Planner (43 handlers) → Executor
   → Humanizer (260+ translations) → UI (streaming GTK4)
 ```
@@ -213,7 +213,7 @@ cios-os/
 │   ├── main.py              # Entry point (6 modos)
 │   ├── core/                # Engine cognitiva
 │   │   ├── bridge.py        # UI ↔ backend (CIOSBridge) + periodic sync
-│   │   ├── intent_parser.py # 201+ regex patterns (incl. Google, desktop, networking)
+│   │   ├── intent_parser.py # 240+ regex patterns (incl. Google, desktop, networking)
 │   │   ├── intent_classifier.py # Hybrid: regex → cache → Ollama
 │   │   ├── planner.py       # 43 handlers + MCO
 │   │   ├── mcp.py           # Live system state
@@ -234,7 +234,7 @@ cios-os/
 │   │       ├── packages.py, peripherals.py, process.py
 │   │       ├── screen_capture.py, spreadsheet.py, system.py
 │   │       └── _common.py
-│   ├── skills/              # 46 system skills
+│   ├── skills/              # 47 system skills
 │   ├── ui/                  # GTK4 + CLI + hotkey + topbar
 │   │   └── gtk/
 │   │       ├── app.py           # Main application (Ctrl+K, overlays)

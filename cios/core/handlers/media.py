@@ -199,9 +199,22 @@ def handle_media_play(intent: Intent, executor: Executor, memory: Memory) -> Pla
 
     url = intent.params.get("url", "")
     query = intent.params.get("query", "")
-    display_mode = intent.params.get("_display_mode", "foreground")
+    display_mode = intent.params.get("_display_mode", "sidebar")
 
-    # If we have a URL, play directly via mpv
+    # For search queries (music), always default to sidebar PIP
+    if not url and query:
+        display_mode = "sidebar"
+
+    # Detect if "url" is actually a search query (Maestro sometimes puts search there)
+    if url and not url.startswith("http") and not url.startswith("ytdl://"):
+        # Maestro put a search term in url field — treat as query
+        query = url.replace("ytsearch", "").replace("ytdl://", "")
+        # Strip "N:" prefix (e.g., "10:offspring" → "offspring")
+        if ":" in query:
+            query = query.split(":", 1)[1]
+        url = ""
+
+    # If we have a real URL, play directly via mpv
     if url:
         ok, msg = play_media(url, display_mode=display_mode)
         return PlanResult(

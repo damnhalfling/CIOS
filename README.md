@@ -106,7 +106,7 @@ No wasted steps. No wrong guesses.
 
 ### Skills
 
-Real system execution. 46 skills, zero abstraction.
+Real system execution. 47 skills, zero abstraction.
 
 Wi-Fi (nmcli) · Audio (pactl) · Files · Processes · Packages (apt) · Windows (compositor IPC) · Clipboard (wl-clipboard) · Battery · Brightness · Dev environments · Disk analysis · Auto-learning · File search · Workflow start · Explore system · Gallery management · Favorites & albums · Duplicate detection · Face clustering · Screen capture · Image editing · Spreadsheets (CSV/XLSX) · Theming · Notifications · Scheduler · Automount · VPN · Firewall · Keyring · Trash · Display settings · Night light · Printer · Backup · Locale · Google Workspace (Gmail, Drive, Calendar, Chat)
 
@@ -270,8 +270,8 @@ All commands work in **English** and **Portuguese**.
 
 ```bash
 # Download the .deb from releases
-wget https://github.com/damnhalfling/CIOS/releases/latest/download/cios_3.0.0-rc6_amd64.deb
-sudo apt install ./cios_3.0.0-rc6_amd64.deb
+wget https://github.com/damnhalfling/CIOS/releases/latest/download/cios_3.0.0-rc14_amd64.deb
+sudo apt install ./cios_3.0.0-rc14_amd64.deb
 sudo reboot
 ```
 
@@ -335,7 +335,7 @@ In practice: if no LLM is available, all regex-matched intents (the vast majorit
 - ✅ Custom Wayland compositor (wlroots 0.18) — running on real hardware
 - ✅ Server-side decorations (titlebar + close/minimize/maximize)
 - ✅ Background task queue — prompt stays free during long operations
-- ✅ 46 skills — Wi-Fi, audio, files, packages, windows, clipboard, dev environments, self-update, file search, workflow start, gallery management, duplicates, face clustering, screen capture, spreadsheets, monitor config, theming, notifications, scheduler, automount, VPN, firewall, keyring, trash, display settings, night light, printer, backup, locale, Google Workspace (Gmail, Drive, Calendar, Chat)
+- ✅ 47 skills — Wi-Fi, audio, files, packages, windows, clipboard, dev environments, self-update, file search, workflow start, gallery management, duplicates, face clustering, screen capture, spreadsheets, monitor config, theming, notifications, scheduler, automount, VPN, firewall, keyring, trash, display settings, night light, printer, backup, locale, mpv media control, Google Workspace (Gmail, Drive, Calendar, Chat)
 - ✅ Hybrid intent classifier — regex + LLM cache with stemming + auto-learning
 - ✅ Voice offline — STT + TTS, fully local
 - ✅ Multi-monitor — secondary screen as full interaction surface
@@ -388,7 +388,7 @@ In practice: if no LLM is available, all regex-matched intents (the vast majorit
 ```
 User Input → Intent Parser → Classifier → MCO → Planner → Executor → Humanizer → UI
                   │              │          │       │          │            │
-            201 Patterns     Cache +      MCP     46 Skills   Shell      Translates
+            240 Patterns     Cache +      MCP     47 Skills   Shell      Translates
             (PT/EN)         LLM +       (live    + Auto-     Control    to human
                            Stemming     state)   Learner      │        language
                                                    │        Memory
@@ -405,7 +405,7 @@ User Input → Intent Parser → Classifier → MCO → Planner → Executor →
 <details>
 <summary><strong>Core components</strong></summary>
 
-- **Intent Parser** — 201 regex patterns (PT/EN), hybrid LLM classifier with cache + stemming for natural language
+- **Intent Parser** — 240 regex patterns (PT/EN), hybrid LLM classifier with cache + stemming for natural language
 - **Intent Classifier** — SQLite-cached LLM classifications, fuzzy matching with light PT stemming, auto-learning from successful executions
 - **Task Queue** — Background execution for long operations (apt install, upgrades). Tasks grouped by context, sequential within context, parallel across contexts. Prompt stays free.
 - **MCP** — Live system state with reactive watchers (nmcli monitor, pactl subscribe) + adaptive polling (1s/5s/15s)
@@ -435,7 +435,7 @@ cios-os/
 │   ├── main.py                 # Entry point (6 modes)
 │   ├── core/
 │   │   ├── bridge.py           # UI ↔ backend (sync + streaming + conversation)
-│   │   ├── intent_parser.py    # 201 regex patterns PT/EN
+│   │   ├── intent_parser.py    # 240 regex patterns PT/EN
 │   │   ├── intent_classifier.py # Hybrid LLM classifier + cache + stemming
 │   │   ├── planner.py          # 43 handlers + MCO + _resilient_call()
 │   │   ├── task_queue.py       # Background task execution (TaskManager + TaskThread)
@@ -635,8 +635,8 @@ CIOS: Conectado na Starlink (192.168.1.42)
 
 ```bash
 # Baixe o .deb da release
-wget https://github.com/damnhalfling/CIOS/releases/latest/download/cios_3.0.0-rc6_amd64.deb
-sudo apt install ./cios_3.0.0-rc6_amd64.deb
+wget https://github.com/damnhalfling/CIOS/releases/latest/download/cios_3.0.0-rc14_amd64.deb
+sudo apt install ./cios_3.0.0-rc14_amd64.deb
 sudo reboot
 ```
 
@@ -668,4 +668,4 @@ cios --setup      # Re-executar setup
 
 ---
 
-*CIOS v3.0.0-rc6 — June 2026*
+*CIOS v3.0.0-rc14 — June 2026*

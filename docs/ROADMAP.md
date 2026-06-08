@@ -1,7 +1,7 @@
 # CIOS — Roadmap
 
 > Substituindo apps por intenção.
-> v3.0.0-rc6 — Junho 2026
+> v3.0.0-rc15 — Junho 2026
 
 ---
 
@@ -20,8 +20,9 @@
 🟡 Estabilização (notebooks) + demo video
 ```
 
-**Milestone alcançado (Junho 2026):** Runtime v3 com 46 skills, 839 testes.
+**Milestone alcançado (Junho 2026):** Runtime v3 com 47 skills, 839 testes.
 Desktop com cobertura ~85%. Google Workspace integrado. Puccini reescrito.
+Media Pipeline v2 (mpv IPC + yt-dlp). Execution Orchestrator completo (OE1-OE12).
 
 **Fase atual:** Estabilização final + demo video + cognição avançada (Fase 3).
 
@@ -67,7 +68,7 @@ como extensão do ser. Independente de adesão comercial, o desenvolvimento cont
 > Desktop completo o suficiente para uso diário + bugs do Maestro/memória resolvidos.
 
 **Contexto:** Compositor Wayland estável. Pipeline unificado v3 resolveu bugs do Maestro.
-46 skills implementados. 839 testes passando. Google Workspace integrado.
+47 skills implementados. 839 testes passando. Google Workspace integrado.
 
 **Concluído:**
 - ✅ Resolver bugs do Maestro (pipeline conversacional) → pipeline unificado v3
