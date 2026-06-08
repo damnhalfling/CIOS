@@ -382,11 +382,19 @@ def play_media(file_path: str, display_mode: str = "foreground") -> tuple[bool, 
 
         cmd.append(file_path)
 
+        # Ensure WAYLAND_DISPLAY is set (compositor may not propagate to subprocess)
+        env = os.environ.copy()
+        if "WAYLAND_DISPLAY" not in env:
+            env["WAYLAND_DISPLAY"] = "wayland-1"
+        if "XDG_RUNTIME_DIR" not in env:
+            env["XDG_RUNTIME_DIR"] = f"/run/user/{os.getuid()}"
+
         subprocess.Popen(
             cmd,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True,
+            env=env,
         )
 
         mode_label = {"sidebar": "em segundo plano", "fullscreen": "em tela cheia"}.get(
