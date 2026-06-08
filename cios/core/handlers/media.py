@@ -231,7 +231,11 @@ def handle_media_play(intent: Intent, executor: Executor, memory: Memory) -> Pla
         # Fallback: open YouTube search in browser (Chrome/Firefox)
         import urllib.parse
 
-        yt_url = f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}"
+        yt_url = (
+            f"https://www.youtube.com/results"
+            f"?search_query={urllib.parse.quote(query + ' playlist')}"
+            f"&sp=EgIQAw%3D%3D"
+        )
         try:
             # Try Chrome first (most common), then firefox, then xdg-open
             browser = None
@@ -264,7 +268,7 @@ def handle_media_play(intent: Intent, executor: Executor, memory: Memory) -> Pla
                 plan_steps=["Abrindo YouTube"],
                 results=[],
                 outcome="success",
-                summary=f"Buscando no YouTube: {query}",
+                summary=f"Buscando playlists de {query} no YouTube.",
             )
         except Exception as e:
             return PlanResult(

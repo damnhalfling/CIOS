@@ -1588,6 +1588,7 @@ class CIOSBridge:
             # Maestro returned an OS command → execute locally
             if intel_result.os_command:
                 cmd = intel_result.os_command
+                logger.info("Intelligence resolved: os_command=%s", cmd.get("intent"))
 
                 # Multi-step execution loop
                 if cmd.get("has_next"):
