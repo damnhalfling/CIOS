@@ -473,19 +473,35 @@ class CIOSBridge:
                     intel_result = intelligence.query(resolved_input, intent="chat")
                     # If Maestro returned an OS command, execute it locally
                     if intel_result.os_command:
+                        signal_topbar_idle()
                         cmd = intel_result.os_command
 
+                        # Multi-step
+                        if cmd.get("has_next"):
+                            return self._execute_multi_step(cmd, resolved_input)
+
+                        # Single-step: execute immediately and return
+                        display_mode = cmd.get("display_mode", "foreground")
                         try:
                             cmd_type = IntentType(cmd["intent"])
                         except ValueError:
                             cmd_type = IntentType.UNKNOWN
+
+                        params = cmd.get("params", {})
+                        params["_display_mode"] = display_mode
+
                         intent = Intent(
                             type=cmd_type,
-                            params=cmd.get("params", {}),
+                            params=params,
                             raw_input=resolved_input,
                             confidence=1.0,
                         )
-                        # Fall through to execution below
+                        result = self._execute_intent(intent, context)
+                        context.record_turn(resolved_input, intent, result)
+                        if result.get("status") in ("success", "recovered"):
+                            learn_from_success(resolved_input, intent)
+                        return result
+
                     elif intel_result.success and intel_result.text:
                         signal_topbar_idle()
                         return {
