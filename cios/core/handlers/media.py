@@ -211,33 +211,16 @@ def handle_media_play(intent: Intent, executor: Executor, memory: Memory) -> Pla
             summary=msg,
         )
 
-    # If we have a search query, open in browser with youtube search
+    # If we have a search query, play music
     if query:
         import shutil
         import subprocess
-
-        # Try mpv + yt-dlp first (native player, respects display_mode)
-        if shutil.which("mpv") and shutil.which("yt-dlp"):
-            search_url = f"ytdl://ytsearch:{query}"
-            ok, msg = play_media(search_url, display_mode=display_mode)
-            if ok:
-                return PlanResult(
-                    plan_steps=[f"Buscando e reproduzindo ({display_mode})"],
-                    results=[],
-                    outcome="success",
-                    summary=msg,
-                )
-
-        # Fallback: open YouTube search in browser (Chrome/Firefox)
         import urllib.parse
 
-        yt_url = (
-            f"https://www.youtube.com/results"
-            f"?search_query={urllib.parse.quote(query + ' playlist')}"
-            f"&sp=EgIQAw%3D%3D"
-        )
+        # Open YouTube Music (auto-plays, better than search page)
+        yt_url = f"https://music.youtube.com/search?q={urllib.parse.quote(query)}"
+
         try:
-            # Try Chrome first (most common), then firefox, then xdg-open
             browser = None
             for candidate in [
                 "google-chrome-stable",
@@ -250,32 +233,33 @@ def handle_media_play(intent: Intent, executor: Executor, memory: Memory) -> Pla
                     browser = candidate
                     break
 
-            if browser:
-                subprocess.Popen(
-                    [browser, yt_url],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    start_new_session=True,
+            if not browser:
+                return PlanResult(
+                    plan_steps=[],
+                    results=[],
+                    outcome="failure",
+                    summary="Nenhum navegador encontrado.",
                 )
-            else:
-                subprocess.Popen(
-                    ["xdg-open", yt_url],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    start_new_session=True,
-                )
+
+            subprocess.Popen(
+                [browser, yt_url],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+
             return PlanResult(
-                plan_steps=["Abrindo YouTube"],
+                plan_steps=["Abrindo YouTube Music"],
                 results=[],
                 outcome="success",
-                summary=f"Buscando playlists de {query} no YouTube.",
+                summary=f"Tocando {query} no YouTube Music.",
             )
         except Exception as e:
             return PlanResult(
-                plan_steps=["Reproduzindo"],
+                plan_steps=[],
                 results=[],
                 outcome="failure",
-                summary=f"Não consegui abrir o navegador: {e}",
+                summary=f"Não consegui abrir: {e}",
             )
 
     return PlanResult(
