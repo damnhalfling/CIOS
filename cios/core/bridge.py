@@ -306,58 +306,20 @@ class CIOSBridge:
         if intent.type == IntentType.UNKNOWN:
             if self._cancelled:
                 raise _CancelledError()
-            # Priority 1: If Intelligence is logged in, ask cloud directly (fastest path)
-            from cios.core.intelligence import intelligence
 
-            if intelligence.is_logged_in:
-                signal_topbar_processing("Consultando inteligência…")
-                try:
-                    intel_result = intelligence.query(resolved_input, intent="chat")
-                    # If Maestro returned an OS command, execute it locally
-                    if intel_result.os_command:
-                        signal_topbar_idle()
-                        cmd = intel_result.os_command
+            # Priority 1: Ask Intelligence (fastest path when logged in)
+            from cios.ui.topbar import signal_topbar_idle, signal_topbar_processing
 
-                        # Multi-step execution loop
-                        if cmd.get("has_next"):
-                            return self._execute_multi_step(cmd, resolved_input)
+            signal_topbar_processing("Consultando inteligência…")
+            intelligence_result = self._resolve_via_intelligence(resolved_input, context)
+            signal_topbar_idle()
 
-                        # Single-step: handle display_mode and execute directly
-                        display_mode = cmd.get("display_mode", "foreground")
-
-                        try:
-                            cmd_type = IntentType(cmd["intent"])
-                        except ValueError:
-                            cmd_type = IntentType.UNKNOWN
-
-                        params = cmd.get("params", {})
-                        params["_display_mode"] = display_mode
-
-                        intent = Intent(
-                            type=cmd_type,
-                            params=params,
-                            raw_input=resolved_input,
-                            confidence=1.0,
-                        )
-                        # IMPORTANT: don't fall through to Priority 2
-                        # Execute this intent directly and return
-                        result = self._execute_intent(intent, context)
-                        context.record_turn(resolved_input, intent, result)
-                        if result.get("status") in ("success", "recovered"):
-                            learn_from_success(resolved_input, intent)
-                        return result
-                    elif intel_result.success and intel_result.text:
-                        signal_topbar_idle()
-                        return {
-                            "steps": ["Consultando inteligência"],
-                            "result": intel_result.text,
-                            "status": "success",
-                            "confirm": None,
-                        }
-                except Exception as e:
-                    logger.debug("Intelligence query failed: %s", e)
+            if intelligence_result:
+                return intelligence_result
 
             # Priority 2: Try local classifier (cache + Ollama for CLASSIFICATION only)
+            from cios.core.intelligence import intelligence
+
             signal_topbar_processing("Classificando…")
             classified = classify_intent(resolved_input)
             if classified:
@@ -378,8 +340,7 @@ class CIOSBridge:
                 # Intelligence is logged in but query failed (network, server error)
                 return {
                     "steps": [],
-                    "result": "Não consegui processar. O CIOS Intelligence está "
-                    "com problemas de conexão. Verifique sua internet ou tente novamente.",
+                    "result": "Não consegui entender este comando. Tente reformular.",
                     "status": "error",
                     "confirm": None,
                     "voice_mode": "full",
@@ -463,57 +424,18 @@ class CIOSBridge:
 
         # LLM fallback — hybrid model (same as _process)
         if intent.type == IntentType.UNKNOWN:
-            # Priority 1: If Intelligence is logged in, ask cloud directly
-            from cios.core.intelligence import intelligence
+            # Priority 1: Ask Intelligence (shared method, no duplication)
+            if on_step:
+                on_step("Consultando inteligência…", 1, 0)
+            intelligence_result = self._resolve_via_intelligence(resolved_input, context)
+            signal_topbar_idle()
 
-            if intelligence.is_logged_in:
-                if on_step:
-                    on_step("Consultando inteligência…", 1, 0)
-                try:
-                    intel_result = intelligence.query(resolved_input, intent="chat")
-                    # If Maestro returned an OS command, execute it locally
-                    if intel_result.os_command:
-                        signal_topbar_idle()
-                        cmd = intel_result.os_command
-
-                        # Multi-step
-                        if cmd.get("has_next"):
-                            return self._execute_multi_step(cmd, resolved_input)
-
-                        # Single-step: execute immediately and return
-                        display_mode = cmd.get("display_mode", "foreground")
-                        try:
-                            cmd_type = IntentType(cmd["intent"])
-                        except ValueError:
-                            cmd_type = IntentType.UNKNOWN
-
-                        params = cmd.get("params", {})
-                        params["_display_mode"] = display_mode
-
-                        intent = Intent(
-                            type=cmd_type,
-                            params=params,
-                            raw_input=resolved_input,
-                            confidence=1.0,
-                        )
-                        result = self._execute_intent(intent, context)
-                        context.record_turn(resolved_input, intent, result)
-                        if result.get("status") in ("success", "recovered"):
-                            learn_from_success(resolved_input, intent)
-                        return result
-
-                    elif intel_result.success and intel_result.text:
-                        signal_topbar_idle()
-                        return {
-                            "steps": ["Consultando inteligência"],
-                            "result": intel_result.text,
-                            "status": "success",
-                            "confirm": None,
-                        }
-                except Exception as e:
-                    logger.debug("Intelligence query failed in streaming: %s", e)
+            if intelligence_result:
+                return intelligence_result
 
             # Priority 2: Try classifier (cache + Ollama)
+            from cios.core.intelligence import intelligence
+
             if on_step:
                 on_step("Classificando…", 1, 0)
             classified = classify_intent(resolved_input)
@@ -534,8 +456,7 @@ class CIOSBridge:
                     }
                 return {
                     "steps": [],
-                    "result": "Não consegui processar. O CIOS Intelligence está "
-                    "com problemas de conexão. Verifique sua internet ou tente novamente.",
+                    "result": "Não consegui entender este comando. Tente reformular.",
                     "status": "error",
                     "confirm": None,
                     "voice_mode": "full",
@@ -1646,6 +1567,67 @@ class CIOSBridge:
             "confirm": None,
             "voice_mode": "full",
         }
+
+    def _resolve_via_intelligence(self, user_input: str, context) -> dict | None:
+        """Resolve an UNKNOWN intent via Intelligence API.
+
+        Shared between _process() and _process_streaming() to avoid duplication.
+
+        Returns:
+            dict result if resolved (os_command executed or text response), or
+            None if Intelligence couldn't resolve (caller should try local classifier).
+        """
+        from cios.core.intelligence import intelligence
+
+        if not intelligence.is_logged_in:
+            return None
+
+        try:
+            intel_result = intelligence.query(user_input, intent="chat")
+
+            # Maestro returned an OS command → execute locally
+            if intel_result.os_command:
+                cmd = intel_result.os_command
+
+                # Multi-step execution loop
+                if cmd.get("has_next"):
+                    return self._execute_multi_step(cmd, user_input)
+
+                # Single-step: execute immediately
+                display_mode = cmd.get("display_mode", "foreground")
+                try:
+                    cmd_type = IntentType(cmd["intent"])
+                except ValueError:
+                    cmd_type = IntentType.UNKNOWN
+
+                params = cmd.get("params", {})
+                params["_display_mode"] = display_mode
+
+                intent = Intent(
+                    type=cmd_type,
+                    params=params,
+                    raw_input=user_input,
+                    confidence=1.0,
+                )
+                result = self._execute_intent(intent, context)
+                context.record_turn(user_input, intent, result)
+                if result.get("status") in ("success", "recovered"):
+                    learn_from_success(user_input, intent)
+                return result
+
+            # Maestro returned a text response (explanation, opinion, etc.)
+            elif intel_result.success and intel_result.text:
+                return {
+                    "steps": ["Consultando inteligência"],
+                    "result": intel_result.text,
+                    "status": "success",
+                    "confirm": None,
+                }
+
+        except Exception as e:
+            logger.debug("Intelligence query failed: %s", e)
+
+        return None  # Couldn't resolve — caller should try local classifier
 
     def _unknown_intent_response(self) -> dict:
         return {
