@@ -339,7 +339,11 @@ def play_media(file_path: str, display_mode: str = "foreground") -> tuple[bool, 
 
     Returns (success, message).
     """
-    is_url = file_path.startswith("http://") or file_path.startswith("https://")
+    is_url = (
+        file_path.startswith("http://")
+        or file_path.startswith("https://")
+        or file_path.startswith("ytdl://")
+    )
 
     if not is_url and not os.path.isfile(file_path):
         return False, "Arquivo não encontrado"
