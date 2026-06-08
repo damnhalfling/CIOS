@@ -1580,10 +1580,21 @@ class CIOSBridge:
         from cios.core.intelligence import intelligence
 
         if not intelligence.is_logged_in:
+            logger.info("_resolve_via_intelligence: not logged in, skipping")
             return None
 
         try:
+            import time as _time
+
+            t0 = _time.time()
             intel_result = intelligence.query(user_input, intent="chat")
+            elapsed = _time.time() - t0
+            logger.info(
+                "_resolve_via_intelligence: success=%s elapsed=%.1fs os_cmd=%s",
+                intel_result.success,
+                elapsed,
+                intel_result.os_command is not None,
+            )
 
             # Maestro returned an OS command → execute locally
             if intel_result.os_command:
@@ -1626,7 +1637,7 @@ class CIOSBridge:
                 }
 
         except Exception as e:
-            logger.debug("Intelligence query failed: %s", e)
+            logger.warning("_resolve_via_intelligence failed: %s: %s", type(e).__name__, e)
 
         return None  # Couldn't resolve — caller should try local classifier
 

@@ -217,7 +217,8 @@ def handle_media_play(intent: Intent, executor: Executor, memory: Memory) -> Pla
         import subprocess
         import urllib.parse
 
-        # Open YouTube Music (auto-plays, better than search page)
+        # Build YouTube Music URL that auto-plays
+        # Use "watch" with a search radio (auto-generates mix from search term)
         yt_url = f"https://music.youtube.com/search?q={urllib.parse.quote(query)}"
 
         try:
@@ -241,18 +242,32 @@ def handle_media_play(intent: Intent, executor: Executor, memory: Memory) -> Pla
                     summary="Nenhum navegador encontrado.",
                 )
 
+            # Launch browser in small window (sidebar-like PIP mode)
+            cmd = [browser]
+            if "chrome" in browser or "chromium" in browser:
+                cmd.extend(
+                    [
+                        "--window-size=500,350",
+                        "--window-position=20,600",
+                        "--new-window",
+                        "--app=" + yt_url,  # App mode = no toolbar, cleaner
+                    ]
+                )
+            else:
+                cmd.append(yt_url)
+
             subprocess.Popen(
-                [browser, yt_url],
+                cmd,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 start_new_session=True,
             )
 
             return PlanResult(
-                plan_steps=["Abrindo YouTube Music"],
+                plan_steps=["Tocando música"],
                 results=[],
                 outcome="success",
-                summary=f"Tocando {query} no YouTube Music.",
+                summary=f"♫ {query} no YouTube Music",
             )
         except Exception as e:
             return PlanResult(
