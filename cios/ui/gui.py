@@ -1334,6 +1334,21 @@ class CIOSApp:
                 for child in upgrade_btn.winfo_children():
                     child.bind("<Button-1>", lambda _: self._on_intel_upgrade())
 
+            # Logout button
+            logout_btn = tk.Frame(card, bg=BG_CARD, padx=SP_COMPACT, pady=SP_TIGHT)
+            logout_btn.pack(fill="x", pady=(SP_TIGHT, 0))
+            tk.Label(
+                logout_btn,
+                text="Sair",
+                font=self._f["small"],
+                fg=FG_DIM,
+                bg=BG_CARD,
+                cursor="hand2",
+            ).pack()
+            logout_btn.bind("<Button-1>", lambda _: self._on_intel_logout())
+            for child in logout_btn.winfo_children():
+                child.bind("<Button-1>", lambda _: self._on_intel_logout())
+
     def _on_intel_login(self) -> None:
         """Handle Intelligence login button click."""
         from cios.core.intelligence import start_auth_flow
@@ -1344,6 +1359,14 @@ class CIOSApp:
                 self.root.after(0, self._refresh_intelligence_ui)
 
         start_auth_flow(on_complete=on_complete)
+
+    def _on_intel_logout(self) -> None:
+        """Handle Intelligence logout button click."""
+        from cios.core.intelligence import intelligence
+
+        intelligence.logout()
+        if self.root:
+            self.root.after(0, self._refresh_intelligence_ui)
 
     def _on_intel_upgrade(self) -> None:
         """Handle upgrade button click — open browser to pricing page."""

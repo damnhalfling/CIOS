@@ -66,9 +66,8 @@ class TestBridgeIntentRouting:
 
     def test_unknown_intent_without_llm(self, bridge):
         """Unknown intent without LLM fallback returns info (no provider message)."""
-        with patch("cios.core.bridge.resolve_unknown_intent", return_value=None):
-            result = bridge.execute_command("asdfghjkl")
-            assert result["status"] in ("error", "info")
+        result = bridge.execute_command("asdfghjkl")
+        assert result["status"] in ("error", "info")
 
 
 class TestBridgeConfirmation:
@@ -224,7 +223,6 @@ class TestBridgeStreamingProgress:
         with (
             patch("cios.ui.topbar.signal_topbar_processing"),
             patch("cios.ui.topbar.signal_topbar_idle") as mock_idle,
-            patch("cios.core.bridge.resolve_unknown_intent", return_value=None),
             patch("cios.core.bridge.classify_intent", return_value=None),
         ):
             bridge.execute_streaming("asdfghjkl", on_step=lambda *a: None)

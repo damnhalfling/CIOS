@@ -465,6 +465,10 @@ class TopBar:
                 else:
                     self._labels["ai"].config(text=f"🧠 {plan} {used}/{limit}", fg=_GREEN)
                 return
+            else:
+                # Not logged in — red indicator
+                self._labels["ai"].config(text="🧠 offline", fg=_RED)
+                return
         except Exception:
             pass
 

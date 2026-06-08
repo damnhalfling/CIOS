@@ -27,7 +27,6 @@ from cios.core.humanizer import humanize_error, humanize_result
 from cios.core.intent_classifier import classify_intent, learn_from_success
 from cios.core.intent_parser import Intent, IntentType, parse_intent
 from cios.core.memory import Memory
-from cios.core.model_router import resolve_unknown_intent
 from cios.core.planner import Planner, PlanResult
 from cios.core.thread_manager import (
     ThreadManager,
@@ -307,74 +306,45 @@ class CIOSBridge:
         if intent.type == IntentType.UNKNOWN:
             if self._cancelled:
                 raise _CancelledError()
-            # Priority 1: If Intelligence is logged in, ask cloud directly (fastest path)
+
+            # Priority 1: Ask Intelligence (fastest path when logged in)
+            from cios.ui.topbar import signal_topbar_idle, signal_topbar_processing
+
+            signal_topbar_processing("Consultando inteligência…")
+            intelligence_result = self._resolve_via_intelligence(resolved_input, context)
+            signal_topbar_idle()
+
+            if intelligence_result:
+                return intelligence_result
+
+            # Priority 2: Try local classifier (cache + Ollama for CLASSIFICATION only)
             from cios.core.intelligence import intelligence
-            from cios.core.model_router import (
-                has_external_provider,
-                is_any_provider_available,
-                request_execution_plan,
-            )
 
-            if intelligence.is_logged_in:
-                signal_topbar_processing("Consultando inteligência…")
-                try:
-                    intel_result = intelligence.query(resolved_input, intent="chat")
-                    # If Maestro returned an OS command, execute it locally
-                    if intel_result.os_command:
-                        signal_topbar_idle()
-                        cmd = intel_result.os_command
-                        # Re-parse as local intent and execute
-
-                        try:
-                            cmd_type = IntentType(cmd["intent"])
-                        except ValueError:
-                            cmd_type = IntentType.UNKNOWN
-                        intent = Intent(
-                            type=cmd_type,
-                            params=cmd.get("params", {}),
-                            raw_input=resolved_input,
-                            confidence=1.0,
-                        )
-                        # Continue to execution below (don't return)
-                    elif intel_result.success and intel_result.text:
-                        signal_topbar_idle()
-                        return {
-                            "steps": ["Consultando inteligência"],
-                            "result": intel_result.text,
-                            "status": "success",
-                            "confirm": None,
-                        }
-                except Exception as e:
-                    logger.debug("Intelligence query failed: %s", e)
-
-            # Priority 2: Try local classifier (cache + Ollama)
             signal_topbar_processing("Classificando…")
             classified = classify_intent(resolved_input)
             if classified:
                 intent = classified
-            elif is_any_provider_available():
-                if self._cancelled:
-                    raise _CancelledError()
-                signal_topbar_processing("Consultando IA…")
-                resolved = resolve_unknown_intent(resolved_input)
-                if self._cancelled:
-                    raise _CancelledError()
-                if resolved:
-                    intent = resolved
-                else:
-                    if has_external_provider():
-                        signal_topbar_processing("Gerando plano…")
-                        plan = request_execution_plan(resolved_input)
-                        if self._cancelled:
-                            raise _CancelledError()
-                        if plan:
-                            signal_topbar_idle()
-                            return self._execution_plan_response(plan)
-                    signal_topbar_idle()
-                    return self._unknown_intent_response()
             else:
+                # Neither Intelligence nor local classifier could resolve
                 signal_topbar_idle()
-                return self._unknown_intent_response()
+                if not intelligence.is_logged_in:
+                    return {
+                        "steps": [],
+                        "result": "Não consegui entender como comando. "
+                        "Para perguntas e conversas, conecte ao CIOS Intelligence "
+                        "(área de login na sidebar).",
+                        "status": "info",
+                        "confirm": None,
+                        "voice_mode": "full",
+                    }
+                # Intelligence is logged in but query failed (network, server error)
+                return {
+                    "steps": [],
+                    "result": "Não consegui entender este comando. Tente reformular.",
+                    "status": "error",
+                    "confirm": None,
+                    "voice_mode": "full",
+                }
 
         # (#75) Check if intent needs clarification
         clarification = self._needs_clarification(intent)
@@ -454,59 +424,43 @@ class CIOSBridge:
 
         # LLM fallback — hybrid model (same as _process)
         if intent.type == IntentType.UNKNOWN:
-            # Priority 1: If Intelligence is logged in, ask cloud directly
-            from cios.core.intelligence import intelligence
-            from cios.core.model_router import is_any_provider_available
+            # Priority 1: Ask Intelligence (shared method, no duplication)
+            if on_step:
+                on_step("Consultando inteligência…", 1, 0)
+            intelligence_result = self._resolve_via_intelligence(resolved_input, context)
+            signal_topbar_idle()
 
-            if intelligence.is_logged_in:
-                if on_step:
-                    on_step("Consultando inteligência…", 1, 0)
-                try:
-                    intel_result = intelligence.query(resolved_input, intent="chat")
-                    # If Maestro returned an OS command, execute it locally
-                    if intel_result.os_command:
-                        cmd = intel_result.os_command
-
-                        try:
-                            cmd_type = IntentType(cmd["intent"])
-                        except ValueError:
-                            cmd_type = IntentType.UNKNOWN
-                        intent = Intent(
-                            type=cmd_type,
-                            params=cmd.get("params", {}),
-                            raw_input=resolved_input,
-                            confidence=1.0,
-                        )
-                        # Fall through to execution below
-                    elif intel_result.success and intel_result.text:
-                        signal_topbar_idle()
-                        return {
-                            "steps": ["Consultando inteligência"],
-                            "result": intel_result.text,
-                            "status": "success",
-                            "confirm": None,
-                        }
-                except Exception as e:
-                    logger.debug("Intelligence query failed in streaming: %s", e)
+            if intelligence_result:
+                return intelligence_result
 
             # Priority 2: Try classifier (cache + Ollama)
+            from cios.core.intelligence import intelligence
+
             if on_step:
                 on_step("Classificando…", 1, 0)
             classified = classify_intent(resolved_input)
             if classified:
                 intent = classified
-            elif is_any_provider_available():
-                if on_step:
-                    on_step("Consultando IA…", 1, 0)
-                resolved = resolve_unknown_intent(resolved_input)
-                if resolved:
-                    intent = resolved
-                else:
-                    signal_topbar_idle()
-                    return self._unknown_intent_response()
             else:
+                # Neither Intelligence nor local classifier could resolve
                 signal_topbar_idle()
-                return self._unknown_intent_response()
+                if not intelligence.is_logged_in:
+                    return {
+                        "steps": [],
+                        "result": "Não consegui entender como comando. "
+                        "Para perguntas e conversas, conecte ao CIOS Intelligence "
+                        "(área de login na sidebar).",
+                        "status": "info",
+                        "confirm": None,
+                        "voice_mode": "full",
+                    }
+                return {
+                    "steps": [],
+                    "result": "Não consegui entender este comando. Tente reformular.",
+                    "status": "error",
+                    "confirm": None,
+                    "voice_mode": "full",
+                }
 
         # (#75) Clarification
         clarification = self._needs_clarification(intent)
@@ -583,6 +537,144 @@ class CIOSBridge:
 
         return result
 
+    def _execute_multi_step(self, first_cmd: dict, original_input: str) -> dict:
+        """Execute a multi-step orchestrated command sequence.
+
+        Loop:
+        1. Execute current step locally
+        2. Report result back to Maestro (via intelligence.query with exec_result)
+        3. Maestro returns next step, or a question for the user, or done
+        4. If question → pause, set pending_question, resume on user answer
+        5. Repeat until no more steps
+        """
+        from cios.core.intelligence import intelligence
+
+        cmd = first_cmd
+        all_steps = []
+        max_steps = 10  # Safety limit
+
+        for iteration in range(max_steps):
+            step_num = cmd.get("step", iteration + 1)
+            total = cmd.get("total_steps", "?")
+            intent_name = cmd.get("intent", "exec")
+            display_mode = cmd.get("display_mode", "foreground")
+
+            logger.info("Multi-step [%s/%s]: intent=%s", step_num, total, intent_name)
+
+            # Execute this step locally
+            try:
+                cmd_type = IntentType(intent_name)
+            except ValueError:
+                cmd_type = IntentType.UNKNOWN
+
+            params = cmd.get("params", {})
+            params["_display_mode"] = display_mode
+
+            intent = Intent(
+                type=cmd_type,
+                params=params,
+                raw_input=original_input,
+                confidence=1.0,
+            )
+
+            # Execute via planner
+            plan_result = self._execute_with_retry(intent)
+            steps, summary, outcome, voice_mode = humanize_result(plan_result)
+            all_steps.extend(steps)
+
+            # If this was the last step, we're done
+            if not cmd.get("has_next"):
+                return {
+                    "steps": all_steps,
+                    "result": summary or cmd.get("explanation", "Concluído."),
+                    "status": outcome,
+                    "confirm": None,
+                    "voice_mode": voice_mode,
+                    "display_mode": display_mode,
+                }
+
+            # Report result back to Maestro for next step
+            exec_result_msg = (
+                f"[exec_result] step={step_num} outcome={outcome} " f"output={summary[:200]}"
+            )
+
+            try:
+                next_result = intelligence.query(exec_result_msg, intent="chat")
+                if next_result.os_command:
+                    cmd = next_result.os_command
+                    # Continue loop with next step
+                elif next_result.success and next_result.text:
+                    text = next_result.text.strip()
+
+                    # Detect if Maestro is asking the user a question
+                    is_question = (
+                        text.endswith("?")
+                        or "qual " in text.lower()
+                        or "escolha" in text.lower()
+                        or "deseja" in text.lower()
+                        or "informe" in text.lower()
+                        or "which " in text.lower()
+                    )
+
+                    if is_question:
+                        # Pause execution — ask user, resume when they answer
+                        orchestrator_intent = Intent(
+                            type=IntentType.UNKNOWN,
+                            params={
+                                "_orchestrator_resume": True,
+                                "_steps_done": all_steps,
+                                "_original_input": original_input,
+                            },
+                            raw_input=original_input,
+                            confidence=1.0,
+                        )
+                        self._thread_manager.set_pending_question(
+                            PendingQuestion(
+                                intent=orchestrator_intent,
+                                question_type="orchestrator_input",
+                                timestamp=time.time(),
+                            )
+                        )
+                        return {
+                            "steps": all_steps,
+                            "result": text,
+                            "status": "question",
+                            "confirm": None,
+                            "voice_mode": "full",
+                        }
+                    else:
+                        # Final text from Maestro (summary, no more steps)
+                        return {
+                            "steps": all_steps,
+                            "result": text,
+                            "status": "success",
+                            "confirm": None,
+                        }
+                else:
+                    # Maestro returned nothing useful
+                    return {
+                        "steps": all_steps,
+                        "result": summary or "Concluído parcialmente.",
+                        "status": outcome,
+                        "confirm": None,
+                    }
+            except Exception as e:
+                logger.warning("Multi-step: failed to get next step: %s", e)
+                return {
+                    "steps": all_steps,
+                    "result": f"Completei {step_num} etapa(s). Erro ao continuar: {summary}",
+                    "status": outcome,
+                    "confirm": None,
+                }
+
+        # Safety: hit max iterations
+        return {
+            "steps": all_steps,
+            "result": "Execução multi-step atingiu limite de segurança.",
+            "status": "error",
+            "confirm": None,
+        }
+
     def _execute_intent(self, intent: Intent, context) -> dict:
         """Execute an intent with retry, validation, and error enrichment.
 
@@ -658,7 +750,7 @@ class CIOSBridge:
 
             return {
                 "steps": [f"⟳ {task.description}"],
-                "result": f"Executando em background... (task {task_id})",
+                "result": f"Executando em background: {task.description}",
                 "status": "background",
                 "confirm": None,
                 "voice_mode": "brief",
@@ -685,6 +777,14 @@ class CIOSBridge:
             "confirm": None,
             "voice_mode": voice_mode,
         }
+
+        # Pass display_mode and step_info from orchestrator to the UI
+        display_mode = intent.params.get("_display_mode")
+        step_info = intent.params.get("_step_info")
+        if display_mode:
+            result["display_mode"] = display_mode
+        if step_info:
+            result["step_info"] = step_info
 
         # Merge extra structured data (e.g., gallery signal) into response
         if plan_result.data:
@@ -949,6 +1049,58 @@ class CIOSBridge:
         # --- Multi-step guided flow path ---
         if question.flow_steps is not None:
             return self._advance_guided_flow(question, answer_clean, confirmed)
+
+        # --- Orchestrator mid-execution input ---
+        if question.question_type == "orchestrator_input":
+            # User answered a question from the Maestro during multi-step execution.
+            # Send the answer back to Maestro and continue the execution loop.
+            from cios.core.intelligence import intelligence
+
+            try:
+                # Send user's answer to Maestro (it has the execution context)
+                result = intelligence.query(answer_clean, intent="chat")
+                if result.os_command:
+                    # Maestro returned next step(s) — continue multi-step
+                    cmd = result.os_command
+                    if cmd.get("has_next"):
+                        return self._execute_multi_step(
+                            cmd, intent.params.get("_original_input", answer_clean)
+                        )
+                    # Single step — execute directly
+                    try:
+                        cmd_type = IntentType(cmd["intent"])
+                    except ValueError:
+                        cmd_type = IntentType.UNKNOWN
+                    params = cmd.get("params", {})
+                    params["_display_mode"] = cmd.get("display_mode", "foreground")
+                    exec_intent = Intent(
+                        type=cmd_type, params=params, raw_input=answer_clean, confidence=1.0
+                    )
+                    plan_result = self._execute_with_retry(exec_intent)
+                    steps, summary, outcome, voice_mode = humanize_result(plan_result)
+                    prev_steps = intent.params.get("_steps_done", [])
+                    return {
+                        "steps": prev_steps + steps,
+                        "result": summary or "Concluído.",
+                        "status": outcome,
+                        "confirm": None,
+                        "voice_mode": voice_mode,
+                    }
+                elif result.success and result.text:
+                    return {
+                        "steps": intent.params.get("_steps_done", []),
+                        "result": result.text,
+                        "status": "success",
+                        "confirm": None,
+                    }
+            except Exception as e:
+                logger.warning("Orchestrator resume failed: %s", e)
+            return {
+                "steps": [],
+                "result": "Não consegui continuar a execução.",
+                "status": "error",
+                "confirm": None,
+            }
 
         # --- Legacy single-question path (backward compatible) ---
         # Inject answer into intent params based on question type
@@ -1415,6 +1567,78 @@ class CIOSBridge:
             "confirm": None,
             "voice_mode": "full",
         }
+
+    def _resolve_via_intelligence(self, user_input: str, context) -> dict | None:
+        """Resolve an UNKNOWN intent via Intelligence API.
+
+        Shared between _process() and _process_streaming() to avoid duplication.
+
+        Returns:
+            dict result if resolved (os_command executed or text response), or
+            None if Intelligence couldn't resolve (caller should try local classifier).
+        """
+        from cios.core.intelligence import intelligence
+
+        if not intelligence.is_logged_in:
+            logger.info("_resolve_via_intelligence: not logged in, skipping")
+            return None
+
+        try:
+            import time as _time
+
+            t0 = _time.time()
+            intel_result = intelligence.query(user_input, intent="chat")
+            elapsed = _time.time() - t0
+            logger.info(
+                "_resolve_via_intelligence: success=%s elapsed=%.1fs os_cmd=%s",
+                intel_result.success,
+                elapsed,
+                intel_result.os_command is not None,
+            )
+
+            # Maestro returned an OS command → execute locally
+            if intel_result.os_command:
+                cmd = intel_result.os_command
+                logger.info("Intelligence resolved: os_command=%s", cmd.get("intent"))
+
+                # Multi-step execution loop
+                if cmd.get("has_next"):
+                    return self._execute_multi_step(cmd, user_input)
+
+                # Single-step: execute immediately
+                display_mode = cmd.get("display_mode", "foreground")
+                try:
+                    cmd_type = IntentType(cmd["intent"])
+                except ValueError:
+                    cmd_type = IntentType.UNKNOWN
+
+                params = cmd.get("params", {})
+                params["_display_mode"] = display_mode
+
+                intent = Intent(
+                    type=cmd_type,
+                    params=params,
+                    raw_input=user_input,
+                    confidence=1.0,
+                )
+                result = self._execute_intent(intent, context)
+                if result.get("status") in ("success", "recovered"):
+                    learn_from_success(user_input, intent)
+                return result
+
+            # Maestro returned a text response (explanation, opinion, etc.)
+            elif intel_result.success and intel_result.text:
+                return {
+                    "steps": ["Consultando inteligência"],
+                    "result": intel_result.text,
+                    "status": "success",
+                    "confirm": None,
+                }
+
+        except Exception as e:
+            logger.warning("_resolve_via_intelligence failed: %s: %s", type(e).__name__, e)
+
+        return None  # Couldn't resolve — caller should try local classifier
 
     def _unknown_intent_response(self) -> dict:
         return {

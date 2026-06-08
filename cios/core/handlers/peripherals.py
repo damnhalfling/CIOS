@@ -297,13 +297,33 @@ def handle_window(intent: Intent, executor: Executor, memory: Memory) -> PlanRes
                 outcome="failure",
                 summary="Which window should I close?",
             )
+        # Strip common PT/EN articles from target
+        import re as _re
+
+        target = _re.sub(r"^(?:o|a|os|as|the)\s+", "", target.strip())
+
         window = window_skill.find_window(target)
         if not window:
+            # Fallback: try killing by process name
+            import subprocess
+
+            proc_result = subprocess.run(
+                ["pkill", "-f", target],
+                capture_output=True,
+                timeout=5,
+            )
+            if proc_result.returncode == 0:
+                return PlanResult(
+                    plan_steps=[f"Closing {target} (process)"],
+                    results=[],
+                    outcome="success",
+                    summary=f"{target.title()} fechado.",
+                )
             return PlanResult(
                 plan_steps=[f"Searching for {target}"],
                 results=[],
                 outcome="failure",
-                summary=f"Window not found: {target}",
+                summary=f"Não encontrei janela ou processo: {target}",
             )
         steps, ok, err = resilient_call(window_skill.close_window, window, skill="window")
         return PlanResult(

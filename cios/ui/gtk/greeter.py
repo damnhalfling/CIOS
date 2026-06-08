@@ -13,11 +13,36 @@ Launched by greetd as the greeter session.
 
 import json
 import os
+import os as _os
 import socket
 import struct
 import sys
+import time
 
 import gi
+
+
+def _wait_for_wayland(max_wait=5.0):
+    """Wait for Wayland display socket to be available.
+
+    The compositor (cios-shell) creates the socket but there's a timing gap
+    between socket creation and the event loop being ready to accept connections.
+    This wait ensures GTK4 can connect successfully.
+    """
+    runtime_dir = _os.environ.get("XDG_RUNTIME_DIR", "/run/user/0")
+    for _i in range(int(max_wait * 10)):
+        try:
+            for f in _os.listdir(runtime_dir):
+                if f.startswith("wayland-") and not f.endswith(".lock"):
+                    _os.environ["WAYLAND_DISPLAY"] = f
+                    return True
+        except (FileNotFoundError, PermissionError):
+            pass
+        time.sleep(0.1)
+    return False
+
+
+_wait_for_wayland()
 
 gi.require_version("Gtk", "4.0")
 from gi.repository import GLib, Gtk  # noqa: E402

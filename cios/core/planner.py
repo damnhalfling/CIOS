@@ -13,6 +13,14 @@ from cios.core.executor import Executor
 from cios.core.handlers._common import PlanResult
 from cios.core.handlers.apps import handle_app_launch, handle_explore_system, handle_list_apps
 from cios.core.handlers.audio import handle_audio
+from cios.core.handlers.desktop import (
+    handle_briefing,
+    handle_firewall,
+    handle_scheduler,
+    handle_theming,
+    handle_trash,
+    handle_vpn,
+)
 
 # Import all handlers
 from cios.core.handlers.dev import (  # noqa: F401
@@ -26,8 +34,20 @@ from cios.core.handlers.dev import (  # noqa: F401
 from cios.core.handlers.disk import handle_disk
 from cios.core.handlers.files import handle_file_organize, handle_files_open, handle_files_search
 from cios.core.handlers.gallery import handle_gallery_manage
+from cios.core.handlers.google_workspace import (
+    handle_calendar,
+    handle_drive,
+    handle_email,
+    handle_gchat,
+)
 from cios.core.handlers.logs import handle_fix_last_error, handle_log_analysis
-from cios.core.handlers.media import handle_intent_browse, handle_intent_media, handle_intent_write
+from cios.core.handlers.media import (
+    handle_intent_browse,
+    handle_intent_media,
+    handle_intent_write,
+    handle_media_control,
+    handle_media_play,
+)
 from cios.core.handlers.misc import handle_command_exec, handle_intelligence, handle_self_update
 from cios.core.handlers.network import handle_network
 from cios.core.handlers.packages import handle_package
@@ -127,6 +147,18 @@ _HANDLER_MAP = {
     IntentType.GALLERY_MANAGE: handle_gallery_manage,
     IntentType.SCREEN_CAPTURE: handle_screen_capture,
     IntentType.SPREADSHEET: handle_spreadsheet,
+    IntentType.EMAIL: handle_email,
+    IntentType.DRIVE: handle_drive,
+    IntentType.CALENDAR: handle_calendar,
+    IntentType.GCHAT: handle_gchat,
+    IntentType.THEMING: handle_theming,
+    IntentType.SCHEDULER: handle_scheduler,
+    IntentType.VPN: handle_vpn,
+    IntentType.FIREWALL: handle_firewall,
+    IntentType.TRASH: handle_trash,
+    IntentType.BRIEFING: handle_briefing,
+    IntentType.MEDIA_PLAY: handle_media_play,
+    IntentType.MEDIA_CONTROL: handle_media_control,
     IntentType.HISTORY_SEARCH: None,  # Handled directly in bridge
 }
 

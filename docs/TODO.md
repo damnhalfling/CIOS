@@ -1,6 +1,6 @@
 # CIOS — TODO
 
-> v2.0.0-rc59 — Maio 2026
+> v3.0.0-rc15 — Junho 2026
 
 ---
 
@@ -27,88 +27,63 @@
 
 ---
 
-## 📋 Próximo (Fase 0.5 — Google Workspace + Desktop Completude)
+## ✅ Concluído — Fase 0.5 (Google Workspace + Desktop Completude)
 
-> Integração com Google Workspace via MCP servers oficiais + fechar gaps desktop.
+Todos os itens desta fase foram concluídos.
 
-### 🔴🔴 Prioridade Máxima — Google Workspace MCP Integration
+### Google Workspace MCP Integration (550-564) ✅
+- OAuth scopes expandidos (Gmail, Drive, Chat, Calendar)
+- Google refresh_token no banco + endpoint de token fresco
+- Google MCP Client genérico (HTTP + OAuth)
+- Skills: Gmail, Drive, Google Chat, Calendar
+- Handlers: email, drive, gchat, calendar
+- UI: EmailView, DriveView (GTK4 + artifact panel)
+- Consent screen UX
 
-> Requisito: usuário logado com Intelligence (plano free mínimo).
-> Google fornece MCP servers remotos (HTTP + OAuth). CIOS consome como client.
+### Desktop Features (500-509) ✅
+- Notifications system + notification center
+- Scheduled tasks / deferred intents
+- Automount USB/SD/drives + notificação de device plugado
+- Theming dark/light mode + via intent
+- Display settings (resolução, scaling, arranjo de monitores)
 
-| # | Task | Tipo | Módulo | Dep |
-|---|------|------|--------|-----|
-| 550 | Expandir OAuth scopes (Gmail, Drive, Chat, Calendar) | Backend | `maestro/app/api/auth.py` | — |
-| 551 | Guardar Google refresh_token no banco | Backend | `maestro/app/models/user.py` + migration | 550 |
-| 552 | Endpoint `GET /v1/auth/google/token` (access_token fresco) | Backend | `maestro/app/api/auth.py` | 551 |
-| 553 | Google MCP Client genérico (HTTP + token) | Core | `core/google_mcp.py` | 552 |
-| 554 | Skill Gmail (search, read, draft, label) | Skill | `skills/email.py` | 553 |
-| 555 | Skill Drive (search, read, download, create) | Skill | `skills/drive.py` | 553 |
-| 556 | Skill Google Chat (search, list, send) | Skill | `skills/gchat.py` | 553 |
-| 557 | Skill Calendar (list, create, update events) | Skill | `skills/calendar.py` | 553 |
-| 558 | Handler email (planner routing) | Handler | `handlers/email.py` | 554 |
-| 559 | Handler drive (planner routing) | Handler | `handlers/drive.py` | 555 |
-| 560 | Handler gchat (planner routing) | Handler | `handlers/gchat.py` | 556 |
-| 561 | Handler calendar (planner routing) | Handler | `handlers/calendar.py` | 557 |
-| 562 | UI: renderizar emails no artifact panel | UI | `ui/gtk/email_view.py` | 554 |
-| 563 | UI: renderizar docs do Drive no artifact panel | UI | `ui/gtk/drive_view.py` | 555 |
-| 564 | Consent screen UX (primeiro uso pede permissão extra) | UX | onboarding + intelligence | 550 |
+### Networking + Segurança (510-514) ✅
+- VPN via intent (WireGuard + OpenVPN)
+- Firewall via intent (ufw)
+- Keyring / secrets (libsecret)
+- Trash / recycle bin (XDG Trash spec)
+- Proxy config (nmcli)
 
-**Endpoints MCP do Google:**
-- Gmail: `https://gmailmcp.googleapis.com/mcp/v1`
-- Drive: `https://drivemcp.googleapis.com/mcp/v1`
-- Chat: `https://chatmcp.googleapis.com/mcp/v1`
-- Calendar: `https://calendarmcp.googleapis.com/mcp/v1`
-- People: `https://people.googleapis.com/mcp/v1`
-
-**Ordem de implementação:**
-1. Backend (550→551→552) — habilita o flow
-2. Client genérico (553) — base para todas as skills
-3. Email (554→558→562) — primeiro uso funcional visível
-4. Drive (555→559→563) — segundo mais útil
-5. Chat + Calendar (556→557→560→561) — complementar
+### Polimento (520-527) ✅
+- Printer support (CUPS)
+- Timezone / locale config
+- Night light (gamma/color temperature)
+- Backup/restore via intent
 
 ---
 
-### 🔴 Prioridade Alta — Bloqueiam uso diário
+## 📋 Próximo — Pendente
+
+### Media Pipeline (mpv IPC)
 
 | # | Task | Tipo | Skill/Módulo |
 |---|------|------|--------------|
-| 500 | Notifications system (eventos, apps, timers, progresso) | Infra | `infra/notifications.py` + handler |
-| 501 | Notification center (histórico, dismiss, actions) | UI | GTK4 panel |
-| 502 | Scheduled tasks / timers ("lembra-me às 17h") | Skill | `skills/scheduler.py` + cron/systemd-timer |
-| 503 | Deferred intents ("depois do almoço", "amanhã cedo") | Core | `core/deferred.py` |
-| 504 | Automount USB/SD/drives externos | Skill | `skills/automount.py` + udisks2 |
-| 505 | Notificação de device plugado ("USB detectado. Abrir?") | UX | notification + automount |
-| 506 | Theming: dark/light mode | UI | GTK4 + compositor CSS |
-| 507 | Theming: configuração via intent ("modo escuro") | Handler | planner handler |
-| 508 | Display settings: resolução/scaling via intent | Skill | `skills/display.py` + wlr-randr |
-| 509 | Display settings: arranjo de monitores | Skill | compositor IPC |
+| — | mpv IPC socket (controle programático: pause, next, vol) | Skill | `skills/mpv_controller.py` |
+| — | Media State Tracker (poll → ~/.cios/.media_state) | Skill | `skills/media_state.py` |
+| — | yt-dlp pipeline (query → playlist → mpv, sem browser) | Skill | `skills/media_player.py` |
+| — | Topbar "now playing" indicator | UI | `ui/gtk/topbar.py` |
+| — | Refatorar handle_media_control para IPC | Handler | `handlers/media.py` |
 
-### 🟡 Prioridade Média — Networking + Segurança
+### Polimento pendente
 
 | # | Task | Tipo | Skill/Módulo |
 |---|------|------|--------------|
-| 510 | VPN via intent ("conecta VPN") | Skill | `skills/vpn.py` + nmcli/wg |
-| 511 | Firewall via intent ("bloqueia porta 8080") | Skill | `skills/firewall.py` + ufw |
-| 512 | Keyring / secrets management | Infra | libsecret / gnome-keyring integration |
-| 513 | Trash / recycle bin (soft-delete) | Skill | `skills/trash.py` + XDG Trash spec |
-| 514 | Proxy config via intent | Skill | network.py extension |
-
-### 🟢 Prioridade Baixa — Polimento
-
-| # | Task | Tipo | Skill/Módulo |
-|---|------|------|--------------|
-| 520 | Printer support ("imprime este documento") | Skill | `skills/printer.py` + CUPS |
-| 521 | Timezone / locale config via intent | Skill | `skills/locale.py` + timedatectl |
-| 522 | Night light (gamma/color temperature) | Skill | `skills/night_light.py` + wlr-gamma |
 | 523 | Do Not Disturb mode | Infra | notifications filter |
 | 524 | Touchpad gestures no compositor | Shell | `shell/src/gestures.c` + libinput |
 | 525 | App store integration (Flatpak/Snap via intent) | Skill | `skills/app_store.py` |
-| 526 | Backup/restore via intent | Skill | `skills/backup.py` + rsync/timeshift |
 | 527 | Multi-user switching (fast user switch) | Session | greetd integration |
 
-### ♿ Acessibilidade
+### ♿ Acessibilidade (obrigatório para público amplo)
 
 | # | Task | Tipo | Skill/Módulo |
 |---|------|------|--------------|

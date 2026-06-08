@@ -187,3 +187,135 @@ def handle_intent_write(intent: Intent, executor: Executor, memory: Memory) -> P
         summary=f"{app.name} opened" if ok else f"Couldn't open {app.name}",
         error=err,
     )
+
+
+def handle_media_play(intent: Intent, executor: Executor, memory: Memory) -> PlanResult:
+    """Handle media_play from the Maestro orchestrator.
+
+    Plays a URL or searches for content via yt-dlp + mpv (no browser dependency).
+    Respects display_mode (sidebar/fullscreen). Uses mpv IPC for control.
+    """
+    from cios.skills.media_player import play_media, play_media_search
+
+    url = intent.params.get("url", "")
+    query = intent.params.get("query", "")
+    display_mode = intent.params.get("_display_mode", "sidebar")
+
+    # For search queries (music), always default to sidebar PIP
+    if not url and query:
+        display_mode = "sidebar"
+
+    # Detect if "url" is actually a search query (Maestro sometimes puts search there)
+    if url and not url.startswith("http") and not url.startswith("ytdl://"):
+        # Maestro put a search term in url field — treat as query
+        query = url.replace("ytsearch", "").replace("ytdl://", "")
+        # Strip "N:" prefix (e.g., "10:offspring" → "offspring")
+        if ":" in query:
+            query = query.split(":", 1)[1]
+        url = ""
+
+    # If we have a real URL, play directly via mpv
+    if url:
+        ok, msg = play_media(url, display_mode=display_mode)
+        return PlanResult(
+            plan_steps=[f"Reproduzindo ({display_mode})"],
+            results=[],
+            outcome="success" if ok else "failure",
+            summary=msg,
+        )
+
+    # If we have a search query, search via yt-dlp and play as playlist
+    if query:
+        ok, msg = play_media_search(query, display_mode=display_mode, count=10)
+        return PlanResult(
+            plan_steps=["Buscando música", "Tocando playlist"],
+            results=[],
+            outcome="success" if ok else "failure",
+            summary=f"♫ {msg}" if ok else msg,
+        )
+
+    return PlanResult(
+        plan_steps=[],
+        results=[],
+        outcome="failure",
+        summary="Não sei o que tocar. Diga o que quer ouvir.",
+    )
+
+
+def handle_media_control(intent: Intent, executor: Executor, memory: Memory) -> PlanResult:
+    """Handle media_control from the Maestro orchestrator.
+
+    Controls active media via mpv IPC: pause, resume, next, stop, fullscreen, volume.
+    """
+    from cios.skills.mpv_controller import (
+        next_track,
+        prev_track,
+        set_volume,
+        stop,
+        toggle_fullscreen,
+        toggle_pause,
+    )
+
+    action = intent.params.get("action", "")
+
+    if action == "stop":
+        ok, msg = stop()
+        return PlanResult(
+            plan_steps=["Parando"],
+            results=[],
+            outcome="success" if ok else "failure",
+            summary=msg,
+        )
+
+    if action == "fullscreen":
+        ok, msg = toggle_fullscreen()
+        return PlanResult(
+            plan_steps=["Tela cheia"],
+            results=[],
+            outcome="success" if ok else "failure",
+            summary=msg,
+        )
+
+    if action in ("pause", "resume", "toggle"):
+        ok, msg = toggle_pause()
+        return PlanResult(
+            plan_steps=["Pause/Resume"],
+            results=[],
+            outcome="success" if ok else "failure",
+            summary=msg,
+        )
+
+    if action == "next":
+        ok, msg = next_track()
+        return PlanResult(
+            plan_steps=["Próxima"],
+            results=[],
+            outcome="success" if ok else "failure",
+            summary=msg,
+        )
+
+    if action == "prev":
+        ok, msg = prev_track()
+        return PlanResult(
+            plan_steps=["Anterior"],
+            results=[],
+            outcome="success" if ok else "failure",
+            summary=msg,
+        )
+
+    if action == "volume":
+        vol = intent.params.get("volume", 50)
+        ok, msg = set_volume(int(vol))
+        return PlanResult(
+            plan_steps=["Volume"],
+            results=[],
+            outcome="success" if ok else "failure",
+            summary=msg,
+        )
+
+    return PlanResult(
+        plan_steps=[],
+        results=[],
+        outcome="failure",
+        summary=f"Ação '{action}' não reconhecida para media.",
+    )

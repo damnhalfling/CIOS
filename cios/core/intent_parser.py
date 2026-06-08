@@ -47,6 +47,18 @@ class IntentType(Enum):
     HISTORY_SEARCH = "history_search"
     SPREADSHEET = "spreadsheet"
     MONITOR = "monitor"
+    EMAIL = "email"
+    DRIVE = "drive"
+    CALENDAR = "calendar"
+    GCHAT = "gchat"
+    THEMING = "theming"
+    SCHEDULER = "scheduler"
+    VPN = "vpn"
+    FIREWALL = "firewall"
+    TRASH = "trash"
+    BRIEFING = "briefing"
+    MEDIA_PLAY = "media_play"
+    MEDIA_CONTROL = "media_control"
     UNKNOWN = "unknown"
 
 
@@ -1209,7 +1221,7 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
     ),
     (
         re.compile(
-            r"(?:verificar?|checar?|como\s+(?:t[aá]|est[aá]))\s+(?:o\s+)?(?:sistema|computador|pc|desempenho|performance)",
+            r"(?:verificar?|checar?|como\s+(?:t[aá]|est[aá]))\s+(?:o\s+|meu\s+)?(?:sistema|computador|pc|desempenho|performance)",
             re.IGNORECASE,
         ),
         IntentType.SYSTEM_HEALTH,
@@ -1408,7 +1420,7 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
     ),
     (
         re.compile(
-            r"(?:desmutar?|unmute|tirar?\s+(?:o\s+)?mute|ativar?\s+(?:o\s+)?som)",
+            r"(?:desmutar?|unmute|(?:tirar?|retir[ae]r?|remover?)\s+(?:o\s+)?mute|ativar?\s+(?:o\s+)?som)",
             re.IGNORECASE,
         ),
         IntentType.AUDIO,
@@ -1417,7 +1429,7 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
     ),
     (
         re.compile(
-            r"(?:silenciar?|mutar?|mute|calar?|silêncio)\s*(?:o\s+)?(?:volume|som|[aá]udio|tudo)?",
+            r"(?:silenciar?|mutar?|(?<!\w)mute(?!\w)|calar?|silêncio)\s*(?:o\s+)?(?:volume|som|[aá]udio|tudo)?",
             re.IGNORECASE,
         ),
         IntentType.AUDIO,
@@ -1435,12 +1447,21 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
     ),
     (
         re.compile(
-            r"(?:qual|quanto|what|how)\s+(?:é\s+)?(?:o\s+)?(?:volume|som)",
+            r"(?:qual|quanto|what|how)\s+(?:\w+\s+){0,3}(?:volume|som)",
             re.IGNORECASE,
         ),
         IntentType.AUDIO,
         lambda m: {"action": "status"},
         0.90,
+    ),
+    (
+        re.compile(
+            r"^(?:volume|som|áudio|audio)$",
+            re.IGNORECASE,
+        ),
+        IntentType.AUDIO,
+        lambda m: {"action": "status"},
+        0.85,
     ),
     # --- screen capture (PT + EN) — MUST be before session control ---
     (
@@ -1911,12 +1932,27 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
         lambda m: {"action": "add_to_album", "album_name": m.group(1).strip()},
         0.95,
     ),
+    # --- daily briefing / meu dia (PT + EN) ---
+    (
+        re.compile(
+            r"(?:(?:meu|como\s+(?:est[aá]|tá)\s+(?:meu|o))\s+dia|"
+            r"daily\s*briefing|morning\s*briefing|"
+            r"(?:mostr[ae]|ver|exib[ei]r?)\s+(?:meu\s+)?(?:dia|briefing|planejamento)|"
+            r"(?:o\s+que\s+(?:tenho|tem)\s+(?:pra\s+)?hoje)|"
+            r"(?:como\s+(?:est[aá]|tá)\s+(?:minha\s+)?(?:agenda|dia))|"
+            r"(?:resuma?|resume)\s+(?:meu\s+)?dia)",
+            re.IGNORECASE,
+        ),
+        IntentType.BRIEFING,
+        lambda m: {},
+        0.95,
+    ),
     # --- intelligence: news (PT + EN) ---
     (
         re.compile(
             r"(?:not[ií]cias|news|o\s+que\s+(?:est[aá]\s+acontecendo|aconteceu\s+(?:hoje|no\s+mundo))|"
             r"resum[ao]\s+(?:as\s+)?not[ií]cias|what(?:'s|\s+is)\s+happening|"
-            r"headlines|manchetes|briefing|novidades\s+(?:do\s+dia|de\s+hoje))",
+            r"headlines|manchetes|novidades\s+(?:do\s+dia|de\s+hoje))",
             re.IGNORECASE,
         ),
         IntentType.INTELLIGENCE,
@@ -1932,7 +1968,7 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
             re.IGNORECASE,
         ),
         IntentType.INTELLIGENCE,
-        lambda m: {"intent": "explain", "query": m.group(0)},
+        lambda m: {"intent": "explain"},
         0.85,
     ),
     # --- intelligence: write (PT + EN) ---
@@ -1944,7 +1980,7 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
             re.IGNORECASE,
         ),
         IntentType.INTELLIGENCE,
-        lambda m: {"intent": "write", "query": m.group(0)},
+        lambda m: {"intent": "write"},
         0.85,
     ),
     # --- intelligence: summarize (PT + EN) ---
@@ -1955,7 +1991,7 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
             re.IGNORECASE,
         ),
         IntentType.INTELLIGENCE,
-        lambda m: {"intent": "summarize", "query": m.group(0)},
+        lambda m: {"intent": "summarize"},
         0.88,
     ),
     # --- intelligence: translate (PT + EN) ---
@@ -1967,8 +2003,336 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
             re.IGNORECASE,
         ),
         IntentType.INTELLIGENCE,
-        lambda m: {"intent": "translate", "query": m.group(0)},
+        lambda m: {"intent": "translate"},
         0.88,
+    ),
+    # --- Personal Memory (PT + EN) → routes to Intelligence ---
+    (
+        re.compile(
+            r"(?:o\s+qu[ée]\s+)?(?:voc[êe]|vc|tu)\s+(?:sabe|lembra|conhece)\s+(?:sobre|de)\s+mim",
+            re.IGNORECASE,
+        ),
+        IntentType.INTELLIGENCE,
+        lambda m: {"intent": "personal_memory"},
+        0.95,
+    ),
+    (
+        re.compile(
+            r"(?:quem\s+(?:sou\s+eu|eu\s+sou))|(?:me\s+(?:conhece|descreve))",
+            re.IGNORECASE,
+        ),
+        IntentType.INTELLIGENCE,
+        lambda m: {"intent": "personal_memory"},
+        0.93,
+    ),
+    (
+        re.compile(
+            r"(?:what\s+do\s+you\s+know\s+about\s+me|who\s+am\s+i|do\s+you\s+(?:know|remember)\s+me)",
+            re.IGNORECASE,
+        ),
+        IntentType.INTELLIGENCE,
+        lambda m: {"intent": "personal_memory"},
+        0.93,
+    ),
+    (
+        re.compile(
+            r"(?:meus?\s+projetos?|my\s+projects?|quais?\s+(?:meus?|são\s+meus?)\s+projetos?)",
+            re.IGNORECASE,
+        ),
+        IntentType.INTELLIGENCE,
+        lambda m: {"intent": "projects"},
+        0.92,
+    ),
+    # --- Theming (PT + EN) ---
+    (
+        re.compile(
+            r"(?:modo\s+)?(?:escuro|dark)\s*(?:mode)?",
+            re.IGNORECASE,
+        ),
+        IntentType.THEMING,
+        lambda m: {"action": "set", "theme": "dark"},
+        0.92,
+    ),
+    (
+        re.compile(
+            r"(?:modo\s+)?(?:claro|light)\s*(?:mode)?",
+            re.IGNORECASE,
+        ),
+        IntentType.THEMING,
+        lambda m: {"action": "set", "theme": "light"},
+        0.92,
+    ),
+    (
+        re.compile(
+            r"(?:trocar?|mudar?|alternar?|toggle|switch)\s+(?:o?\s+)?(?:tema|theme|modo|mode)",
+            re.IGNORECASE,
+        ),
+        IntentType.THEMING,
+        lambda m: {"action": "toggle"},
+        0.90,
+    ),
+    # --- Scheduler / Reminders (PT + EN) ---
+    (
+        re.compile(
+            r"(?:lembr[ae](?:-me)?|remind\s*(?:me)?|avisa(?:-me)?)\s+(.+)",
+            re.IGNORECASE,
+        ),
+        IntentType.SCHEDULER,
+        lambda m: {"action": "remind", "text": m.group(1).strip()},
+        0.92,
+    ),
+    (
+        re.compile(
+            r"(?:daqui\s+a|in|em)\s+(\d+)\s*(?:min|minuto|minute|hora|hour|h)\s*(.+)?",
+            re.IGNORECASE,
+        ),
+        IntentType.SCHEDULER,
+        lambda m: {"action": "timer", "time_expr": m.group(0), "text": (m.group(2) or "").strip()},
+        0.90,
+    ),
+    (
+        re.compile(
+            r"(?:às|as|at)\s+(\d{1,2}(?::\d{2})?)\s*h?\s+(.+)",
+            re.IGNORECASE,
+        ),
+        IntentType.SCHEDULER,
+        lambda m: {"action": "remind", "time_expr": m.group(0), "text": m.group(2).strip()},
+        0.90,
+    ),
+    # --- VPN (PT + EN) ---
+    (
+        re.compile(
+            r"(?:conect(?:ar?|e)|connect|ligar?|ativar?|enable)\s+(?:a?\s+)?(?:vpn|wireguard|openvpn)",
+            re.IGNORECASE,
+        ),
+        IntentType.VPN,
+        lambda m: {"action": "connect"},
+        0.92,
+    ),
+    (
+        re.compile(
+            r"(?:desconect(?:ar?|e)|disconnect|desligar?|desativar?|disable)\s+(?:a?\s+)?(?:vpn|wireguard|openvpn)",
+            re.IGNORECASE,
+        ),
+        IntentType.VPN,
+        lambda m: {"action": "disconnect"},
+        0.92,
+    ),
+    (
+        re.compile(
+            r"(?:status|estado)\s+(?:da?\s+)?(?:vpn)",
+            re.IGNORECASE,
+        ),
+        IntentType.VPN,
+        lambda m: {"action": "status"},
+        0.90,
+    ),
+    # --- Firewall (PT + EN) ---
+    (
+        re.compile(
+            r"(?:bloque(?:ar?|ia)|block|deny)\s+(?:a?\s+)?(?:porta|port)\s+(\d+)",
+            re.IGNORECASE,
+        ),
+        IntentType.FIREWALL,
+        lambda m: {"action": "deny", "port": int(m.group(1))},
+        0.93,
+    ),
+    (
+        re.compile(
+            r"(?:liber(?:ar?|e)|allow|open)\s+(?:a?\s+)?(?:porta|port)\s+(\d+)",
+            re.IGNORECASE,
+        ),
+        IntentType.FIREWALL,
+        lambda m: {"action": "allow", "port": int(m.group(1))},
+        0.93,
+    ),
+    (
+        re.compile(
+            r"(?:ativar?|enable|habilitar?)\s+(?:o?\s+)?(?:firewall|ufw)",
+            re.IGNORECASE,
+        ),
+        IntentType.FIREWALL,
+        lambda m: {"action": "enable"},
+        0.92,
+    ),
+    (
+        re.compile(
+            r"(?:desativar?|disable|desabilitar?)\s+(?:o?\s+)?(?:firewall|ufw)",
+            re.IGNORECASE,
+        ),
+        IntentType.FIREWALL,
+        lambda m: {"action": "disable"},
+        0.92,
+    ),
+    # --- Trash (PT + EN) ---
+    (
+        re.compile(
+            r"(?:lixeira|trash|recycle\s*bin)",
+            re.IGNORECASE,
+        ),
+        IntentType.TRASH,
+        lambda m: {"action": "list"},
+        0.88,
+    ),
+    (
+        re.compile(
+            r"(?:esvaziar?|empty|limpar?)\s+(?:a?\s+)?(?:lixeira|trash)",
+            re.IGNORECASE,
+        ),
+        IntentType.TRASH,
+        lambda m: {"action": "empty"},
+        0.92,
+    ),
+    (
+        re.compile(
+            r"(?:restaurar?|restore|recuperar?)\s+(.+?)(?:\s+da\s+lixeira|\s+from\s+trash)?$",
+            re.IGNORECASE,
+        ),
+        IntentType.TRASH,
+        lambda m: {"action": "restore", "name": m.group(1).strip()},
+        0.90,
+    ),
+    # --- Google Workspace: Email (PT + EN) ---
+    (
+        re.compile(
+            r"(?:meus?\s+)?(?:email|e-mail|emails|e-mails|correio)",
+            re.IGNORECASE,
+        ),
+        IntentType.EMAIL,
+        lambda m: {"action": "search", "query": ""},
+        0.90,
+    ),
+    (
+        re.compile(
+            r"(?:buscar?|procurar?|search|find)\s+(?:nos?\s+)?(?:email|e-mail|emails|e-mails)",
+            re.IGNORECASE,
+        ),
+        IntentType.EMAIL,
+        lambda m: {"action": "search", "query": ""},
+        0.92,
+    ),
+    (
+        re.compile(
+            r"(?:email|e-mail|emails)\s+(?:de|do|da|from)\s+(.+)",
+            re.IGNORECASE,
+        ),
+        IntentType.EMAIL,
+        lambda m: {"action": "search", "query": f"from:{m.group(1).strip()}"},
+        0.93,
+    ),
+    (
+        re.compile(
+            r"(?:email|e-mail|emails)\s+(?:sobre|about)\s+(.+)",
+            re.IGNORECASE,
+        ),
+        IntentType.EMAIL,
+        lambda m: {"action": "search", "query": m.group(1).strip()},
+        0.93,
+    ),
+    (
+        re.compile(
+            r"(?:escrever?|redigir?|criar?|draft|write|compose)\s+(?:um?\s+)?(?:email|e-mail)",
+            re.IGNORECASE,
+        ),
+        IntentType.EMAIL,
+        lambda m: {"action": "draft"},
+        0.92,
+    ),
+    (
+        re.compile(
+            r"(?:emails?\s+)?(?:não\s+lidos?|unread|novos?|new)",
+            re.IGNORECASE,
+        ),
+        IntentType.EMAIL,
+        lambda m: {"action": "search", "query": "is:unread"},
+        0.88,
+    ),
+    # --- Google Workspace: Drive (PT + EN) ---
+    (
+        re.compile(
+            r"(?:meus?\s+)?(?:arquivos?|files?)\s+(?:no\s+)?(?:drive|google\s*drive)",
+            re.IGNORECASE,
+        ),
+        IntentType.DRIVE,
+        lambda m: {"action": "search", "query": ""},
+        0.90,
+    ),
+    (
+        re.compile(
+            r"(?:buscar?|procurar?|search|find)\s+(?:no\s+)?(?:drive|google\s*drive)\s*(.+)?",
+            re.IGNORECASE,
+        ),
+        IntentType.DRIVE,
+        lambda m: {"action": "search", "query": (m.group(1) or "").strip()},
+        0.92,
+    ),
+    (
+        re.compile(
+            r"(?:abrir?|open|ver|see)\s+(?:o?\s+)?(?:documento|doc|arquivo|file)\s+(.+?)(?:\s+no\s+drive)?$",
+            re.IGNORECASE,
+        ),
+        IntentType.DRIVE,
+        lambda m: {"action": "search", "query": m.group(1).strip()},
+        0.90,
+    ),
+    # --- Google Workspace: Calendar (PT + EN) ---
+    (
+        re.compile(
+            r"(?:minha\s+)?(?:agenda|calendar|calendário|compromissos?|eventos?)",
+            re.IGNORECASE,
+        ),
+        IntentType.CALENDAR,
+        lambda m: {"action": "list"},
+        0.90,
+    ),
+    (
+        re.compile(
+            r"(?:agenda|eventos?|compromissos?)\s+(?:de\s+)?(?:hoje|today|amanhã|tomorrow|semana|week)",
+            re.IGNORECASE,
+        ),
+        IntentType.CALENDAR,
+        lambda m: {
+            "action": "list",
+            "days": 1 if "hoje" in m.group(0).lower() or "today" in m.group(0).lower() else 7,
+        },
+        0.93,
+    ),
+    (
+        re.compile(
+            r"(?:criar?|create|agendar?|schedule|marcar?)\s+(?:um?\s+)?(?:evento|reunião|meeting|compromisso)",
+            re.IGNORECASE,
+        ),
+        IntentType.CALENDAR,
+        lambda m: {"action": "create"},
+        0.92,
+    ),
+    # --- Google Workspace: Chat (PT + EN) ---
+    (
+        re.compile(
+            r"(?:mensagens?|messages?)\s+(?:no\s+)?(?:chat|google\s*chat)",
+            re.IGNORECASE,
+        ),
+        IntentType.GCHAT,
+        lambda m: {"action": "search", "query": ""},
+        0.90,
+    ),
+    (
+        re.compile(
+            r"(?:buscar?|procurar?|search)\s+(?:no\s+)?(?:chat|google\s*chat)\s+(.+)",
+            re.IGNORECASE,
+        ),
+        IntentType.GCHAT,
+        lambda m: {"action": "search", "query": m.group(1).strip()},
+        0.92,
+    ),
+    (
+        re.compile(
+            r"(?:enviar?|send|mandar?)\s+(?:mensagem|message)\s+(?:no\s+)?(?:chat|google\s*chat)",
+            re.IGNORECASE,
+        ),
+        IntentType.GCHAT,
+        lambda m: {"action": "send"},
+        0.92,
     ),
 ]
 

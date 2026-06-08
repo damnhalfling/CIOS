@@ -60,6 +60,7 @@ class UserProfile:
     picture: str = ""
     plan: str = "free"
     token: str = ""
+    refresh_token: str = ""
 
 
 @dataclass
@@ -135,7 +136,46 @@ class IntelligenceClient:
 
     @property
     def is_logged_in(self) -> bool:
-        return self._user is not None and bool(self._user.token)
+        """Check if user is authenticated with a valid (non-expired) token.
+
+        Parses JWT expiry locally to avoid showing 'connected' with dead token.
+        If token expired but refresh_token exists, still returns True (auto-refresh will handle it).
+        If both expired, returns False.
+        """
+        if not self._user or not self._user.token:
+            return False
+
+        # Check if access token is expired
+        if self._is_token_expired(self._user.token):
+            # Has refresh token? Still considered logged in (will auto-refresh)
+            # No refresh token and access expired = not logged in
+            return bool(self._user.refresh_token)
+
+        return True
+
+    def _is_token_expired(self, token: str) -> bool:
+        """Check if a JWT token is expired by decoding payload (no signature verification).
+
+        Returns False (not expired) if token can't be parsed as JWT — this handles
+        test tokens and non-standard formats gracefully (fail-open for local check).
+        The server will reject truly invalid tokens with 401 anyway.
+        """
+        try:
+            import base64
+
+            # JWT = header.payload.signature — decode payload
+            parts = token.split(".")
+            if len(parts) != 3:
+                return False  # Not a JWT structure — assume valid
+            # Add padding
+            payload_b64 = parts[1] + "=" * (4 - len(parts[1]) % 4)
+            payload = json.loads(base64.b64decode(payload_b64))
+            exp = payload.get("exp", 0)
+            if exp == 0:
+                return False  # No expiry claim — assume valid
+            return time.time() > exp
+        except Exception:
+            return False  # Can't parse = assume valid (server will validate)
 
     @property
     def user(self) -> UserProfile | None:
@@ -166,6 +206,7 @@ class IntelligenceClient:
                 picture=data.get("picture", ""),
                 plan=data.get("plan", "free"),
                 token=data.get("token", ""),
+                refresh_token=data.get("refresh_token", ""),
             )
             self._usage.plan = self._user.plan
             self._usage.limit_today = _plan_limit(self._user.plan)
@@ -203,7 +244,7 @@ class IntelligenceClient:
         self._save_session()
         logger.info("New conversation started")
 
-    def save_auth(self, token: str, user_data: dict) -> None:
+    def save_auth(self, token: str, user_data: dict, refresh_token: str = "") -> None:
         """Save authentication after successful login."""
         self._user = UserProfile(
             id=user_data.get("id", 0),
@@ -212,6 +253,7 @@ class IntelligenceClient:
             picture=user_data.get("picture", ""),
             plan=user_data.get("plan", "free"),
             token=token,
+            refresh_token=refresh_token,
         )
         self._usage.plan = self._user.plan
         self._usage.limit_today = _plan_limit(self._user.plan)
@@ -226,6 +268,7 @@ class IntelligenceClient:
                     "picture": self._user.picture,
                     "plan": self._user.plan,
                     "token": token,
+                    "refresh_token": refresh_token,
                 },
                 indent=2,
             )
@@ -272,6 +315,7 @@ class IntelligenceClient:
         3. Call /v1/chat with intent, client, conversation_id
         5. Parse cognitive_state + memory_sources
         6. Update usage and session
+        7. If 401 → auto-refresh token and retry once
         """
         if not self.is_logged_in:
             return IntelligenceResult(
@@ -290,10 +334,12 @@ class IntelligenceClient:
 
         result = self._call_chat(text, intent)
 
+        # Auto-retry after token refresh
+        if result.error == "token_refreshed":
+            result = self._call_chat(text, intent)
+
         if result.success:
             self._usage.used_today += 1
-            # OS: don't persist conversation_id between queries
-            # Each query is independent (no stale context)
             if result.cognitive_state:
                 self._last_cognitive_state = result.cognitive_state
 
@@ -476,7 +522,11 @@ class IntelligenceClient:
     def _handle_http_error(self, e: urllib.error.HTTPError) -> IntelligenceResult:
         """Handle HTTP errors from the API."""
         if e.code == 401:
-            logger.warning("Intelligence token expired")
+            # Try auto-refresh before giving up
+            if self._try_refresh_token():
+                logger.info("Token refreshed successfully, retry needed")
+                return IntelligenceResult(success=False, error="token_refreshed", text="")
+            logger.warning("Intelligence token expired and refresh failed")
             return IntelligenceResult(
                 success=False, error="token_expired", text="Sessão expirada. Faça login novamente."
             )
@@ -491,6 +541,85 @@ class IntelligenceClient:
             return IntelligenceResult(
                 success=False, error="api_error", text="Erro no serviço. Tente novamente."
             )
+
+    def _try_refresh_token(self) -> bool:
+        """Attempt to refresh the access token using the stored refresh_token.
+
+        Returns True if refresh succeeded and self._user.token is updated.
+        If refresh fails (expired, revoked), clears auth → user becomes disconnected.
+        """
+        if not self._user or not self._user.refresh_token:
+            return False
+
+        try:
+            payload = json.dumps({"refresh_token": self._user.refresh_token}).encode()
+            req = urllib.request.Request(
+                f"{API_BASE}/v1/auth/refresh",
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read())
+
+            new_token = data.get("token", "")
+            if not new_token:
+                self._mark_disconnected()
+                return False
+
+            # Update in-memory and on-disk
+            self._user.token = new_token
+            self.save_auth(
+                new_token,
+                {
+                    "id": self._user.id,
+                    "email": self._user.email,
+                    "name": self._user.name,
+                    "picture": self._user.picture,
+                    "plan": self._user.plan,
+                },
+                refresh_token=self._user.refresh_token,
+            )
+            logger.info("Token auto-refreshed for %s", self._user.email)
+            return True
+
+        except urllib.error.HTTPError as e:
+            if e.code == 401:
+                # Refresh token itself expired or revoked
+                self._mark_disconnected()
+            logger.debug("Token refresh failed: HTTP %d", e.code)
+            return False
+        except Exception as e:
+            logger.debug("Token refresh failed: %s", e)
+            return False
+
+    def _mark_disconnected(self) -> None:
+        """Clear token (keep user info for re-login convenience).
+
+        After this, is_logged_in returns False and UI shows disconnected.
+        """
+        if self._user:
+            self._user.token = ""
+            self._user.refresh_token = ""
+            # Update file to reflect disconnected state
+            try:
+                AUTH_FILE.write_text(
+                    json.dumps(
+                        {
+                            "id": self._user.id,
+                            "email": self._user.email,
+                            "name": self._user.name,
+                            "picture": self._user.picture,
+                            "plan": self._user.plan,
+                            "token": "",
+                            "refresh_token": "",
+                        },
+                        indent=2,
+                    )
+                )
+            except Exception:
+                pass
+        logger.warning("Intelligence marked as disconnected (tokens expired/revoked)")
 
     # ─── Usage Check ──────────────────────────────────────────────────
 
@@ -517,6 +646,31 @@ class IntelligenceClient:
 
         threading.Thread(target=_fetch, daemon=True).start()
 
+    def briefing(self) -> dict | None:
+        """Fetch the daily briefing from the Intelligence API.
+
+        Returns the briefing dict or None if unavailable.
+        """
+        if not self.is_logged_in:
+            return None
+
+        headers = {
+            "Authorization": f"Bearer {self._user.token}",
+        }
+
+        req = urllib.request.Request(
+            f"{API_BASE}/v1/briefing",
+            headers=headers,
+            method="GET",
+        )
+
+        try:
+            with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
+                return json.loads(resp.read())
+        except Exception as e:
+            logger.warning("Briefing fetch failed: %s", e)
+            return None
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  SYSTEM CONTEXT (sent with every API call from OS)
@@ -524,7 +678,11 @@ class IntelligenceClient:
 
 
 def _get_system_context() -> dict:
-    """Gather current OS context for API escalation."""
+    """Gather current OS context for API escalation.
+
+    Provides the Maestro with full awareness of the device state
+    so it can make context-aware decisions (sidebar vs fullscreen, etc.).
+    """
     import subprocess
 
     context = {
@@ -532,6 +690,7 @@ def _get_system_context() -> dict:
         "client": "os",
     }
 
+    # Active window
     try:
         result = subprocess.run(
             ["xdotool", "getactivewindow", "getwindowname"],
@@ -541,6 +700,78 @@ def _get_system_context() -> dict:
         )
         if result.returncode == 0:
             context["active_window"] = result.stdout.strip()
+    except Exception:
+        pass
+
+    # Open apps (from compositor IPC or /proc)
+    try:
+        result = subprocess.run(
+            ["ps", "-eo", "comm", "--no-headers"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        if result.returncode == 0:
+            # Filter to known GUI apps
+            known_apps = {
+                "chrome",
+                "google-chrome",
+                "firefox",
+                "code",
+                "vscode",
+                "foot",
+                "terminal",
+                "vlc",
+                "mpv",
+                "nautilus",
+                "thunar",
+                "slack",
+                "telegram",
+                "discord",
+                "spotify",
+            }
+            running = set(result.stdout.strip().splitlines())
+            open_apps = [app for app in running if app.lower() in known_apps]
+            if open_apps:
+                context["open_apps"] = open_apps
+    except Exception:
+        pass
+
+    # Active project (check if vscode/editor has a project open)
+    active_window = context.get("active_window", "")
+    if " - " in active_window:
+        # VSCode: "file.py - project_name - Visual Studio Code"
+        parts = active_window.split(" - ")
+        if len(parts) >= 2 and "Code" in active_window:
+            context["active_project"] = parts[-2].strip()
+
+    # Basic resources
+    try:
+        import psutil
+
+        context["resources"] = {
+            "cpu": int(psutil.cpu_percent(interval=0)),
+            "ram": int(psutil.virtual_memory().percent),
+        }
+    except Exception:
+        pass
+
+    # Media state (what's currently playing)
+    try:
+        from cios.skills.mpv_controller import get_media_state
+
+        media = get_media_state()
+        if media is not None:
+            context["media_state"] = {
+                "playing": media.playing,
+                "paused": media.paused,
+                "title": media.title,
+                "mode": media.mode,
+                "url": media.url,
+                "position": media.position,
+                "duration": media.duration,
+                "playlist_count": media.playlist_count,
+            }
     except Exception:
         pass
 
@@ -577,11 +808,12 @@ def start_auth_flow(on_complete: Callable[[bool, str], None] | None = None) -> N
                 params = parse_qs(parsed.query)
                 token = params.get("token", [""])[0]
                 user_json = params.get("user", [""])[0]
+                refresh_tok = params.get("refresh_token", [""])[0]
 
                 if token and user_json:
                     try:
                         user_data = json.loads(user_json)
-                        intelligence.save_auth(token, user_data)
+                        intelligence.save_auth(token, user_data, refresh_token=refresh_tok)
                         result_holder["success"] = True
                         result_holder["message"] = f"Bem-vindo, {user_data.get('name', '')}!"
 

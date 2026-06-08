@@ -54,6 +54,7 @@ shell_sources = files(
   'src/process.c',
   'src/ipc.c',
   'src/decorations.c',
+  'src/gestures.c',
 )
 
 executable(

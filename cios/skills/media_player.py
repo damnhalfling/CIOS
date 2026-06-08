@@ -330,50 +330,49 @@ def _thumb_video(src: str, dest: Path, size: tuple) -> str | None:
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def play_media(file_path: str) -> tuple[bool, str]:
-    """Play a media file using mpv (embedded or standalone).
+def play_media(file_path: str, display_mode: str = "foreground") -> tuple[bool, str]:
+    """Play a media file using mpv with IPC control.
+
+    Args:
+        file_path: Local file path OR URL (YouTube, etc.)
+        display_mode: "sidebar" (small PIP), "fullscreen", or "foreground" (default)
 
     Returns (success, message).
     """
-    if not os.path.isfile(file_path):
-        return False, "Arquivo não encontrado"
+    from cios.skills.mpv_controller import play
 
-    # Check for mpv
-    if not shutil.which("mpv"):
-        return False, "mpv não instalado. Instale com: instalar mpv"
+    return play(file_path, mode=display_mode)
 
-    ext = os.path.splitext(file_path)[1].lower()
-    name = os.path.basename(file_path)
 
-    try:
-        # Launch mpv with minimal UI
-        cmd = ["mpv", "--force-window=yes", "--osd-level=1"]
+def play_media_search(
+    query: str, display_mode: str = "sidebar", count: int = 10
+) -> tuple[bool, str]:
+    """Search YouTube via yt-dlp and play results as playlist.
 
-        if ext in _AUDIO_EXTS:
-            # Audio: small window with visualizer
-            cmd.extend(["--force-window=yes", "--geometry=400x100"])
+    Args:
+        query: Search terms (e.g., "techno", "lofi hip hop")
+        display_mode: "sidebar", "fullscreen", "foreground"
+        count: Number of search results to queue
 
-        cmd.append(file_path)
+    Returns (success, message).
+    """
+    from cios.skills.mpv_controller import play_search
 
-        subprocess.Popen(
-            cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True,
-        )
-        return True, name
-    except Exception as e:
-        logger.warning("Failed to play %s: %s", file_path, e)
-        return False, f"Erro ao reproduzir: {name}"
+    return play_search(query, mode=display_mode, count=count)
+
+
+def media_fullscreen() -> tuple[bool, str]:
+    """Toggle fullscreen on the active mpv instance."""
+    from cios.skills.mpv_controller import toggle_fullscreen
+
+    return toggle_fullscreen()
 
 
 def stop_playback() -> tuple[bool, str]:
-    """Stop any running mpv instance."""
-    try:
-        subprocess.run(["pkill", "-f", "mpv"], capture_output=True, timeout=5)
-        return True, "Reprodução parada"
-    except Exception:
-        return False, "Nenhuma reprodução ativa"
+    """Stop the CIOS-managed mpv instance (does not kill unrelated mpv)."""
+    from cios.skills.mpv_controller import stop
+
+    return stop()
 
 
 # ═══════════════════════════════════════════════════════════════════════════

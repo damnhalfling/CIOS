@@ -1,6 +1,6 @@
 # CIOS — Arquitetura
 
-> v2.0.0-rc59 — Maio 2026
+> v3.0.0-rc14 — Junho 2026
 
 ---
 
@@ -35,8 +35,8 @@ Boot → GRUB (0s, silent) → Plymouth (splash CIOS) → greetd (login)
 ## Pipeline de intenção
 
 ```
-User Input → Parser (201 patterns) → Classifier (regex → cache → Ollama)
-  → MCO (decision layer) → Planner (30 handlers) → Executor
+User Input → Parser (240+ patterns) → Classifier (regex → cache → Ollama)
+  → MCO (decision layer) → Planner (43 handlers) → Executor
   → Humanizer (260+ translations) → UI (streaming GTK4)
 ```
 
@@ -213,9 +213,9 @@ cios-os/
 │   ├── main.py              # Entry point (6 modos)
 │   ├── core/                # Engine cognitiva
 │   │   ├── bridge.py        # UI ↔ backend (CIOSBridge) + periodic sync
-│   │   ├── intent_parser.py # 201 regex patterns (incl. HISTORY_SEARCH)
+│   │   ├── intent_parser.py # 240+ regex patterns (incl. Google, desktop, networking)
 │   │   ├── intent_classifier.py # Hybrid: regex → cache → Ollama
-│   │   ├── planner.py       # 30 handlers + MCO
+│   │   ├── planner.py       # 43 handlers + MCO
 │   │   ├── mcp.py           # Live system state
 │   │   ├── executor.py      # Shell execution (timeout, blocked cmds)
 │   │   ├── humanizer.py     # 260+ translations
@@ -223,10 +223,18 @@ cios-os/
 │   │   ├── thread_manager.py # Conversation state + sync + sanitization
 │   │   ├── task_queue.py    # Background execution
 │   │   ├── intelligence.py  # Cloud AI integration
+│   │   ├── command_poller.py # Cross-device command polling
+│   │   ├── google_mcp.py   # Google Workspace MCP client
 │   │   ├── model_router.py  # LLM routing + fallback
 │   │   ├── error_recovery.py # 19 error types
-│   │   └── handlers/        # 16 intent handler modules (30 handler methods)
-│   ├── skills/              # 28 system skills
+│   │   └── handlers/        # 19 handler modules (43 handler methods)
+│   │       ├── apps.py, audio.py, desktop.py, dev.py
+│   │       ├── disk.py, files.py, gallery.py, google_workspace.py
+│   │       ├── logs.py, media.py, misc.py, network.py
+│   │       ├── packages.py, peripherals.py, process.py
+│   │       ├── screen_capture.py, spreadsheet.py, system.py
+│   │       └── _common.py
+│   ├── skills/              # 47 system skills
 │   ├── ui/                  # GTK4 + CLI + hotkey + topbar
 │   │   └── gtk/
 │   │       ├── app.py           # Main application (Ctrl+K, overlays)
@@ -239,8 +247,8 @@ cios-os/
 │   │       └── ...
 │   └── infra/               # Daemon, voice, monitors, deps
 ├── shell/                   # Compositor C (wlroots 0.18)
-│   └── src/                 # 13 source files
-├── tests/                   # 415 testes (33 arquivos)
+│   └── src/                 # 14 source files (incl. gestures.c)
+├── tests/                   # 839 testes (36 arquivos)
 ├── session/                 # Wayland session config
 ├── scripts/                 # Build/install scripts
 └── pyproject.toml           # Project config
@@ -252,29 +260,25 @@ cios-os/
 
 CIOS é um **desktop environment cognitivo** sobre Linux (Debian). Kernel, drivers, init, e networking stack são delegados intencionalmente.
 
-### Cobertura atual (~60% de um desktop completo)
+### Cobertura atual (~85% de um desktop completo)
 
 | Área | Cobertura | Notas |
 |------|-----------|-------|
-| Display/Compositor | ~80% | Falta gestures, scaling config |
+| Display/Compositor | ~85% | Display settings via intent, falta gestures |
 | Interface/Shell | ~90% | 6 modos, intent-driven |
-| System Management | ~70% | Falta notifications, scheduled tasks, keyring |
-| Hardware Integration | ~60% | Wi-Fi, BT, audio, battery OK. Falta printer, automount, display config |
-| Networking | ~50% | Wi-Fi OK. Falta VPN, firewall, proxy |
+| System Management | ~90% | Notifications, scheduled tasks, keyring, theming, trash |
+| Hardware Integration | ~80% | Wi-Fi, BT, audio, battery, printer, automount, display OK |
+| Networking | ~85% | Wi-Fi, VPN (WireGuard + OpenVPN), firewall (ufw), proxy OK |
 | Acessibilidade | 0% | Blocker para público amplo |
-| Personalização | ~10% | Sem theming, sem appearance settings |
+| Personalização | ~70% | Theming dark/light, night light, locale |
 
-### Gaps críticos (ver TODO.md #500-534)
+### Gaps críticos restantes
 
 | Gap | Impacto | Solução |
 |-----|---------|---------|
-| Notifications | Sistema mudo, eventos perdidos | `infra/notifications.py` + GTK4 panel |
-| Scheduled tasks | Sem timers, sem "lembra-me" | `skills/scheduler.py` + systemd-timer |
-| Automount | USB plugado = nada acontece | `skills/automount.py` + udisks2 |
-| Theming | Parece inacabado | GTK4 CSS + compositor |
-| VPN/Firewall | Networking incompleto | `skills/vpn.py` + `skills/firewall.py` |
-| Keyring | Apps não guardam secrets | libsecret integration |
 | Accessibility | Exclui usuários | AT-SPI + Orca + compositor |
+| Touchpad gestures | Compositing incompleto | Extensão do compositor (C) |
+| App store integration | Flatpak/Snap via intent | `skills/app_store.py` (parcial) |
 
 ### Decisão arquitetural
 

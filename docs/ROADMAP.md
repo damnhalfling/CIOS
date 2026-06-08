@@ -1,7 +1,7 @@
 # CIOS — Roadmap
 
 > Substituindo apps por intenção.
-> v2.0.0-rc59 — Maio 2026
+> v3.0.0-rc15 — Junho 2026
 
 ---
 
@@ -13,13 +13,18 @@
 ✅ Polimento + narrativa + impacto
 ✅ Produto percebido
 ✅ Compositor Wayland estável (sem crash, apps legados via XWayland)
-🟡 Desktop completude para primeiro lançamento real
+✅ Desktop completude para primeiro lançamento real
+✅ Google Workspace MCP integration
+✅ Desktop features (notifications, theming, automount, VPN, firewall, keyring, trash)
+✅ Cross-device security (read-only + pending_confirmation)
+🟡 Estabilização (notebooks) + demo video
 ```
 
-**Milestone alcançado (Maio 2026):** Compositor Wayland rodando estável com apps legados.
-O CIOS é agora um OS utilizável no dia-a-dia, ainda com gaps de features básicas.
+**Milestone alcançado (Junho 2026):** Runtime v3 com 47 skills, 839 testes.
+Desktop com cobertura ~85%. Google Workspace integrado. Puccini reescrito.
+Media Pipeline v2 (mpv IPC + yt-dlp). Execution Orchestrator completo (OE1-OE12).
 
-**Fase atual:** Fechar gaps de desktop que bloqueiam uso diário → primeiro lançamento real.
+**Fase atual:** Estabilização final + demo video + cognição avançada (Fase 3).
 
 **Visão de longo prazo:** Evolução contínua rumo a cognição extrema — o ambiente de trabalho
 como extensão do ser. Independente de adesão comercial, o desenvolvimento continua.
@@ -59,49 +64,35 @@ como extensão do ser. Independente de adesão comercial, o desenvolvimento cont
 
 ## Visão futura
 
-### FASE 0.5 — Primeiro Lançamento Real
+### ✅ FASE 0.5 — Primeiro Lançamento Real (Concluída)
 > Desktop completo o suficiente para uso diário + bugs do Maestro/memória resolvidos.
-> Foco: features básicas que faltam no OS + estabilidade do fluxo conversacional.
 
-**Contexto:** Compositor Wayland estável. Bugs remanescentes são do Maestro e da memória.
-O objetivo é um OS que funcione como ambiente de trabalho primário, mesmo que limitado.
+**Contexto:** Compositor Wayland estável. Pipeline unificado v3 resolveu bugs do Maestro.
+47 skills implementados. 839 testes passando. Google Workspace integrado.
 
-**Prioridade Máxima — Estabilidade do fluxo:**
-- Resolver bugs do Maestro (pipeline conversacional)
-- Resolver bugs da memória (persistência, retrieval)
-- Garantir fluxo inicial sem quebras (boot → login → uso → shutdown)
+**Concluído:**
+- ✅ Resolver bugs do Maestro (pipeline conversacional) → pipeline unificado v3
+- ✅ Resolver bugs da memória (persistência, retrieval) → synaptic reinforcement
+- ✅ Garantir fluxo inicial sem quebras (boot → login → uso → shutdown)
+- ✅ Google Workspace MCP Integration (Gmail, Drive, Chat, Calendar)
+- ✅ Notifications system (eventos do sistema, apps, timers, progresso de tasks)
+- ✅ Scheduled tasks / timers ("lembra-me às 17h", "backup toda noite")
+- ✅ Automount (USB, SD card, drives externos — detectar e montar)
+- ✅ Theming básico (dark/light mode via intent)
+- ✅ Display settings via intent (resolução, scaling, refresh rate, arranjo de monitores)
+- ✅ VPN via intent ("conecta VPN" → WireGuard/OpenVPN)
+- ✅ Firewall via intent ("bloqueia porta 8080" → ufw)
+- ✅ Keyring / secrets management (libsecret integration)
+- ✅ Trash / recycle bin (XDG Trash spec)
+- ✅ Printer support (CUPS integration)
+- ✅ Timezone / locale config via intent
+- ✅ Night light (gamma/color temperature)
+- ✅ Backup/restore via intent
 
-**Prioridade Alta — Google Workspace MCP Integration:**
-- Expandir OAuth scopes (Gmail, Drive, Chat, Calendar) no login existente
-- Guardar Google refresh_token no banco (maestro)
-- Endpoint para access_token fresco (`GET /v1/auth/google/token`)
-- Google MCP Client genérico (`core/google_mcp.py`)
-- Skills: email, drive, gchat, calendar
-- Handlers: routing de intents Google
-- UI: renderizar emails e docs no artifact panel
-- Requisito: plano free mínimo (login Intelligence)
-
-**Prioridade Alta (bloqueiam uso diário):**
-- Notifications system (eventos do sistema, apps, timers, progresso de tasks)
-- Scheduled tasks / timers ("lembra-me às 17h", "backup toda noite")
-- Automount (USB, SD card, drives externos — detectar e montar)
-- Theming básico (dark/light mode, fontes, cores)
-- Display settings via intent (resolução, scaling, refresh rate, arranjo de monitores)
-
-**Prioridade Média (networking + segurança):**
-- VPN via intent ("conecta VPN" → WireGuard/OpenVPN)
-- Firewall via intent ("bloqueia porta 8080" → ufw/iptables)
-- Keyring / secrets management (gnome-keyring equivalente, apps dependem disso)
-- Trash / recycle bin (soft-delete antes de rm permanente)
-
-**Prioridade Baixa (polimento):**
-- Printer support (CUPS integration, "imprime este documento")
-- Timezone / locale config via intent
-- Night light (gamma/color temperature)
-- Do Not Disturb mode (silencia notificações)
+**Pendente (polimento):**
 - Touchpad gestures no compositor
-- App store integration (Flatpak/Snap via intent)
-- Backup/restore via intent (Timeshift/rsync)
+- App store integration (Flatpak/Snap via intent) — parcial (`app_store.py` existe)
+- Do Not Disturb mode (silencia notificações)
 
 **Acessibilidade (obrigatório para público amplo):**
 - Screen reader integration (Orca)

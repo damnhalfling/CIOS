@@ -73,9 +73,21 @@ static void handle_xdg_surface_unmap(struct wl_listener *listener, void *data) {
 
     surface->visible = false;
 
-    /* If this was focused, clear focus */
+    /* If this was focused, focus another visible surface */
     if (surface->server->focused == surface) {
         surface->server->focused = NULL;
+        /* Find another visible surface to focus */
+        struct CiosSurface *fallback;
+        wl_list_for_each(fallback, &surface->server->surfaces, link) {
+            if (fallback != surface && fallback->visible) {
+                if (fallback->xdg_toplevel) {
+                    server_focus_xdg_surface(surface->server, fallback);
+                } else {
+                    server_focus_surface(surface->server, fallback);
+                }
+                break;
+            }
+        }
     }
 
     /* Send event via IPC */
@@ -208,6 +220,12 @@ void server_focus_xdg_surface(struct CiosServer *server, struct CiosSurface *sur
     if (keyboard) {
         wlr_seat_keyboard_notify_enter(server->seat, wlr_surface,
             keyboard->keycodes, keyboard->num_keycodes, &keyboard->modifiers);
+    } else {
+        /* Keyboard may not be ready yet (race condition during boot).
+         * Set pointer focus as fallback — keyboard focus will be set
+         * when the next key event arrives (input.c forwards to focused surface). */
+        wlr_seat_pointer_notify_enter(server->seat, wlr_surface, 0, 0);
+        LOG_INFO("xdg focus: keyboard not ready, set pointer focus as fallback");
     }
 }
 

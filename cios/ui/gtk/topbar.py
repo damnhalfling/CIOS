@@ -32,6 +32,17 @@ class Topbar(Gtk.Box):
         spacer.set_hexpand(True)
         self.append(spacer)
 
+        # Media: now playing indicator (hidden by default)
+        self._media_label = Gtk.Label(label="")
+        self._media_label.add_css_class("topbar-media")
+        self._media_label.set_visible(False)
+        self.append(self._media_label)
+
+        # Spacer after media
+        spacer2 = Gtk.Box()
+        spacer2.set_hexpand(True)
+        self.append(spacer2)
+
         # Right: contextual info
         self._day_label = Gtk.Label(label="")
         self._day_label.add_css_class("topbar-item")
@@ -100,7 +111,7 @@ class Topbar(Gtk.Box):
         subprocess.Popen(["systemctl", "poweroff"])
 
     def _update(self):
-        """Update time and date."""
+        """Update time, date, and media state."""
         now = time.localtime()
 
         # Time
@@ -113,7 +124,35 @@ class Topbar(Gtk.Box):
         # Date
         self._date_label.set_label(time.strftime("%d/%m", now))
 
+        # Media state (read from state file)
+        self._update_media()
+
         return True
+
+    def _update_media(self):
+        """Update now-playing indicator from media state file."""
+        import json
+        from pathlib import Path
+
+        state_file = Path.home() / ".cios" / ".media_state"
+        try:
+            if state_file.exists():
+                data = json.loads(state_file.read_text(encoding="utf-8"))
+                title = data.get("title", "")
+                playing = data.get("playing", False)
+                paused = data.get("paused", False)
+
+                if title and (playing or paused):
+                    icon = "▶" if playing else "⏸"
+                    truncated = title[:25] + "…" if len(title) > 25 else title
+                    self._media_label.set_label(f"♫ {truncated} ({icon})")
+                    self._media_label.set_visible(True)
+                    return
+
+        except (json.JSONDecodeError, OSError):
+            pass
+
+        self._media_label.set_visible(False)
 
     @staticmethod
     def get_css() -> str:
@@ -147,6 +186,12 @@ class Topbar(Gtk.Box):
             .topbar-user {{
                 color: {FG_SEC};
                 font-size: 11px;
+            }}
+            .topbar-media {{
+                color: {ACCENT_LT};
+                font-size: 10px;
+                font-weight: 500;
+                opacity: 0.9;
             }}
             .topbar-power {{
                 color: {FG_DIM};
