@@ -1622,7 +1622,6 @@ class CIOSBridge:
                     confidence=1.0,
                 )
                 result = self._execute_intent(intent, context)
-                context.record_turn(user_input, intent, result)
                 if result.get("status") in ("success", "recovered"):
                     learn_from_success(user_input, intent)
                 return result
