@@ -1,6 +1,60 @@
 # CIOS — Arquitetura
 
-> v3.0.0-rc14 — Junho 2026
+> v3.0.1-beta — Junho 2026
+
+---
+
+## Filosofia Cognitiva
+
+O CIOS não usa LLM como sistema principal. Usa **arquitetura cognitiva**.
+
+```
+Paradigma da indústria:          Paradigma CIOS:
+
+  User Input                       User Input
+      ↓                                ↓
+    LLM (70B)                    Intent Parser (regex, <1ms)
+      ↓                                ↓
+   Response                      Thought Layer (estado, memória, contexto)
+                                       ↓
+                                  LLM (1-7B, só quando necessário)
+                                       ↓
+                                  Executor (ação no sistema)
+```
+
+**Princípio Doom:** A indústria tenta GPUs maiores pra renderizar tudo.
+O CIOS pergunta: "O que nem precisa passar pelo modelo?"
+
+### A separação fundamental
+
+```
+Cognição ≠ Geração de linguagem
+```
+
+| Responsabilidade | Quem resolve | Custo |
+|-----------------|--------------|-------|
+| Identificar intenção | Regex (257 patterns) | 0 tokens, <1ms |
+| Decidir como executar | MCO + Orchestrator | 0 tokens, <5ms |
+| Manter estado/memória | Thought Layer (Python) | 0 tokens |
+| Selecionar contexto | Memory Engine (RAG) | ~100 tokens |
+| Gerar texto natural | LLM (Ollama/Bedrock) | ~500 tokens |
+| Executar no sistema | Skills (47 módulos) | 0 tokens |
+
+**Resultado:** 80%+ das interações funcionam com 0 tokens. O LLM é chamado
+apenas para geração de texto (explicações, opiniões, conversas abertas).
+
+### Hierarquia de resolução
+
+```
+[1] Regex patterns (257)     → 80% dos intents → <1ms, offline, 0 tokens
+[2] Intent cache (SQLite)    → 10% (frases já vistas) → <5ms, offline
+[3] Keyword + scoring        → 5% (variações próximas) → <10ms, offline
+[4] LLM classify (Ollama 3B) → 4% (ambiguidades entre 2-3 opções)
+[5] LLM full (Bedrock)       → 1% (conversas abertas, explicações)
+```
+
+Cada camada reduz a necessidade da próxima. O sistema fica mais inteligente
+**sem** aumentar inferência — porque aprende novos patterns e cacheia.
 
 ---
 
@@ -35,23 +89,82 @@ Boot → GRUB (0s, silent) → Plymouth (splash CIOS) → greetd (login)
 ## Pipeline de intenção
 
 ```
-User Input → Parser (240+ patterns) → Classifier (regex → cache → Ollama)
-  → MCO (decision layer) → Planner (43 handlers) → Executor
+User Input → Parser (257 patterns) → Classifier (regex → cache → Ollama)
+  → MCO (decision layer) → Planner (47 handlers) → Executor
   → Humanizer (260+ translations) → UI (streaming GTK4)
 ```
+
+### Thought Layer (camada cognitiva pré-LLM)
+
+O Thought Layer é o que torna possível usar LLMs pequenos (ou nenhum).
+Ele assume funções que normalmente seriam empurradas para dentro do modelo:
+
+```
+┌─────────────────────────────────────────────────┐
+│  THOUGHT LAYER (Python, determinístico)          │
+│                                                   │
+│  Intent Parser ── identifica O QUE              │
+│  Memory Engine ── sabe QUEM/QUANDO (RAG)        │
+│  MCP Context   ── percebe ONDE (sistema)        │
+│  Orchestrator  ── decide COMO (context-aware)   │
+│  State Manager ── mantém estado entre requests   │
+│  Planner       ── resolve SEM modelo quando pode │
+│                                                   │
+│  ↓ Só chama LLM quando precisa gerar texto ↓     │
+└─────────────────────────────────────────────────┘
+```
+
+**O que isso elimina do LLM:**
+- Memória (o modelo não precisa "lembrar" — a memória é externa)
+- Planejamento (o Planner decide a rota, não o LLM)
+- Estado (mantido entre requests, não recalculado)
+- Identidade (fixa no config, não emergida dos parâmetros)
+- Contexto do sistema (MCP provê, não precisa estar no prompt)
+
+**Hipótese central:** 70B parâmetros ≈ 7B + Thought Layer bem construído.
+O CIOS já opera com essa premissa — 80% dos intents resolvem sem modelo nenhum.
+
+### Disambiguation (quando há ambiguidade)
+
+```
+Regex identifica 2-3 intents possíveis
+    ↓
+Contexto resolve? (media_state, active_apps, etc.)
+    ├── Sim → Executa o mais provável
+    └── Não →
+        ├── 2-3 opções → LLM pequeno escolhe
+        └── 4+ opções → OS mostra botões ao user
+                         (comandos pré-formatados, executa local)
+```
+
+Exemplo de disambiguation response:
+```json
+{
+  "type": "disambiguation",
+  "text": "Parar o quê?",
+  "options": [
+    {"label": "Parar a música", "intent": "media_control", "params": {"action": "stop"}},
+    {"label": "Desligar o PC", "intent": "session", "params": {"action": "shutdown"}}
+  ]
+}
+```
+User clica → OS executa direto. Zero round-trip ao server.
 
 ### MCP — Model Context Protocol
 Live system state. Sempre atualizado.
 
 - Wi-Fi, Volume, CPU, Apps, Disk, Battery, Bluetooth, Networks
+- Media state (now playing, mode, playlist)
 - Reactive watchers (nmcli monitor, pactl subscribe)
 - Adaptive polling (1s/5s/15s conforme atividade)
 
 ### MCO — Model Context Orchestrator
-Camada de decisão:
-- Contexto suficiente → executa imediatamente
-- Ambíguo → pergunta de clarificação
-- Desconhecido → guia o usuário
+Camada de decisão context-aware:
+- User trabalhando + pede música → sidebar PIP
+- Nada aberto + pede música → sidebar (sempre não-intrusivo)
+- Media tocando + "para" → media_control (não shutdown)
+- Instala pacote → background, notifica quando pronto
+- Operação destrutiva → pede confirmação
 
 ### Fallback chain (quando Ollama indisponível)
 1. Pattern matching (regex) — 80%+ dos intents
@@ -63,65 +176,72 @@ Camada de decisão:
 
 ---
 
+## Media Pipeline v2
+
+```
+User: "toca techno"
+    ↓
+Intent Parser → media_play {query: "techno"}
+    ↓
+mpv_controller.play_search("techno", mode="sidebar")
+    ↓
+mpv --input-ipc-server=~/.cios/mpv.sock ytdl://ytsearch10:techno
+    ↓
+┌─────────────────────────────────────┐
+│  mpv (sidebar PIP, 480p, on-top)    │
+│  ← JSON IPC → MpvController        │
+│  ← State poll 2s → .media_state    │
+│  ← Topbar reads → ♫ Track (▶)      │
+└─────────────────────────────────────┘
+```
+
+**Controles via IPC (não xdotool):**
+- `toggle_pause()`, `next_track()`, `prev_track()`
+- `toggle_fullscreen()`, `set_volume(n)`, `quit()`
+- Playlist: `loadfile <url> append-play`
+
+**Decisões automáticas:**
+- Sempre sidebar PIP (música não interrompe trabalho)
+- 480p cap (performance em hardware limitado)
+- Stop seletivo (não mata mpv de outros contextos)
+
+---
+
+## Execution Orchestrator (Maestro)
+
+Quando `client=os` e o intent requer execução complexa:
+
+```
+User: "instala docker"
+    ↓
+Maestro Pipeline:
+  [1] Regex detect → intent: package, params: {package: "docker"}
+  [2] Orchestrator planeja multi-step:
+      Step 1: Adiciona repositório Docker
+      Step 2: apt update
+      Step 3: Instala docker-ce
+      Step 4: Adiciona user ao grupo
+  [3] Retorna step 1 → OS executa → reporta → Maestro envia step 2...
+  [4] Error? → _attempt_recovery (fix_dpkg, add_sudo, retry_network)
+  [5] User input needed? → type: "question" → OS mostra → user responde → continua
+```
+
+**Session State:** Maestro mantém estado entre requests (media, apps, projeto ativo).
+Persiste em DB com TTL 1h. Restaura no boot.
+
+---
+
 ## Conversation Threading & History Sync
 
 ### Thread Manager
-Gerencia estado conversacional com threading determinístico:
-
 ```
 User Input → ThreadManager.route_input()
   → ThreadClassifier (pronoun, continuation, intent, temporal signals)
   → RoutingDecision: answer_pending | continue_thread | new_thread
 ```
 
-- **Thread lifecycle:** active → completed (auto-close após 180s inatividade)
-- **Persistence:** SQLite (threads + turns), max 50 threads locais
-- **Context:** últimos 5 turns disponíveis para pronoun resolution
-
 ### History Sync (Web ↔ OS)
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  SYNC ARCHITECTURE                                       │
-├─────────────────────────────────────────────────────────┤
-│                                                           │
-│  CIOS OS ──push──→ /v1/sync ←──push── Web (Maestro)     │
-│     ↑                  │                    ↑             │
-│     └──────pull────────┘────────pull────────┘             │
-│                                                           │
-│  Bidirectional: push unsynced + pull new_from_server      │
-│  Periodic: every 5 minutes (daemon thread)                │
-│  On-demand: after thread close (fire-and-forget)          │
-└─────────────────────────────────────────────────────────┘
-```
-
-**Sanitization pipeline (o que NUNCA é sincronizado):**
-- `params` (credenciais, paths, tokens) — excluídos do payload
-- Absolute paths → `[path]`
-- Passwords/tokens → `[redacted]`
-- sudo commands → `sudo [command]`
-- Threads marcados `local_only` — nunca saem da máquina
-
-**Campos de controle:**
-- `local_only: bool` — thread contém dados sensíveis, fica só local
-- `origin: str` — "os" ou "web", indica onde foi criado
-- `synced: int` — 0 (pendente) ou 1 (sincronizado)
-
-**Auto-detecção de conteúdo sensível:**
-- SSH connections, private keys, .env files, credentials.json
-- Intent type "session" (login/logout operations)
-- Threads detectados são auto-marcados `local_only`
-
-### Search (Ctrl+K)
-
-```
-Ctrl+K → SearchOverlay (GTK4, floating)
-  → debounce 300ms → ThreadStore.search(query)
-  → LIKE match on user_input + result_summary + summary
-  → Results: summary, outcome icon, time, preview
-```
-
-Também acessível via intent: "busca no histórico sobre X"
+Bidirectional, periódico (5min), com sanitização automática de dados sensíveis.
 
 ---
 
@@ -135,73 +255,41 @@ Compositor Wayland purpose-built. Não é WM genérico.
 | Biblioteca | wlroots 0.18.1 |
 | Build | Meson |
 | Linhas | ~4500 |
-| Arquivos | 13 (main, server, output, input, hotkeys, xwayland, xdg_shell, layer_shell, decorations, process, ipc, log) |
 
 **Funcionalidades:**
-- XWayland para apps legados (browser, editor, terminal)
+- XWayland para apps legados
 - Layer-shell (topbar, overlay)
-- Server-side decorations (titlebar 28px, close/minimize/maximize)
+- Server-side decorations
 - IPC via Unix socket (JSON protocol)
-- VT switching (Ctrl+Alt+F1-F12)
-- Multi-monitor (primário: CIOS, secundário: apps)
-- Hotkeys: Ctrl+Space (overlay), Alt+Tab (switch), Alt+F4 (close)
+- Multi-monitor, hotplug
 - Crash recovery (reinicia runtime se exit != 0)
-
-**Libs bundled (/usr/lib/cios/):**
-- libwlroots-0.18, libwayland 1.23, libdisplay-info, libliftoff
-- Isoladas via RPATH (não poluem o sistema)
+- Window Manager: `move_to_sidebar()`, `move_to_foreground()`, `move_to_fullscreen()`
 
 ---
 
 ## Security boundary: OS vs Web
 
-**Princípio:** Execução é sempre local, nunca remota. Sync é de conteúdo, nunca de capacidade.
-
 | Camada | Pode | Não pode |
 |--------|------|----------|
-| **Web (Intelligence)** | Conversar, gerar texto, ver histórico | Executar comandos, acessar filesystem, controlar hardware |
+| **Web (Intelligence)** | Conversar, gerar texto, ver histórico | Executar comandos, acessar filesystem |
 | **OS (CIOS)** | Tudo da web + executar, instalar, configurar | — |
-| **Sync** | Transferir texto de conversas, memórias, metadata | Transferir credenciais, comandos executáveis, paths locais |
-
-**Implicações:**
-- Breach na web = vazamento de conversas (contido, sem acesso a hardware)
-- Breach no OS = requer acesso físico à máquina
-- Nenhum servidor tem credenciais de nenhuma máquina
-- Funciona offline (skills, intent parser, Ollama)
-- Cloud down ≠ computador inutilizável
+| **Sync** | Transferir texto de conversas | Transferir credenciais, comandos |
 
 ---
 
-## Background Tasks
+## Números
 
-- TaskQueue: operações longas (apt install, upgrades) em background threads
-- Tasks agrupadas por contexto (package, network, files)
-- Execução sequencial dentro do mesmo contexto, paralela entre contextos
-- Prompt livre durante execução
-- Progress polling (2s) com atualização visual
-
----
-
-## Cross-Device
-
-- Command Poller: OS recebe e executa comandos remotos (Web → Cloud API → OS)
-- Polling thread (5s interval, graceful shutdown)
-- Status reporting: delivered → executed/failed
-- OS Orchestrator: detecta quando chat web precisa de ação no OS
-- Tipos: file_read, file_update, dev_start, package, system
-
----
-
-## Componentes de IA (opcionais, pós-login)
-
-Instalados via `sudo cios-setup-ai`:
-
-| Componente | Tamanho | Função |
-|-----------|---------|--------|
-| Ollama | ~500MB | Runtime de LLM local |
-| Mistral | ~4GB | Modelo de linguagem |
-| Whisper | ~1GB | Speech-to-text (spec pronta, integração pendente) |
-| Piper | ~100MB | Text-to-speech (spec pronta, integração pendente) |
+| Métrica | Valor |
+|---------|-------|
+| Intents (regex) | 257 patterns, 47 tipos |
+| Skills | 47 módulos Python |
+| Testes | 1079 (839 OS + 240 Maestro) |
+| Boot → Desktop | <4s |
+| Latência intent (regex) | <1ms |
+| Latência LLM (Bedrock) | ~2s |
+| RAM idle | ~180MB |
+| Offline funcional | 80%+ |
+| Compositor | 100% Wayland (zero X11 na UI) |
 
 ---
 
@@ -210,81 +298,20 @@ Instalados via `sudo cios-setup-ai`:
 ```
 cios-os/
 ├── cios/                    # Python runtime
-│   ├── main.py              # Entry point (6 modos)
-│   ├── core/                # Engine cognitiva
-│   │   ├── bridge.py        # UI ↔ backend (CIOSBridge) + periodic sync
-│   │   ├── intent_parser.py # 240+ regex patterns (incl. Google, desktop, networking)
-│   │   ├── intent_classifier.py # Hybrid: regex → cache → Ollama
-│   │   ├── planner.py       # 43 handlers + MCO
+│   ├── core/                # Engine cognitiva (Thought Layer)
+│   │   ├── intent_parser.py # 257 regex patterns
+│   │   ├── bridge.py        # UI ↔ backend + orchestration
+│   │   ├── intelligence.py  # Cloud AI + system_context
+│   │   ├── planner.py       # 47 handlers + MCO
 │   │   ├── mcp.py           # Live system state
-│   │   ├── executor.py      # Shell execution (timeout, blocked cmds)
-│   │   ├── humanizer.py     # 260+ translations
-│   │   ├── memory.py        # SQLite history
-│   │   ├── thread_manager.py # Conversation state + sync + sanitization
-│   │   ├── task_queue.py    # Background execution
-│   │   ├── intelligence.py  # Cloud AI integration
-│   │   ├── command_poller.py # Cross-device command polling
-│   │   ├── google_mcp.py   # Google Workspace MCP client
-│   │   ├── model_router.py  # LLM routing + fallback
-│   │   ├── error_recovery.py # 19 error types
-│   │   └── handlers/        # 19 handler modules (43 handler methods)
-│   │       ├── apps.py, audio.py, desktop.py, dev.py
-│   │       ├── disk.py, files.py, gallery.py, google_workspace.py
-│   │       ├── logs.py, media.py, misc.py, network.py
-│   │       ├── packages.py, peripherals.py, process.py
-│   │       ├── screen_capture.py, spreadsheet.py, system.py
-│   │       └── _common.py
+│   │   └── handlers/        # 19 handler modules
 │   ├── skills/              # 47 system skills
-│   ├── ui/                  # GTK4 + CLI + hotkey + topbar
-│   │   └── gtk/
-│   │       ├── app.py           # Main application (Ctrl+K, overlays)
-│   │       ├── search_overlay.py # History search (Ctrl+K)
-│   │       ├── hotkey_overlay.py # Quick command (Ctrl+Space)
-│   │       ├── ipc_listener.py  # Compositor IPC (hotkeys, logout)
-│   │       ├── sidebar.py       # Metrics + history + origin indicators
-│   │       ├── chat_feed.py     # Streaming chat messages
-│   │       ├── artifact_panel.py # Long content display
-│   │       └── ...
-│   └── infra/               # Daemon, voice, monitors, deps
+│   │   ├── mpv_controller.py    # Media IPC control
+│   │   ├── window_manager.py    # Sidebar/foreground/fullscreen
+│   │   └── ...
+│   ├── ui/gtk/              # GTK4 interface
+│   └── infra/               # Daemon, voice, deps
 ├── shell/                   # Compositor C (wlroots 0.18)
-│   └── src/                 # 14 source files (incl. gestures.c)
-├── tests/                   # 839 testes (36 arquivos)
-├── session/                 # Wayland session config
-├── scripts/                 # Build/install scripts
-└── pyproject.toml           # Project config
+├── tests/                   # 839 testes
+└── pyproject.toml
 ```
-
----
-
-## Completude vs. Desktop Linux
-
-CIOS é um **desktop environment cognitivo** sobre Linux (Debian). Kernel, drivers, init, e networking stack são delegados intencionalmente.
-
-### Cobertura atual (~85% de um desktop completo)
-
-| Área | Cobertura | Notas |
-|------|-----------|-------|
-| Display/Compositor | ~85% | Display settings via intent, falta gestures |
-| Interface/Shell | ~90% | 6 modos, intent-driven |
-| System Management | ~90% | Notifications, scheduled tasks, keyring, theming, trash |
-| Hardware Integration | ~80% | Wi-Fi, BT, audio, battery, printer, automount, display OK |
-| Networking | ~85% | Wi-Fi, VPN (WireGuard + OpenVPN), firewall (ufw), proxy OK |
-| Acessibilidade | 0% | Blocker para público amplo |
-| Personalização | ~70% | Theming dark/light, night light, locale |
-
-### Gaps críticos restantes
-
-| Gap | Impacto | Solução |
-|-----|---------|---------|
-| Accessibility | Exclui usuários | AT-SPI + Orca + compositor |
-| Touchpad gestures | Compositing incompleto | Extensão do compositor (C) |
-| App store integration | Flatpak/Snap via intent | `skills/app_store.py` (parcial) |
-
-### Decisão arquitetural
-
-Cada gap é resolvível como:
-1. **Novo skill** (Python module em `skills/`)
-2. **Novo handler** no planner (intent routing)
-3. **Extensão do compositor** (C, para gestures/zoom)
-
-A arquitetura já suporta. É trabalho incremental, não rewrite.
