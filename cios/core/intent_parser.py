@@ -2334,6 +2334,116 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
         lambda m: {"action": "send"},
         0.92,
     ),
+    # --- Media Play (PT + EN) — tocar música/vídeo ---
+    (
+        re.compile(
+            r"(?:toc(?:ar?|a|e)|play|reproduz(?:ir?|a))\s+(?:um(?:a)?\s+)?(.+)",
+            re.IGNORECASE,
+        ),
+        IntentType.MEDIA_PLAY,
+        lambda m: {"query": m.group(1).strip()},
+        0.93,
+    ),
+    (
+        re.compile(
+            r"(?:quero|estou\s+(?:a\s*fim|afim)|vou|bora)\s+(?:de\s+)?(?:ouvir|escutar|curtir)\s+(?:um(?:a)?\s+)?(.+)",
+            re.IGNORECASE,
+        ),
+        IntentType.MEDIA_PLAY,
+        lambda m: {"query": m.group(1).strip()},
+        0.92,
+    ),
+    (
+        re.compile(
+            r"(?:bot[ae]r?|coloc(?:ar?|a)|p[oõ]e)\s+(?:um(?:a)?\s+)?(.+?)(?:\s+(?:pra|para|enquanto).*)?$",
+            re.IGNORECASE,
+        ),
+        IntentType.MEDIA_PLAY,
+        lambda m: {"query": m.group(1).strip()},
+        0.90,
+    ),
+    (
+        re.compile(
+            r"(?:ouvir|escutar|listen(?:\s+to)?)\s+(.+)",
+            re.IGNORECASE,
+        ),
+        IntentType.MEDIA_PLAY,
+        lambda m: {"query": m.group(1).strip()},
+        0.90,
+    ),
+    (
+        re.compile(
+            r"(?:coloca|bota|põe)\s+(?:uma?\s+)?(?:m[uú]sica|song|music)(?:\s+(.+))?",
+            re.IGNORECASE,
+        ),
+        IntentType.MEDIA_PLAY,
+        lambda m: {"query": (m.group(1) or "music").strip()},
+        0.92,
+    ),
+    # --- Media Control (PT + EN) — controles de reprodução ---
+    (
+        re.compile(
+            r"^(?:para(?:r|u)?|stop|pare)(?:\s+(?:a\s+)?(?:m[uú]sica|music|reprodu[cç][aã]o|playback|v[ií]deo))?$",
+            re.IGNORECASE,
+        ),
+        IntentType.MEDIA_CONTROL,
+        lambda m: {"action": "stop"},
+        0.95,
+    ),
+    (
+        re.compile(
+            r"^(?:paus[ae]r?|pause)(?:\s+(?:a\s+)?(?:m[uú]sica|music|reprodu[cç][aã]o))?$",
+            re.IGNORECASE,
+        ),
+        IntentType.MEDIA_CONTROL,
+        lambda m: {"action": "toggle"},
+        0.95,
+    ),
+    (
+        re.compile(
+            r"^(?:continu(?:ar?|e)|resume|despausa|unpause|volta(?:r)?)$",
+            re.IGNORECASE,
+        ),
+        IntentType.MEDIA_CONTROL,
+        lambda m: {"action": "toggle"},
+        0.93,
+    ),
+    (
+        re.compile(
+            r"^(?:pr[oó]xim[ao]|next|skip|pula|avan[cç]a)(?:\s+(?:m[uú]sica|track|faixa))?$",
+            re.IGNORECASE,
+        ),
+        IntentType.MEDIA_CONTROL,
+        lambda m: {"action": "next"},
+        0.95,
+    ),
+    (
+        re.compile(
+            r"^(?:anterior|prev(?:ious)?|volta(?:r)?(?:\s+(?:a\s+)?(?:m[uú]sica|track|faixa)))$",
+            re.IGNORECASE,
+        ),
+        IntentType.MEDIA_CONTROL,
+        lambda m: {"action": "prev"},
+        0.93,
+    ),
+    (
+        re.compile(
+            r"(?:tela\s+cheia|fullscreen|expande?|maximiz[ae]r?)\s*(?:(?:o\s+)?(?:v[ií]deo|player|media))?",
+            re.IGNORECASE,
+        ),
+        IntentType.MEDIA_CONTROL,
+        lambda m: {"action": "fullscreen"},
+        0.90,
+    ),
+    (
+        re.compile(
+            r"(?:volume|vol)\s+(\d+)",
+            re.IGNORECASE,
+        ),
+        IntentType.MEDIA_CONTROL,
+        lambda m: {"action": "volume", "volume": int(m.group(1))},
+        0.93,
+    ),
 ]
 
 
