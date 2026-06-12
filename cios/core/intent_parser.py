@@ -1447,6 +1447,24 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
     ),
     (
         re.compile(
+            r"(?:volume)\s+(?:do\s+)?(?:audio|som|[aá]udio|speaker|caixa)\s+(?:em\s+|a\s+|pra\s+)?(\d+)\s*%?",
+            re.IGNORECASE,
+        ),
+        IntentType.AUDIO,
+        lambda m: {"action": "set", "level": int(m.group(1))},
+        0.96,
+    ),
+    (
+        re.compile(
+            r"(?:coloca|bota|p[oõ]e|seta|set)\s+(?:o\s+)?(?:volume|som)\s+(?:em\s+|a\s+|pra\s+)?(\d+)\s*%?",
+            re.IGNORECASE,
+        ),
+        IntentType.AUDIO,
+        lambda m: {"action": "set", "level": int(m.group(1))},
+        0.95,
+    ),
+    (
+        re.compile(
             r"(?:qual|quanto|what|how)\s+(?:\w+\s+){0,3}(?:volume|som)",
             re.IGNORECASE,
         ),

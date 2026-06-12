@@ -32,6 +32,12 @@ class Topbar(Gtk.Box):
         spacer.set_hexpand(True)
         self.append(spacer)
 
+        # DCS11: Condensed daily summary ("2 meetings, 3 emails, foco: CIOS")
+        self._daily_summary = Gtk.Label(label="")
+        self._daily_summary.add_css_class("topbar-summary")
+        self._daily_summary.set_visible(False)
+        self.append(self._daily_summary)
+
         # Media: now playing indicator (hidden by default)
         self._media_label = Gtk.Label(label="")
         self._media_label.add_css_class("topbar-media")
@@ -127,6 +133,9 @@ class Topbar(Gtk.Box):
         # Media state (read from state file)
         self._update_media()
 
+        # DCS11: Daily summary (read from briefing cache)
+        self._update_daily_summary()
+
         return True
 
     def _update_media(self):
@@ -153,6 +162,45 @@ class Topbar(Gtk.Box):
             pass
 
         self._media_label.set_visible(False)
+
+    def _update_daily_summary(self):
+        """DCS11: Update condensed daily summary from briefing cache.
+
+        Shows something like: "2 meetings, 3 emails, foco: CIOS"
+        Reads from the cached briefing file written by Intelligence module.
+        """
+        import json
+        from pathlib import Path
+
+        cache_file = Path.home() / ".cios" / ".briefing_cache"
+        try:
+            if not cache_file.exists():
+                self._daily_summary.set_visible(False)
+                return
+
+            data = json.loads(cache_file.read_text(encoding="utf-8"))
+            parts = []
+
+            meetings = len(data.get("meetings", []))
+            if meetings > 0:
+                parts.append(f"{meetings} {'reunião' if meetings == 1 else 'reuniões'}")
+
+            emails = len(data.get("emails", []))
+            if emails > 0:
+                parts.append(f"{emails} {'email' if emails == 1 else 'emails'}")
+
+            focus = data.get("focus_suggestion", "")
+            if focus:
+                parts.append(f"foco: {focus[:20]}")
+
+            if parts:
+                self._daily_summary.set_label(" · ".join(parts))
+                self._daily_summary.set_visible(True)
+            else:
+                self._daily_summary.set_visible(False)
+
+        except (json.JSONDecodeError, OSError):
+            self._daily_summary.set_visible(False)
 
     @staticmethod
     def get_css() -> str:
@@ -192,6 +240,12 @@ class Topbar(Gtk.Box):
                 font-size: 10px;
                 font-weight: 500;
                 opacity: 0.9;
+            }}
+            .topbar-summary {{
+                color: {FG_DIM};
+                font-size: 10px;
+                font-weight: 400;
+                opacity: 0.8;
             }}
             .topbar-power {{
                 color: {FG_DIM};

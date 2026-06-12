@@ -650,6 +650,7 @@ class IntelligenceClient:
         """Fetch the daily briefing from the Intelligence API.
 
         Returns the briefing dict or None if unavailable.
+        Also caches the result to ~/.cios/.briefing_cache for topbar (DCS11).
         """
         if not self.is_logged_in:
             return None
@@ -666,7 +667,17 @@ class IntelligenceClient:
 
         try:
             with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
-                return json.loads(resp.read())
+                data = json.loads(resp.read())
+
+            # Cache for topbar condensed view (DCS11)
+            try:
+                cache_path = Path.home() / ".cios" / ".briefing_cache"
+                cache_path.parent.mkdir(parents=True, exist_ok=True)
+                cache_path.write_text(json.dumps(data), encoding="utf-8")
+            except Exception:
+                pass
+
+            return data
         except Exception as e:
             logger.warning("Briefing fetch failed: %s", e)
             return None

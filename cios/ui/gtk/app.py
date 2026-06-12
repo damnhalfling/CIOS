@@ -215,6 +215,19 @@ class CIOSApplication(Gtk.Application):
         self._hotkey_overlay = HotkeyOverlay(on_submit=self._on_hotkey_submit)
         root_overlay.add_overlay(self._hotkey_overlay)
 
+        # ── Briefing overlay (DCS10 — triggered by "meu dia" intent) ──
+        from cios.ui.gtk.briefing_overlay import BriefingOverlay
+
+        self._briefing_overlay = BriefingOverlay()
+        root_overlay.add_overlay(self._briefing_overlay)
+
+        # Apply briefing overlay CSS
+        briefing_ov_css = Gtk.CssProvider()
+        briefing_ov_css.load_from_data(BriefingOverlay.get_css().encode())
+        Gtk.StyleContext.add_provider_for_display(
+            self._win.get_display(), briefing_ov_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+
         # ── Search overlay (Ctrl+K) ──
         self._search_overlay = SearchOverlay()
         root_overlay.add_overlay(self._search_overlay)
@@ -321,15 +334,62 @@ class CIOSApplication(Gtk.Application):
         self._input.set_text(text)
         self._on_submit()
 
-    def _spawn_secondary_windows(self):
-        """Detect secondary outputs and create independent windows for them.
+    def show_briefing_overlay(self):
+        """DCS10: Show briefing overlay (triggered by 'meu dia' / 'briefing' intent)."""
+        if self._briefing_overlay.get_visible():
+            self._briefing_overlay.hide_overlay()
+        else:
+            self._briefing_overlay.show_overlay()
 
-        Currently disabled — extended monitors work as drag targets for app windows.
-        The compositor handles rendering on extended outputs automatically.
-        Secondary windows will be re-enabled when proper output-aware window
-        placement is implemented.
+    def _spawn_secondary_windows(self):
+        """Detect secondary outputs and create windows with briefing dashboard.
+
+        On secondary monitors, shows the BriefingDashboard (DCS9) by default.
+        Falls back to standard SecondaryWindow chat if briefing is unavailable.
         """
-        pass
+        try:
+            from cios.infra.monitors import get_monitors
+
+            monitors = get_monitors()
+            # Filter to non-primary monitors
+            secondary = [m for m in monitors if not m.primary and m.width > 0]
+
+            if not secondary:
+                return
+
+            from cios.ui.gtk.briefing_dashboard import BriefingDashboard
+            from cios.ui.gtk.secondary_window import SecondaryWindow
+
+            for monitor in secondary:
+                win = SecondaryWindow(
+                    app=self,
+                    bridge=self._bridge,
+                    monitor_name=monitor.name,
+                    width=monitor.width,
+                    height=monitor.height,
+                )
+                # Add briefing dashboard as default view on secondary
+                dashboard = BriefingDashboard()
+                # Insert dashboard above chat feed
+                root_child = win.get_child()
+                if root_child:
+                    # Apply dashboard CSS
+                    dash_css = Gtk.CssProvider()
+                    dash_css.load_from_data(BriefingDashboard.get_css().encode())
+                    Gtk.StyleContext.add_provider_for_display(
+                        win.get_display(), dash_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+                    )
+
+                win.present()
+                logger.info(
+                    "Secondary window created on %s (%dx%d)",
+                    monitor.name,
+                    monitor.width,
+                    monitor.height,
+                )
+
+        except Exception as e:
+            logger.debug("Secondary windows not spawned: %s", e)
 
     def _on_hotkey_triggered(self):
         """Called when Ctrl+Space is pressed (via compositor IPC)."""
@@ -394,6 +454,13 @@ class CIOSApplication(Gtk.Application):
                     if data.get("action") == "lock_screen":
                         GLib.idle_add(self._hide_status)
                         GLib.idle_add(self._do_lock_screen)
+                        return
+
+                    # Briefing overlay (DCS10 — intent "meu dia" / "briefing")
+                    if data.get("action") == "briefing" or data.get("intent") == "briefing":
+                        GLib.idle_add(self._hide_status)
+                        GLib.idle_add(self.show_briefing_overlay)
+                        GLib.idle_add(self._finish_execution)
                         return
 
                     # Confirmation needed (destructive action)
