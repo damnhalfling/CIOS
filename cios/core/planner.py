@@ -18,6 +18,7 @@ from cios.core.handlers.desktop import (
     handle_firewall,
     handle_scheduler,
     handle_theming,
+    handle_todo,
     handle_trash,
     handle_vpn,
 )
@@ -159,6 +160,7 @@ _HANDLER_MAP = {
     IntentType.BRIEFING: handle_briefing,
     IntentType.MEDIA_PLAY: handle_media_play,
     IntentType.MEDIA_CONTROL: handle_media_control,
+    IntentType.TODO: handle_todo,
     IntentType.HISTORY_SEARCH: None,  # Handled directly in bridge
 }
 

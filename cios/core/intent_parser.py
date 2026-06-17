@@ -59,6 +59,7 @@ class IntentType(Enum):
     BRIEFING = "briefing"
     MEDIA_PLAY = "media_play"
     MEDIA_CONTROL = "media_control"
+    TODO = "todo"
     UNKNOWN = "unknown"
 
 
@@ -2443,6 +2444,52 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
         IntentType.MEDIA_CONTROL,
         lambda m: {"action": "volume", "volume": int(m.group(1))},
         0.93,
+    ),
+    # --- TODO / Task management (PT + EN) ---
+    (
+        re.compile(
+            r"(?:adiciona(?:r)?|nova|cria(?:r)?|add)\s+(?:uma?\s+)?(?:tarefa|task|todo)[:\s]+(.+)",
+            re.IGNORECASE,
+        ),
+        IntentType.TODO,
+        lambda m: {"action": "add", "text": m.group(1).strip()},
+        0.95,
+    ),
+    (
+        re.compile(
+            r"(?:minhas?\s+)?(?:tarefas|tasks|todos|pendências|pendencias)",
+            re.IGNORECASE,
+        ),
+        IntentType.TODO,
+        lambda m: {"action": "list"},
+        0.90,
+    ),
+    (
+        re.compile(
+            r"(?:marca(?:r)?|completa(?:r)?|feit[ao]|done)\s+(?:a?\s+)?(?:tarefa|task|todo)\s+#?(\d+)",
+            re.IGNORECASE,
+        ),
+        IntentType.TODO,
+        lambda m: {"action": "done", "id": int(m.group(1))},
+        0.95,
+    ),
+    (
+        re.compile(
+            r"(?:remove(?:r)?|deleta(?:r)?|apaga(?:r)?)\s+(?:a?\s+)?(?:tarefa|task|todo)\s+#?(\d+)",
+            re.IGNORECASE,
+        ),
+        IntentType.TODO,
+        lambda m: {"action": "remove", "id": int(m.group(1))},
+        0.95,
+    ),
+    (
+        re.compile(
+            r"(?:próximas?|next|urgentes?|top)\s+(?:tarefas|tasks|todos)",
+            re.IGNORECASE,
+        ),
+        IntentType.TODO,
+        lambda m: {"action": "top"},
+        0.90,
     ),
 ]
 

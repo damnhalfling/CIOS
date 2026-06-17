@@ -190,87 +190,82 @@ def handle_trash(intent: Intent, executor: Executor, memory: Memory) -> PlanResu
 
 
 def handle_briefing(intent: Intent, executor: Executor, memory: Memory) -> PlanResult:
-    """Handle daily briefing intent: 'meu dia', 'briefing', 'como está meu dia'."""
-    from cios.core.intelligence import intelligence
+    """Handle daily briefing intent: 'meu dia', 'briefing', 'como está meu dia'.
 
-    if not intelligence.is_logged_in:
-        return PlanResult(
-            plan_steps=["Verificando briefing"],
-            results=[],
-            outcome="failure",
-            summary="Faça login no CIOS Intelligence para ver seu briefing diário.",
-        )
+    Combines:
+    1. Local TODOs (from ~/.cios/todos.json)
+    2. Intelligence API briefing (calendar, memory highlights)
+    """
+    from cios.skills.todo import get_top_tasks
 
-    data = intelligence.briefing()
-    if not data:
-        return PlanResult(
-            plan_steps=["Buscando briefing"],
-            results=[],
-            outcome="failure",
-            summary="Não foi possível carregar o briefing. Verifique a conexão.",
-        )
-
-    # Format briefing for terminal/UI display
     lines = []
 
-    # Greeting + Focus
-    lines.append(data.get("greeting", ""))
-    if data.get("focus_suggestion"):
-        lines.append(f"🎯 {data['focus_suggestion']}")
-    if data.get("next_meeting_in_minutes") is not None:
-        lines.append(f"⏰ Próxima reunião em {data['next_meeting_in_minutes']} min")
-
-    lines.append("")
-
-    # Meetings
-    meetings = data.get("meetings", [])
-    if meetings:
-        lines.append(f"📅 {len(meetings)} reunião{'ões' if len(meetings) > 1 else ''}:")
-        for m in meetings:
-            time_str = m.get("time", "")
-            if "T" in time_str:
-                time_str = time_str.split("T")[1][:5]
-            duration = f" ({m['duration']}min)" if m.get("duration") else ""
-            lines.append(f"   {time_str}{duration} — {m['title']}")
+    # ── Local TODOs (always available, even offline) ──
+    local_tasks = get_top_tasks(limit=5)
+    if local_tasks:
+        lines.append("📋 Suas próximas tarefas:")
+        for t in local_tasks:
+            priority_icon = {"high": "🔴", "medium": "🟡", "low": "⚪"}.get(t.priority, "○")
+            lines.append(f"   {priority_icon} #{t.id} {t.text}")
         lines.append("")
 
-    # Emails
-    emails = data.get("emails", [])
-    if emails:
-        lines.append(
-            f"📧 {len(emails)} email{'s' if len(emails) > 1 else ''} importante{'s' if len(emails) > 1 else ''}:"
+    # ── Intelligence API (calendar, memory, suggestions) ──
+    from cios.core.intelligence import intelligence
+
+    if intelligence.is_logged_in:
+        data = intelligence.briefing()
+        if data:
+            # Greeting
+            if data.get("greeting"):
+                lines.insert(0, data["greeting"])
+                lines.insert(1, "")
+
+            # Tasks from Intelligence (inferred goals/projects)
+            api_tasks = data.get("tasks", [])
+            if api_tasks:
+                lines.append("🎯 Projetos ativos:")
+                for t in api_tasks[:3]:
+                    lines.append(f"   • {t['text']}")
+                lines.append("")
+
+            # Calendar
+            calendar = data.get("calendar", [])
+            if calendar:
+                lines.append(f"📅 {len(calendar)} evento{'s' if len(calendar) > 1 else ''} hoje:")
+                for ev in calendar:
+                    lines.append(f"   {ev.get('time', '')} — {ev.get('title', '')}")
+                lines.append("")
+
+            # Memory highlights
+            highlights = data.get("memory_highlights", [])
+            if highlights:
+                lines.append("🧠 Recentes:")
+                for h in highlights:
+                    lines.append(f"   • {h['content'][:60]}")
+                lines.append("")
+
+            # Summary
+            if data.get("summary"):
+                lines.append(f"📊 {data['summary']}")
+    else:
+        if not local_tasks:
+            return PlanResult(
+                plan_steps=["Verificando briefing"],
+                results=[],
+                outcome="success",
+                summary=(
+                    "Sem tarefas registradas. Use 'adiciona tarefa: ...' para criar.\n"
+                    "Faça login no Intelligence para integrar agenda e memória."
+                ),
+            )
+
+    if not lines:
+        return PlanResult(
+            plan_steps=["Briefing"],
+            results=[],
+            outcome="success",
+            summary="Dia tranquilo — sem pendências registradas.",
         )
-        for e in emails:
-            priority_marker = "●" if e.get("priority") == "high" else "○"
-            lines.append(f"   {priority_marker} {e['subject'][:50]} — {e.get('from', '')[:30]}")
-        lines.append("")
-
-    # Last context
-    last_ctx = data.get("last_context")
-    if last_ctx:
-        lines.append(f"🧠 Onde parou: {last_ctx['summary'][:60]}")
-        lines.append("")
-
-    # Playlist
-    playlist = data.get("playlist")
-    if playlist:
-        lines.append(f"🎵 {playlist['title']}")
-        lines.append("")
-
-    # Insights
-    insights = data.get("insights", [])
-    if insights:
-        lines.append("💡 Descobertas:")
-        for ins in insights:
-            lines.append(f"   {ins['topic']}: {ins['summary'][:60]}")
-        lines.append("")
-
-    # Time blocks
-    blocks = data.get("time_blocks", [])
-    if blocks:
-        lines.append("⏱️ Blocos:")
-        for b in blocks:
-            lines.append(f"   {b['start']}–{b['end']} {b['label']}")
 
     summary = "\n".join(lines).strip()
 
@@ -279,4 +274,85 @@ def handle_briefing(intent: Intent, executor: Executor, memory: Memory) -> PlanR
         results=[],
         outcome="success",
         summary=summary,
+    )
+
+
+def handle_todo(intent: Intent, executor: Executor, memory: Memory) -> PlanResult:
+    """Handle TODO management intents: add, list, done, remove, top."""
+    from cios.skills.todo import add_todo, get_top_tasks, list_todos, mark_done, remove_todo
+
+    action = intent.params.get("action", "list")
+
+    if action == "add":
+        text = intent.params.get("text", "")
+        if not text:
+            return PlanResult(
+                plan_steps=["Adicionar tarefa"],
+                results=[],
+                outcome="failure",
+                summary="Diga o que precisa fazer. Ex: 'adiciona tarefa: revisar PR'",
+            )
+        priority = intent.params.get("priority", "medium")
+        todo = add_todo(text, priority)
+        return PlanResult(
+            plan_steps=["Tarefa adicionada"],
+            results=[],
+            outcome="success",
+            summary=f"✓ Tarefa #{todo.id} criada: {todo.text}",
+        )
+
+    if action == "done":
+        task_id = intent.params.get("id", 0)
+        todo = mark_done(task_id)
+        if todo:
+            return PlanResult(
+                plan_steps=["Tarefa concluída"],
+                results=[],
+                outcome="success",
+                summary=f"✓ Tarefa #{todo.id} concluída: {todo.text}",
+            )
+        return PlanResult(
+            plan_steps=["Marcar tarefa"],
+            results=[],
+            outcome="failure",
+            summary=f"Tarefa #{task_id} não encontrada.",
+        )
+
+    if action == "remove":
+        task_id = intent.params.get("id", 0)
+        removed = remove_todo(task_id)
+        if removed:
+            return PlanResult(
+                plan_steps=["Remover tarefa"],
+                results=[],
+                outcome="success",
+                summary=f"✓ Tarefa #{task_id} removida.",
+            )
+        return PlanResult(
+            plan_steps=["Remover tarefa"],
+            results=[],
+            outcome="failure",
+            summary=f"Tarefa #{task_id} não encontrada.",
+        )
+
+    # action == "list" or "top"
+    todos = get_top_tasks(limit=10) if action == "top" else list_todos()
+    if not todos:
+        return PlanResult(
+            plan_steps=["Listar tarefas"],
+            results=[],
+            outcome="success",
+            summary="Sem tarefas pendentes. Use 'adiciona tarefa: ...' para criar.",
+        )
+
+    lines = ["📋 Tarefas pendentes:"]
+    for t in todos:
+        icon = {"high": "🔴", "medium": "🟡", "low": "⚪"}.get(t.priority, "○")
+        lines.append(f"   {icon} #{t.id} {t.text}")
+
+    return PlanResult(
+        plan_steps=["Listar tarefas"],
+        results=[],
+        outcome="success",
+        summary="\n".join(lines),
     )
