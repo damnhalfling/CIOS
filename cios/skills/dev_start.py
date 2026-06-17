@@ -191,11 +191,11 @@ def _wait_for_port_free(port: int, timeout: float = 3.0, interval: float = 0.2) 
 def _detect_editor() -> str | None:
     """Detect the best available code editor.
 
-    Checks for ``code`` (VS Code), ``codium`` (VS Codium), then falls back
-    to the ``VISUAL`` or ``EDITOR`` environment variables.
+    Checks for ``kiro`` (Kiro IDE), ``code`` (VS Code), ``codium`` (VS Codium),
+    then falls back to the ``VISUAL`` or ``EDITOR`` environment variables.
     Returns the command name or ``None`` if nothing is found.
     """
-    for candidate in ("code", "codium"):
+    for candidate in ("kiro", "code", "codium"):
         if shutil.which(candidate):
             return candidate
     # Fallback to environment variables
