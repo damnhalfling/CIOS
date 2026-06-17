@@ -49,7 +49,12 @@ from cios.core.handlers.media import (
     handle_media_control,
     handle_media_play,
 )
-from cios.core.handlers.misc import handle_command_exec, handle_file_ops, handle_intelligence, handle_self_update
+from cios.core.handlers.misc import (
+    handle_command_exec,
+    handle_file_ops,
+    handle_intelligence,
+    handle_self_update,
+)
 from cios.core.handlers.network import handle_network
 from cios.core.handlers.packages import handle_package
 from cios.core.handlers.peripherals import (
