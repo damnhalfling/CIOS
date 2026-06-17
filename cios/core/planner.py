@@ -49,7 +49,7 @@ from cios.core.handlers.media import (
     handle_media_control,
     handle_media_play,
 )
-from cios.core.handlers.misc import handle_command_exec, handle_intelligence, handle_self_update
+from cios.core.handlers.misc import handle_command_exec, handle_file_ops, handle_intelligence, handle_self_update
 from cios.core.handlers.network import handle_network
 from cios.core.handlers.packages import handle_package
 from cios.core.handlers.peripherals import (
@@ -145,6 +145,7 @@ _HANDLER_MAP = {
     IntentType.FILES_SEARCH: handle_files_search,
     IntentType.FILES_OPEN: handle_files_open,
     IntentType.INTELLIGENCE: handle_intelligence,
+    IntentType.FILE_OPS: handle_file_ops,
     IntentType.GALLERY_MANAGE: handle_gallery_manage,
     IntentType.SCREEN_CAPTURE: handle_screen_capture,
     IntentType.SPREADSHEET: handle_spreadsheet,

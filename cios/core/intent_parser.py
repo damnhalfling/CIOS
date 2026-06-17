@@ -58,6 +58,7 @@ class IntentType(Enum):
     TRASH = "trash"
     BRIEFING = "briefing"
     MEDIA_PLAY = "media_play"
+    FILE_OPS = "file_ops"
     MEDIA_CONTROL = "media_control"
     TODO = "todo"
     UNKNOWN = "unknown"

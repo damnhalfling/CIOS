@@ -12,7 +12,7 @@ from cios.core.handlers.files import handle_file_organize, handle_files_open, ha
 from cios.core.handlers.gallery import handle_gallery_manage
 from cios.core.handlers.logs import handle_fix_last_error, handle_log_analysis
 from cios.core.handlers.media import handle_intent_browse, handle_intent_media, handle_intent_write
-from cios.core.handlers.misc import handle_command_exec, handle_intelligence, handle_self_update
+from cios.core.handlers.misc import handle_command_exec, handle_file_ops, handle_intelligence, handle_self_update
 from cios.core.handlers.network import handle_network
 from cios.core.handlers.packages import handle_package
 from cios.core.handlers.peripherals import handle_bluetooth, handle_clipboard, handle_window
@@ -52,4 +52,5 @@ __all__ = [
     "handle_command_exec",
     "handle_self_update",
     "handle_intelligence",
+    "handle_file_ops",
 ]

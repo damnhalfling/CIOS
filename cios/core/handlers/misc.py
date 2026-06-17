@@ -1,10 +1,62 @@
-"""Handlers for command execution, self-update, and intelligence intents."""
+"""Handlers for command execution, self-update, file operations, and intelligence intents."""
+
+import os
 
 from cios.core.executor import Executor
 from cios.core.handlers._common import PlanResult, sanitize_error
 from cios.core.intent_parser import Intent
 from cios.core.memory import Memory
 from cios.skills import self_update as update_skill
+
+
+def handle_file_ops(intent: Intent, executor: Executor, memory: Memory) -> PlanResult:
+    """Handle filesystem operations: mkdir, create file, etc."""
+    action = intent.params.get("action", "")
+    path = intent.params.get("path", "")
+
+    if not path:
+        return PlanResult(
+            plan_steps=["File operation"],
+            results=[],
+            outcome="failure",
+            summary="Qual pasta ou arquivo devo criar?",
+        )
+
+    # Resolve path: if not absolute, put in ~/Projetos for project-like names
+    if not os.path.isabs(path):
+        home = os.path.expanduser("~")
+        # If it looks like a project name, put in ~/Projetos
+        projetos_dir = os.path.join(home, "Projetos")
+        if os.path.isdir(projetos_dir):
+            full_path = os.path.join(projetos_dir, path)
+        else:
+            full_path = os.path.join(home, path)
+    else:
+        full_path = path
+
+    if action == "mkdir":
+        result = executor.run(f"mkdir -p {full_path}")
+        if result.success:
+            return PlanResult(
+                plan_steps=[f"Criar pasta: {full_path}"],
+                results=[result],
+                outcome="success",
+                summary=f"Pasta criada: {full_path}",
+            )
+        else:
+            return PlanResult(
+                plan_steps=[f"Criar pasta: {full_path}"],
+                results=[result],
+                outcome="failure",
+                summary=f"Erro ao criar pasta: {sanitize_error(result.stderr, 'mkdir')}",
+            )
+
+    return PlanResult(
+        plan_steps=["File operation"],
+        results=[],
+        outcome="failure",
+        summary=f"Ação '{action}' não suportada ainda.",
+    )
 
 
 def handle_command_exec(intent: Intent, executor: Executor, memory: Memory) -> PlanResult:
