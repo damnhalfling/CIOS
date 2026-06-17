@@ -36,6 +36,7 @@ def _scan_project_dirs() -> list[str]:
     search_roots = [
         os.path.join(home, d)
         for d in (
+            "Projetos",
             "projetos",
             "projects",
             "dev",
