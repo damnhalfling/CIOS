@@ -1568,6 +1568,25 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
         lambda m: {"action": "lock"},
         0.90,
     ),
+    # --- file operations (PT + EN) — MUST be before app_launch ---
+    (
+        re.compile(
+            r"(?:cri(?:ar?|e)|criar?|create|mkdir)\s+(?:uma?\s+)?(?:pasta|diret[oó]rio|folder|directory)\s+(.+?)(?:\s+(?:para|pra|por favor).*)?$",
+            re.IGNORECASE,
+        ),
+        IntentType.FILE_OPS,
+        lambda m: {"action": "mkdir", "path": m.group(1).strip()},
+        0.95,
+    ),
+    (
+        re.compile(
+            r"(?:cri(?:ar?|e)|criar?)\s+(?:uma?\s+)?(?:pasta|folder)\s+(?:para|pro|do|chamad[ao])\s+(.+?)$",
+            re.IGNORECASE,
+        ),
+        IntentType.FILE_OPS,
+        lambda m: {"action": "mkdir", "path": m.group(1).strip()},
+        0.95,
+    ),
     # --- app launcher (PT + EN) ---
     (
         re.compile(
