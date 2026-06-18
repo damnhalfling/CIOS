@@ -2517,28 +2517,39 @@ _RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
 def parse_intent(user_input: str) -> Intent:
     """Parse user input into a structured Intent using pattern matching.
 
-    Context validation strategy:
-    - Every regex match is validated against context words for its intent type
-    - If the intent has context words defined and NONE appear in the input,
-      the match is rejected and we try the next rule
-    - Intents with specific-enough patterns (FILE_OPS, BRIEFING, TODO, etc.)
-      don't need context validation and are always trusted
-    - This prevents false positives like "download" → audio:down
-      or "iniciar um projeto" → app_launch
+    Strategy:
+    - Long phrases (> 8 words): skip regex entirely → UNKNOWN → escalates to LLM.
+      Natural language sentences with multiple intents, context, and ambiguity
+      cannot be resolved by regex. LLM understands the full sentence.
+    - Short phrases (≤ 8 words): regex with context validation.
+      Even for short phrases, every match is validated against context words.
 
-    If no rule matches (or all are rejected by context), returns UNKNOWN
-    which triggers escalation to Intelligence/Ollama.
+    This prevents:
+    - "download" triggering audio:down
+    - "instale para nos" being parsed as package name "para nos"
+    - Any conversational sentence being butchered by substring matching
     """
     text = user_input.strip()
     if not text:
         return Intent(type=IntentType.UNKNOWN, confidence=0.0, raw_input=text)
 
+    words = text.split()
+
+    # Long phrases → always escalate to LLM (regex can't handle natural language)
+    if len(words) > 8:
+        return Intent(
+            type=IntentType.UNKNOWN,
+            confidence=0.0,
+            raw_input=text,
+            requires_complex_reasoning=True,
+        )
+
+    # Short phrases → regex with context validation
     for pattern, intent_type, extractor, confidence in _RULES:
         match = pattern.search(text)
         if match:
-            # Validate context: does the full sentence confirm this intent?
             if not _confirms_context(text, intent_type):
-                continue  # Context doesn't confirm — try next rule
+                continue
 
             params = extractor(match) if extractor else {}
             return Intent(
