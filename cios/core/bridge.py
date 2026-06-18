@@ -537,6 +537,69 @@ class CIOSBridge:
 
         return result
 
+    def _execute_plan_steps(self, cmd: dict, original_input: str) -> dict:
+        """Execute an execution plan from the Intelligence planner.
+
+        The planner returns concrete shell steps that we run sequentially.
+        Each step is a shell command. We show progress and stop on failure.
+        """
+        params = cmd.get("params", {})
+        steps = params.get("steps", [])
+        explanation = params.get("explanation", "")
+        risk = params.get("risk", "low")
+
+        if not steps:
+            return {
+                "steps": ["Plano recebido"],
+                "result": explanation or "Nenhum comando a executar.",
+                "status": "info",
+                "confirm": None,
+                "voice_mode": "full",
+            }
+
+        logger.info(
+            "Executing plan: %d steps, risk=%s, explain='%s'",
+            len(steps),
+            risk,
+            explanation[:80],
+        )
+
+        all_results = []
+        failed = False
+
+        for i, step_cmd in enumerate(steps, 1):
+            logger.info("  Plan step [%d/%d]: %s", i, len(steps), step_cmd[:100])
+
+            # Execute via shell
+            result = self.executor.run(step_cmd, timeout=60)
+            step_label = f"[{i}/{len(steps)}] {step_cmd[:60]}"
+
+            if result.success:
+                output = result.stdout.strip()[:200] if result.stdout else "OK"
+                all_results.append(f"✓ {step_label}")
+                if output and output != "OK":
+                    all_results.append(f"  {output}")
+            else:
+                error = result.stderr.strip()[:200] if result.stderr else "Falhou"
+                all_results.append(f"✗ {step_label}")
+                all_results.append(f"  Erro: {error}")
+                failed = True
+                break  # Stop on first failure
+
+        summary_parts = []
+        if explanation:
+            summary_parts.append(explanation)
+        summary_parts.append("")
+        summary_parts.extend(all_results)
+
+        return {
+            "steps": [f"Executando plano ({len(steps)} passos)"],
+            "result": "\n".join(summary_parts).strip(),
+            "status": "failure" if failed else "success",
+            "confirm": None,
+            "voice_mode": "full",
+        }
+
     def _execute_multi_step(self, first_cmd: dict, original_input: str) -> dict:
         """Execute a multi-step orchestrated command sequence.
 
@@ -595,7 +658,7 @@ class CIOSBridge:
 
             # Report result back to Maestro for next step
             exec_result_msg = (
-                f"[exec_result] step={step_num} outcome={outcome} " f"output={summary[:200]}"
+                f"[exec_result] step={step_num} outcome={outcome} output={summary[:200]}"
             )
 
             try:
@@ -1600,6 +1663,10 @@ class CIOSBridge:
             if intel_result.os_command:
                 cmd = intel_result.os_command
                 logger.info("Intelligence resolved: os_command=%s", cmd.get("intent"))
+
+                # Execution plan: sequential shell steps with confirmation
+                if cmd.get("intent") == "execution_plan" or cmd.get("type") == "plan":
+                    return self._execute_plan_steps(cmd, user_input)
 
                 # Multi-step execution loop
                 if cmd.get("has_next"):
