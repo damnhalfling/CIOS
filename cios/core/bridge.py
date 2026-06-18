@@ -542,6 +542,9 @@ class CIOSBridge:
 
         The planner returns concrete shell steps that we run sequentially.
         Each step is a shell command. We show progress and stop on failure.
+
+        Commands requiring root (sudo/apt/dpkg/systemctl) are automatically
+        elevated via pkexec (graphical password prompt).
         """
         params = cmd.get("params", {})
         steps = params.get("steps", [])
@@ -568,10 +571,12 @@ class CIOSBridge:
         failed = False
 
         for i, step_cmd in enumerate(steps, 1):
+            # Elevate privileged commands via pkexec (graphical sudo)
+            step_cmd = self._elevate_if_needed(step_cmd)
+
             logger.info("  Plan step [%d/%d]: %s", i, len(steps), step_cmd[:100])
 
-            # Execute via shell
-            result = self._executor.run(step_cmd, timeout=60)
+            result = self._executor.run(step_cmd, timeout=120)
             step_label = f"[{i}/{len(steps)}] {step_cmd[:60]}"
 
             if result.success:
@@ -599,6 +604,25 @@ class CIOSBridge:
             "confirm": None,
             "voice_mode": "full",
         }
+
+    def _elevate_if_needed(self, command: str) -> str:
+        """Replace sudo with pkexec for graphical privilege elevation.
+
+        Detects commands that need root and wraps them with pkexec
+        so the user gets a graphical password prompt instead of hanging.
+        """
+        # Already has sudo → replace with pkexec
+        if command.strip().startswith("sudo "):
+            return "pkexec " + command.strip()[5:]
+
+        # Commands that inherently need root
+        _NEEDS_ROOT = ("dpkg -i", "apt-get", "apt ", "systemctl", "mount ", "umount ")
+        for prefix in _NEEDS_ROOT:
+            if prefix in command:
+                # Wrap the whole command with pkexec sh -c if not already elevated
+                return f'pkexec sh -c "{command}"'
+
+        return command
 
     def _execute_multi_step(self, first_cmd: dict, original_input: str) -> dict:
         """Execute a multi-step orchestrated command sequence.
