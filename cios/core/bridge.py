@@ -571,7 +571,7 @@ class CIOSBridge:
             logger.info("  Plan step [%d/%d]: %s", i, len(steps), step_cmd[:100])
 
             # Execute via shell
-            result = self.executor.run(step_cmd, timeout=60)
+            result = self._executor.run(step_cmd, timeout=60)
             step_label = f"[{i}/{len(steps)}] {step_cmd[:60]}"
 
             if result.success:
