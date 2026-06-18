@@ -124,6 +124,23 @@ _PRONOUNS_EN = {"that", "this", "it", "those", "the same", "that one"}
 _ALL_PRONOUNS = _PRONOUNS_PT | _PRONOUNS_EN
 
 
+def _step_needs_root_static(command: str) -> bool:
+    """Check if a shell command needs root privileges (module-level)."""
+    cmd = command.strip()
+    if cmd.startswith("sudo "):
+        return True
+    _ROOT_PATTERNS = (
+        "dpkg -i",
+        "dpkg --install",
+        "apt-get",
+        "apt ",
+        "systemctl",
+        "mount ",
+        "umount ",
+    )
+    return any(p in cmd for p in _ROOT_PATTERNS)
+
+
 class CIOSBridge:
     """Single entry point for all UI → backend communication."""
 
@@ -602,122 +619,110 @@ class CIOSBridge:
         return self._run_plan_steps(steps, explanation, sudo_password)
 
     def _run_plan_steps(self, steps: list, explanation: str, sudo_password: str) -> dict:
-        """Actually execute plan steps (after password if needed)."""
-        logger.info(
-            "Executing plan: %d steps, explain='%s'",
-            len(steps),
-            explanation[:80],
+        """Execute plan steps in background via TaskManager.
+
+        Liberates the prompt immediately. Shows red feedback in history.
+        Steps execute asynchronously with progress updates.
+        """
+        from cios.core.task_queue import Task
+
+        task = Task(
+            description=explanation[:60] or "Executando plano",
+            context="plan_execution",
         )
 
-        all_results = []
-        failed = False
+        executor = self._executor
+        plan_steps = steps
+        password = sudo_password
 
-        for i, step_cmd in enumerate(steps, 1):
-            needs_root = self._step_needs_root(step_cmd)
+        def execute_fn(t: Task) -> dict:
+            all_results = []
+            failed = False
 
-            # Strip sudo prefix if present (we handle elevation ourselves)
-            actual_cmd = step_cmd.strip()
-            if actual_cmd.startswith("sudo "):
-                actual_cmd = actual_cmd[5:]
-                needs_root = True
+            for i, step_cmd in enumerate(plan_steps, 1):
+                actual_cmd = step_cmd.strip()
+                needs_root = _step_needs_root_static(actual_cmd)
+                if actual_cmd.startswith("sudo "):
+                    actual_cmd = actual_cmd[5:]
+                    needs_root = True
 
-            if needs_root and sudo_password:
-                logger.info("  Plan step [%d/%d]: sudo %s", i, len(steps), actual_cmd[:80])
-                import subprocess
+                t.add_progress(
+                    f"[{i}/{len(plan_steps)}] {actual_cmd[:50]}", (i / len(plan_steps)) * 90
+                )
 
-                try:
-                    proc = subprocess.run(
-                        f"sudo -S {actual_cmd}",
-                        shell=True,
-                        input=sudo_password + "\n",
-                        capture_output=True,
-                        text=True,
-                        timeout=120,
-                        env={
-                            "DEBIAN_FRONTEND": "noninteractive",
-                            "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
-                        },
-                    )
-                    step_label = f"[{i}/{len(steps)}] {actual_cmd[:50]}"
-                    if proc.returncode == 0:
-                        output = proc.stdout.strip()[:200] if proc.stdout else "OK"
-                        all_results.append(f"✓ {step_label}")
-                        if output and output != "OK":
-                            all_results.append(f"  {output}")
-                    else:
-                        error = proc.stderr.strip()[:200] if proc.stderr else "Falhou"
-                        error = "\n".join(
-                            line for line in error.splitlines() if "[sudo]" not in line
+                if needs_root and password:
+                    import subprocess
+
+                    try:
+                        proc = subprocess.run(
+                            f"sudo -S {actual_cmd}",
+                            shell=True,
+                            input=password + "\n",
+                            capture_output=True,
+                            text=True,
+                            timeout=120,
+                            env={
+                                "DEBIAN_FRONTEND": "noninteractive",
+                                "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+                            },
                         )
-                        all_results.append(f"✗ {step_label}")
-                        if error.strip():
-                            all_results.append(f"  {error.strip()}")
+                        if proc.returncode == 0:
+                            all_results.append(f"\u2713 {actual_cmd[:50]}")
+                        else:
+                            error = proc.stderr.strip()[:200] if proc.stderr else "Falhou"
+                            error = "\n".join(
+                                line for line in error.splitlines() if "[sudo]" not in line
+                            )
+                            all_results.append(f"\u2717 {actual_cmd[:50]}")
+                            if error.strip():
+                                all_results.append(f"  {error.strip()}")
+                            failed = True
+                            break
+                    except Exception as e:
+                        all_results.append(f"\u2717 {actual_cmd[:50]}: {e}")
                         failed = True
                         break
-                except subprocess.TimeoutExpired:
-                    all_results.append(f"✗ [{i}/{len(steps)}] Timeout (120s)")
-                    failed = True
-                    break
-            elif needs_root and not sudo_password:
-                # Try without password (NOPASSWD)
-                logger.info("  Plan step [%d/%d]: sudo -n %s", i, len(steps), actual_cmd[:80])
-                result = self._executor.run(f"sudo -n {actual_cmd}", timeout=120)
-                step_label = f"[{i}/{len(steps)}] {actual_cmd[:50]}"
-                if result.success:
-                    output = result.stdout.strip()[:200] if result.stdout else "OK"
-                    all_results.append(f"✓ {step_label}")
-                    if output and output != "OK":
-                        all_results.append(f"  {output}")
+                elif needs_root:
+                    result = executor.run(f"sudo -n {actual_cmd}", timeout=120)
+                    if result.success:
+                        all_results.append(f"\u2713 {actual_cmd[:50]}")
+                    else:
+                        all_results.append(f"\u2717 {actual_cmd[:50]}: permissao negada")
+                        failed = True
+                        break
                 else:
-                    all_results.append(f"✗ {step_label}")
-                    all_results.append("  Erro: permissão negada")
-                    failed = True
-                    break
-            else:
-                logger.info("  Plan step [%d/%d]: %s", i, len(steps), step_cmd[:100])
-                result = self._executor.run(step_cmd, timeout=120)
-                step_label = f"[{i}/{len(steps)}] {step_cmd[:60]}"
-                if result.success:
-                    output = result.stdout.strip()[:200] if result.stdout else "OK"
-                    all_results.append(f"✓ {step_label}")
-                    if output and output != "OK":
-                        all_results.append(f"  {output}")
-                else:
-                    error = result.stderr.strip()[:200] if result.stderr else "Falhou"
-                    all_results.append(f"✗ {step_label}")
-                    all_results.append(f"  Erro: {error}")
-                    failed = True
-                    break
+                    result = executor.run(step_cmd, timeout=120)
+                    if result.success:
+                        output = result.stdout.strip()[:150] if result.stdout else ""
+                        all_results.append(f"\u2713 {step_cmd[:50]}")
+                        if output:
+                            all_results.append(f"  {output}")
+                    else:
+                        error = result.stderr.strip()[:200] if result.stderr else "Falhou"
+                        all_results.append(f"\u2717 {step_cmd[:50]}")
+                        all_results.append(f"  {error}")
+                        failed = True
+                        break
 
-        summary_parts = []
-        if explanation:
-            summary_parts.append(explanation)
-        summary_parts.append("")
-        summary_parts.extend(all_results)
+            t.add_progress("Concluido", 100.0)
+            return {
+                "steps": [f"Plano ({len(plan_steps)} passos)"],
+                "result": "\n".join(all_results).strip() or "Concluido",
+                "status": "error" if failed else "success",
+                "voice_mode": "full",
+            }
+
+        task._execute_fn = execute_fn
+        task_id = self._task_manager.submit(task)
 
         return {
-            "steps": [f"Executando plano ({len(steps)} passos)"],
-            "result": "\n".join(summary_parts).strip(),
-            "status": "failure" if failed else "success",
+            "steps": [f"\u21bb {explanation[:60]}"],
+            "result": f"Executando: {explanation[:80]}",
+            "status": "background",
             "confirm": None,
-            "voice_mode": "full",
+            "voice_mode": "brief",
+            "task_id": task_id,
         }
-
-    def _step_needs_root(self, command: str) -> bool:
-        """Check if a shell command needs root privileges."""
-        cmd = command.strip()
-        if cmd.startswith("sudo "):
-            return True
-        _ROOT_PATTERNS = (
-            "dpkg -i",
-            "dpkg --install",
-            "apt-get",
-            "apt ",
-            "systemctl",
-            "mount ",
-            "umount ",
-        )
-        return any(p in cmd for p in _ROOT_PATTERNS)
 
     def _execute_multi_step(self, first_cmd: dict, original_input: str) -> dict:
         """Execute a multi-step orchestrated command sequence.
