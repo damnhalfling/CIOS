@@ -15,6 +15,29 @@ import sys
 from cios.core.config import LOG_DIR, ensure_dirs
 
 
+def _start_polkit_agent() -> None:
+    """Start polkit authentication agent in background (for pkexec prompts)."""
+    import os
+    import subprocess
+
+    agent_paths = [
+        "/usr/lib/policykit-1-gnome/polkit-gnome-authentication-agent-1",
+        "/usr/libexec/polkit-gnome-authentication-agent-1",
+    ]
+    for agent in agent_paths:
+        if os.path.isfile(agent):
+            try:
+                subprocess.Popen(
+                    [agent],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True,
+                )
+            except Exception:
+                pass
+            return
+
+
 def main() -> None:
     # Quick flags (no logging needed)
     if "--version" in sys.argv or "-V" in sys.argv:
@@ -24,6 +47,9 @@ def main() -> None:
         return
 
     ensure_dirs()
+
+    # Start polkit authentication agent (needed for pkexec graphical password prompts)
+    _start_polkit_agent()
 
     logging.basicConfig(
         filename=str(LOG_DIR / "cios.log"),
