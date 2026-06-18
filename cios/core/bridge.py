@@ -541,15 +541,11 @@ class CIOSBridge:
         """Execute an execution plan from the Intelligence planner.
 
         The planner returns concrete shell steps that we run sequentially.
-        Each step is a shell command. We show progress and stop on failure.
-
-        Commands requiring root (sudo/apt/dpkg/systemctl) are automatically
-        elevated via pkexec (graphical password prompt).
+        If any step needs root, we ask for password first via pending_question.
         """
         params = cmd.get("params", {})
         steps = params.get("steps", [])
         explanation = params.get("explanation", "")
-        risk = params.get("risk", "low")
 
         if not steps:
             return {
@@ -560,10 +556,56 @@ class CIOSBridge:
                 "voice_mode": "full",
             }
 
+        # Check if any step needs root
+        needs_root = any(self._step_needs_root(s) for s in steps)
+
+        if needs_root:
+            from cios.skills.package_manager import needs_sudo_password
+
+            if needs_sudo_password():
+                # Check if password was provided (from pending_question answer)
+                sudo_password = cmd.get("params", {}).get("sudo_password", "")
+                if not sudo_password:
+                    # Ask for password — store plan for continuation
+                    from cios.core.intent_parser import Intent, IntentType
+
+                    plan_intent = Intent(
+                        type=IntentType.COMMAND_EXEC,
+                        params={
+                            "_plan_steps": steps,
+                            "_plan_explanation": explanation,
+                            "action": "plan_execution",
+                        },
+                        raw_input=original_input,
+                        confidence=1.0,
+                    )
+                    self._thread_manager.set_pending_question(
+                        PendingQuestion(
+                            intent=plan_intent,
+                            question_type="sudo_password",
+                            timestamp=time.time(),
+                        )
+                    )
+                    return {
+                        "steps": [],
+                        "result": f"{explanation}\n\nPreciso da tua senha pra executar:",
+                        "status": "success",
+                        "confirm": None,
+                        "voice_mode": "full",
+                        "password_prompt": True,
+                    }
+            else:
+                sudo_password = ""
+        else:
+            sudo_password = ""
+
+        return self._run_plan_steps(steps, explanation, sudo_password)
+
+    def _run_plan_steps(self, steps: list, explanation: str, sudo_password: str) -> dict:
+        """Actually execute plan steps (after password if needed)."""
         logger.info(
-            "Executing plan: %d steps, risk=%s, explain='%s'",
+            "Executing plan: %d steps, explain='%s'",
             len(steps),
-            risk,
             explanation[:80],
         )
 
@@ -571,25 +613,81 @@ class CIOSBridge:
         failed = False
 
         for i, step_cmd in enumerate(steps, 1):
-            # Elevate privileged commands via pkexec (graphical sudo)
-            step_cmd = self._elevate_if_needed(step_cmd)
+            needs_root = self._step_needs_root(step_cmd)
 
-            logger.info("  Plan step [%d/%d]: %s", i, len(steps), step_cmd[:100])
+            # Strip sudo prefix if present (we handle elevation ourselves)
+            actual_cmd = step_cmd.strip()
+            if actual_cmd.startswith("sudo "):
+                actual_cmd = actual_cmd[5:]
+                needs_root = True
 
-            result = self._executor.run(step_cmd, timeout=120)
-            step_label = f"[{i}/{len(steps)}] {step_cmd[:60]}"
+            if needs_root and sudo_password:
+                logger.info("  Plan step [%d/%d]: sudo %s", i, len(steps), actual_cmd[:80])
+                import subprocess
 
-            if result.success:
-                output = result.stdout.strip()[:200] if result.stdout else "OK"
-                all_results.append(f"✓ {step_label}")
-                if output and output != "OK":
-                    all_results.append(f"  {output}")
+                try:
+                    proc = subprocess.run(
+                        f"sudo -S {actual_cmd}",
+                        shell=True,
+                        input=sudo_password + "\n",
+                        capture_output=True,
+                        text=True,
+                        timeout=120,
+                        env={
+                            "DEBIAN_FRONTEND": "noninteractive",
+                            "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+                        },
+                    )
+                    step_label = f"[{i}/{len(steps)}] {actual_cmd[:50]}"
+                    if proc.returncode == 0:
+                        output = proc.stdout.strip()[:200] if proc.stdout else "OK"
+                        all_results.append(f"✓ {step_label}")
+                        if output and output != "OK":
+                            all_results.append(f"  {output}")
+                    else:
+                        error = proc.stderr.strip()[:200] if proc.stderr else "Falhou"
+                        error = "\n".join(
+                            line for line in error.splitlines() if "[sudo]" not in line
+                        )
+                        all_results.append(f"✗ {step_label}")
+                        if error.strip():
+                            all_results.append(f"  {error.strip()}")
+                        failed = True
+                        break
+                except subprocess.TimeoutExpired:
+                    all_results.append(f"✗ [{i}/{len(steps)}] Timeout (120s)")
+                    failed = True
+                    break
+            elif needs_root and not sudo_password:
+                # Try without password (NOPASSWD)
+                logger.info("  Plan step [%d/%d]: sudo -n %s", i, len(steps), actual_cmd[:80])
+                result = self._executor.run(f"sudo -n {actual_cmd}", timeout=120)
+                step_label = f"[{i}/{len(steps)}] {actual_cmd[:50]}"
+                if result.success:
+                    output = result.stdout.strip()[:200] if result.stdout else "OK"
+                    all_results.append(f"✓ {step_label}")
+                    if output and output != "OK":
+                        all_results.append(f"  {output}")
+                else:
+                    all_results.append(f"✗ {step_label}")
+                    all_results.append("  Erro: permissão negada")
+                    failed = True
+                    break
             else:
-                error = result.stderr.strip()[:200] if result.stderr else "Falhou"
-                all_results.append(f"✗ {step_label}")
-                all_results.append(f"  Erro: {error}")
-                failed = True
-                break  # Stop on first failure
+                logger.info("  Plan step [%d/%d]: %s", i, len(steps), step_cmd[:100])
+                result = self._executor.run(step_cmd, timeout=120)
+                step_label = f"[{i}/{len(steps)}] {step_cmd[:60]}"
+                if result.success:
+                    output = result.stdout.strip()[:200] if result.stdout else "OK"
+                    all_results.append(f"✓ {step_label}")
+                    if output and output != "OK":
+                        all_results.append(f"  {output}")
+                else:
+                    error = result.stderr.strip()[:200] if result.stderr else "Falhou"
+                    all_results.append(f"✗ {step_label}")
+                    all_results.append(f"  Erro: {error}")
+                    failed = True
+                    break
 
         summary_parts = []
         if explanation:
@@ -605,24 +703,21 @@ class CIOSBridge:
             "voice_mode": "full",
         }
 
-    def _elevate_if_needed(self, command: str) -> str:
-        """Replace sudo with pkexec for graphical privilege elevation.
-
-        Detects commands that need root and wraps them with pkexec
-        so the user gets a graphical password prompt instead of hanging.
-        """
-        # Already has sudo → replace with pkexec
-        if command.strip().startswith("sudo "):
-            return "pkexec " + command.strip()[5:]
-
-        # Commands that inherently need root
-        _NEEDS_ROOT = ("dpkg -i", "apt-get", "apt ", "systemctl", "mount ", "umount ")
-        for prefix in _NEEDS_ROOT:
-            if prefix in command:
-                # Wrap the whole command with pkexec sh -c if not already elevated
-                return f'pkexec sh -c "{command}"'
-
-        return command
+    def _step_needs_root(self, command: str) -> bool:
+        """Check if a shell command needs root privileges."""
+        cmd = command.strip()
+        if cmd.startswith("sudo "):
+            return True
+        _ROOT_PATTERNS = (
+            "dpkg -i",
+            "dpkg --install",
+            "apt-get",
+            "apt ",
+            "systemctl",
+            "mount ",
+            "umount ",
+        )
+        return any(p in cmd for p in _ROOT_PATTERNS)
 
     def _execute_multi_step(self, first_cmd: dict, original_input: str) -> dict:
         """Execute a multi-step orchestrated command sequence.
@@ -771,6 +866,13 @@ class CIOSBridge:
         from cios.core.task_queue import Task, get_task_context, should_run_background
 
         context.notify_activity()
+
+        # Plan execution — resume after password was provided
+        if intent.params.get("action") == "plan_execution" and intent.params.get("_plan_steps"):
+            steps = intent.params["_plan_steps"]
+            explanation = intent.params.get("_plan_explanation", "")
+            sudo_password = intent.params.get("sudo_password", "")
+            return self._run_plan_steps(steps, explanation, sudo_password)
 
         # History search — handled directly (no planner needed)
         if intent.type == IntentType.HISTORY_SEARCH:
