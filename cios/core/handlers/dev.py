@@ -230,8 +230,12 @@ def handle_workflow_start(intent: Intent, executor: Executor, memory: Memory) ->
         return PlanResult(
             plan_steps=plan_steps,
             results=[],
-            outcome="success",
-            summary=f"Projeto '{project_query}' criado e aberto no editor",
+            outcome="success" if editor_cmd else "partial",
+            summary=(
+                f"Projeto '{project_query}' criado e aberto no editor"
+                if editor_cmd
+                else f"Projeto '{project_query}' criado em {project_path}\n⚠ Nenhum editor de código encontrado no sistema"
+            ),
         )
 
     plan_steps.append(f"Found: {os.path.basename(match)}")
@@ -273,6 +277,8 @@ def handle_workflow_start(intent: Intent, executor: Executor, memory: Memory) ->
     parts = [f"Workspace ready: {os.path.basename(match)}"]
     if editor_opened:
         parts.append("Editor opened")
+    elif not editor_opened:
+        parts.append("⚠ Nenhum editor de código encontrado no sistema")
     if browser_opened:
         parts.append(f"Browser on localhost:{project.port}")
 
