@@ -181,7 +181,6 @@ def _execute_handler_for_audit(intent_type: IntentType):
         "cios.core.handlers.apps.find_app": MagicMock(return_value=None),
         "cios.core.handlers.apps.launch_app": MagicMock(return_value=(["Launching"], True, "")),
         "cios.core.handlers.dev.find_app": MagicMock(return_value=None),
-        "cios.core.handlers.dev.launch_app": MagicMock(return_value=(["Launching"], True, "")),
         "cios.core.handlers.media.find_app": MagicMock(return_value=None),
         "cios.core.handlers.media.launch_app": MagicMock(return_value=(["Launching"], True, "")),
         "cios.core.handlers.system.execute_session_action": MagicMock(
