@@ -189,20 +189,53 @@ def _wait_for_port_free(port: int, timeout: float = 3.0, interval: float = 0.2) 
 
 
 def _detect_editor() -> str | None:
-    """Detect the best available code editor.
+    """Detect the user's preferred code editor.
 
-    Checks for ``kiro`` (Kiro IDE), ``code`` (VS Code), ``codium`` (VS Codium),
-    then falls back to the ``VISUAL`` or ``EDITOR`` environment variables.
-    Returns the command name or ``None`` if nothing is found.
+    Resolution order:
+    1. User config (~/.cios/config.json → "editor" key)
+    2. $VISUAL environment variable
+    3. $EDITOR environment variable
+    4. Auto-detect from common editors installed on the system
+
+    Returns the command name or None if nothing is found.
     """
-    for candidate in ("kiro", "code", "codium"):
-        if shutil.which(candidate):
-            return candidate
-    # Fallback to environment variables
+    # 1. User config (highest priority — user's explicit choice)
+    try:
+        import json
+
+        config_path = Path.home() / ".cios" / "config.json"
+        if config_path.exists():
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            editor = config.get("editor", "")
+            if editor and shutil.which(editor):
+                return editor
+    except Exception:
+        pass
+
+    # 2. Environment variables
     for var in ("VISUAL", "EDITOR"):
         editor = os.environ.get(var)
         if editor and shutil.which(editor):
             return editor
+
+    # 3. Auto-detect (broad scan of common GUI editors)
+    _KNOWN_EDITORS = (
+        "kiro",
+        "code",
+        "codium",
+        "zed",
+        "sublime_text",
+        "subl",
+        "kate",
+        "gedit",
+        "gnome-text-editor",
+        "neovide",
+        "cursor",
+    )
+    for candidate in _KNOWN_EDITORS:
+        if shutil.which(candidate):
+            return candidate
+
     return None
 
 
