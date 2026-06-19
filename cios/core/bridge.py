@@ -574,7 +574,7 @@ class CIOSBridge:
             }
 
         # Check if any step needs root
-        needs_root = any(self._step_needs_root(s) for s in steps)
+        needs_root = any(_step_needs_root_static(s) for s in steps)
 
         if needs_root:
             from cios.skills.package_manager import needs_sudo_password

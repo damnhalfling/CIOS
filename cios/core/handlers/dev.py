@@ -7,10 +7,10 @@ import subprocess
 import time
 
 from cios.core.executor import Executor
-from cios.core.handlers._common import PlanResult, resilient_call, sanitize_error
+from cios.core.handlers._common import PlanResult, sanitize_error
 from cios.core.intent_parser import Intent
 from cios.core.memory import Memory
-from cios.skills.app_launcher import find_app, launch_app
+from cios.skills.app_launcher import find_app
 from cios.skills.dev_start import (
     _detect_editor,
     _is_port_in_use,
@@ -243,20 +243,11 @@ def handle_workflow_start(intent: Intent, executor: Executor, memory: Memory) ->
     plan_steps.append(f"Type: {project.type}")
 
     editor_opened = False
-    editor_app = find_app("code") or find_app("editor")
-    if editor_app:
-        plan_steps.append(f"Opening {editor_app.name}")
-        resilient_call(launch_app, editor_app, skill="app_launch", retryable=False)
-        try:
-            subprocess.Popen(
-                [editor_app.exec_command.split()[0], match],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                start_new_session=True,
-            )
-            editor_opened = True
-        except Exception:
-            pass
+    editor_cmd = _detect_editor()
+    if editor_cmd:
+        plan_steps.append(f"Opening in {editor_cmd}")
+        _open_editor(editor_cmd, match)
+        editor_opened = True
 
     browser_opened = False
     if project.type in ("node", "python") and project.port:
