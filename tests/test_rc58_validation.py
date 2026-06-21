@@ -155,9 +155,9 @@ class TestIntentParserRC58:
         from cios.core.intent_parser import IntentType, parse_intent
 
         intent = parse_intent(input_text)
-        assert intent.type == getattr(
-            IntentType, expected_type
-        ), f"Input '{input_text}' parsed as {intent.type}, expected {expected_type}"
+        assert intent.type == getattr(IntentType, expected_type), (
+            f"Input '{input_text}' parsed as {intent.type}, expected {expected_type}"
+        )
         assert intent.confidence >= 0.80
 
 
@@ -208,7 +208,7 @@ class TestPlannerRoutingRC58:
         )
         result = planner.execute(intent)
         assert result is not None
-        assert result.outcome in ("success", "failure")
+        assert result.outcome in ("success", "failure", "recovered")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -409,9 +409,9 @@ class TestErrorRecoveryRC58:
         from cios.core.error_recovery import classify_error
 
         result = classify_error(error_text)
-        assert (
-            result == expected_type
-        ), f"'{error_text}' classified as '{result}', expected '{expected_type}'"
+        assert result == expected_type, (
+            f"'{error_text}' classified as '{result}', expected '{expected_type}'"
+        )
 
     @pytest.mark.parametrize("error_text,expected_type", ERROR_SAMPLES)
     def test_recovery_suggestion_not_empty(self, error_text, expected_type):

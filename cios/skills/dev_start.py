@@ -1,5 +1,7 @@
 """Skill: dev_start — detect project type, install deps, start server."""
 
+from __future__ import annotations
+
 import logging
 import os
 import shutil
@@ -13,6 +15,18 @@ from cios.core.executor import ExecResult, Executor
 from cios.core.memory import Memory, SessionContext
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class WorkflowResult:
+    """Result of a workflow_start skill execution."""
+
+    steps: list[str]
+    outcome: str  # "success" | "failure" | "partial"
+    summary: str
+    project_path: str | None = None
+    editor_opened: bool = False
+    browser_opened: bool = False
 
 
 @dataclass
@@ -384,3 +398,295 @@ def execute_dev_start(
             logger.warning("Failed to persist session context for '%s'", project_name)
 
     return plan, results, proc.pid
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  PROJECT SCANNING (for workflow_start)
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def _scan_project_dirs() -> list[str]:
+    """Scan common directories for projects."""
+    home = os.path.expanduser("~")
+    search_roots = [
+        os.path.join(home, d)
+        for d in (
+            "Projetos",
+            "projetos",
+            "projects",
+            "dev",
+            "code",
+            "src",
+            "workspace",
+            "repos",
+            "github",
+            "Development",
+            "Code",
+        )
+    ]
+    search_roots.append(home)
+
+    markers = {
+        "package.json",
+        "pyproject.toml",
+        "Cargo.toml",
+        "go.mod",
+        "pom.xml",
+        "build.gradle",
+        "Makefile",
+        "CMakeLists.txt",
+        "Gemfile",
+        "composer.json",
+        ".git",
+    }
+
+    projects: list[str] = []
+    seen: set[str] = set()
+
+    for root in search_roots:
+        if not os.path.isdir(root):
+            continue
+        try:
+            for entry in os.scandir(root):
+                if not entry.is_dir() or entry.name.startswith("."):
+                    continue
+                path = entry.path
+                if path in seen:
+                    continue
+                try:
+                    contents = set(os.listdir(path))
+                except PermissionError:
+                    continue
+                if contents & markers:
+                    projects.append(path)
+                    seen.add(path)
+        except PermissionError:
+            continue
+
+    return sorted(projects, key=lambda p: os.path.getmtime(p), reverse=True)
+
+
+def _find_project(query: str, project_dirs: list[str]) -> str | None:
+    """Find the best matching project directory for a query."""
+    q = query.lower().strip()
+
+    for d in project_dirs:
+        if os.path.basename(d).lower() == q:
+            return d
+    for d in project_dirs:
+        if os.path.basename(d).lower().startswith(q):
+            return d
+    for d in project_dirs:
+        if q in os.path.basename(d).lower():
+            return d
+
+    q_words = set(q.split())
+    for d in project_dirs:
+        name_words = set(os.path.basename(d).lower().replace("-", " ").replace("_", " ").split())
+        if q_words & name_words:
+            return d
+
+    return None
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  WORKFLOW START SKILL
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def workflow_start(
+    project_query: str,
+    executor: Executor,
+    memory: Memory,
+) -> WorkflowResult:
+    """Full workflow_start logic — encapsulates all workflow orchestration.
+
+    Handles:
+    - Project found → detect type, open editor, optionally open browser.
+    - Project not found → create dir, init git, open editor.
+    - No editor found → outcome="partial" with warning.
+
+    All I/O exceptions are caught and reflected in WorkflowResult.outcome.
+    """
+    try:
+        return _workflow_start_inner(project_query, executor, memory)
+    except Exception as exc:
+        logger.exception("workflow_start failed unexpectedly: %s", exc)
+        return WorkflowResult(
+            steps=["Searching for project"],
+            outcome="failure",
+            summary=f"Erro inesperado: {exc}",
+            project_path=None,
+            editor_opened=False,
+            browser_opened=False,
+        )
+
+
+def _workflow_start_inner(
+    project_query: str,
+    executor: Executor,
+    memory: Memory,
+) -> WorkflowResult:
+    """Internal workflow logic — may raise on I/O errors (caught by caller)."""
+    steps: list[str] = ["Searching for project"]
+    project_dirs = _scan_project_dirs()
+    match = _find_project(project_query, project_dirs)
+
+    if not match:
+        return _create_new_project(project_query, steps)
+
+    # ── Found existing project ──────────────────────────────────────────
+    steps.append(f"Found: {os.path.basename(match)}")
+    project = detect_project(match)
+    steps.append(f"Type: {project.type}")
+
+    editor_opened = False
+    editor_cmd = _detect_editor()
+    if editor_cmd:
+        steps.append(f"Opening in {editor_cmd}")
+        _open_editor(editor_cmd, match)
+        editor_opened = True
+
+    browser_opened = _try_open_browser(project, match, steps)
+
+    # Build summary
+    parts = [f"Workspace ready: {os.path.basename(match)}"]
+    if editor_opened:
+        parts.append("Editor opened")
+    else:
+        parts.append("⚠ Nenhum editor de código encontrado no sistema")
+    if browser_opened:
+        parts.append(f"Browser on localhost:{project.port}")
+
+    # Record for auto-learn
+    _record_workflow(project_query, match)
+
+    outcome = "success" if editor_opened else "partial"
+    return WorkflowResult(
+        steps=steps,
+        outcome=outcome,
+        summary="\n".join(parts),
+        project_path=match,
+        editor_opened=editor_opened,
+        browser_opened=browser_opened,
+    )
+
+
+def _create_new_project(project_query: str, steps: list[str]) -> WorkflowResult:
+    """Create a new project directory, init git, and open editor."""
+    steps.append(f"Creating project '{project_query}'")
+    home = os.path.expanduser("~")
+    base_candidates = [
+        os.path.join(home, "projetos"),
+        os.path.join(home, "projects"),
+        os.path.join(home, "dev"),
+    ]
+    base_dir = next(
+        (d for d in base_candidates if os.path.isdir(d)),
+        os.path.join(home, "projetos"),
+    )
+
+    safe_name = project_query.lower().replace(" ", "-")
+    project_path = os.path.join(base_dir, safe_name)
+
+    try:
+        os.makedirs(project_path, exist_ok=True)
+    except OSError as exc:
+        logger.warning("Failed to create project dir: %s", exc)
+        return WorkflowResult(
+            steps=steps,
+            outcome="failure",
+            summary=f"Não consegui criar o projeto '{project_query}'",
+            project_path=None,
+            editor_opened=False,
+            browser_opened=False,
+        )
+
+    # Create README
+    readme_path = os.path.join(project_path, "README.md")
+    if not os.path.exists(readme_path):
+        try:
+            with open(readme_path, "w") as f:
+                f.write(f"# {project_query.title()}\n\n")
+        except OSError:
+            pass
+
+    # Initialize git
+    if shutil.which("git") and not os.path.exists(os.path.join(project_path, ".git")):
+        try:
+            subprocess.run(
+                ["git", "init"],
+                cwd=project_path,
+                capture_output=True,
+                timeout=10,
+            )
+            steps.append("Git initialized")
+        except Exception:
+            pass
+
+    # Open editor
+    editor_cmd = _detect_editor()
+    editor_opened = False
+    if editor_cmd:
+        steps.append(f"Opening in {editor_cmd}")
+        _open_editor(editor_cmd, project_path)
+        editor_opened = True
+
+    outcome = "success" if editor_opened else "partial"
+    summary = (
+        f"Projeto '{project_query}' criado e aberto no editor"
+        if editor_opened
+        else (
+            f"Projeto '{project_query}' criado em {project_path}\n"
+            "⚠ Nenhum editor de código encontrado no sistema"
+        )
+    )
+
+    return WorkflowResult(
+        steps=steps,
+        outcome=outcome,
+        summary=summary,
+        project_path=project_path,
+        editor_opened=editor_opened,
+        browser_opened=False,
+    )
+
+
+def _try_open_browser(project: ProjectInfo, match: str, steps: list[str]) -> bool:
+    """Attempt to open the browser for web projects. Returns True on success."""
+    if project.type not in ("node", "python") or not project.port:
+        return False
+
+    from cios.skills.app_launcher import find_app
+
+    browser_app = find_app("browser") or find_app("chrome") or find_app("firefox")
+    if not browser_app:
+        return False
+
+    steps.append(f"Opening browser on port {project.port}")
+    try:
+        subprocess.Popen(
+            [browser_app.exec_command.split()[0], f"http://localhost:{project.port}"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        return True
+    except Exception:
+        return False
+
+
+def _record_workflow(project_query: str, project_path: str) -> None:
+    """Record the workflow execution in AutoLearner for pattern detection."""
+    try:
+        from cios.skills.auto_learn import AutoLearner
+
+        learner = AutoLearner()
+        learner.record_execution(
+            project_query,
+            "workflow_start",
+            {"project": project_query, "path": project_path},
+            "success",
+        )
+    except Exception:
+        logger.debug("Failed to record workflow in AutoLearner")

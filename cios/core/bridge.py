@@ -27,7 +27,9 @@ from cios.core.humanizer import humanize_error, humanize_result
 from cios.core.intent_classifier import classify_intent, learn_from_success
 from cios.core.intent_parser import Intent, IntentType, parse_intent
 from cios.core.memory import Memory
+from cios.core.plan_executor import PlanExecutor
 from cios.core.planner import Planner, PlanResult
+from cios.core.privilege import PrivilegeManager
 from cios.core.thread_manager import (
     ThreadManager,
     ThreadStore,
@@ -124,23 +126,6 @@ _PRONOUNS_EN = {"that", "this", "it", "those", "the same", "that one"}
 _ALL_PRONOUNS = _PRONOUNS_PT | _PRONOUNS_EN
 
 
-def _step_needs_root_static(command: str) -> bool:
-    """Check if a shell command needs root privileges (module-level)."""
-    cmd = command.strip()
-    if cmd.startswith("sudo "):
-        return True
-    _ROOT_PATTERNS = (
-        "dpkg -i",
-        "dpkg --install",
-        "apt-get",
-        "apt ",
-        "systemctl",
-        "mount ",
-        "umount ",
-    )
-    return any(p in cmd for p in _ROOT_PATTERNS)
-
-
 class CIOSBridge:
     """Single entry point for all UI → backend communication."""
 
@@ -165,6 +150,9 @@ class CIOSBridge:
         from cios.core.task_queue import TaskManager
 
         self._task_manager = TaskManager(on_task_complete=self._on_task_complete)
+        # Privilege escalation and plan execution
+        self._privilege = PrivilegeManager()
+        self._plan_executor = PlanExecutor(self._executor, self._privilege, self._task_manager)
         # Cancellation flag — checked by long-running operations
         self._cancelled = False
 
@@ -559,6 +547,7 @@ class CIOSBridge:
 
         The planner returns concrete shell steps that we run sequentially.
         If any step needs root, we ask for password first via pending_question.
+        Delegates to PlanExecutor for actual execution.
         """
         params = cmd.get("params", {})
         steps = params.get("steps", [])
@@ -574,12 +563,10 @@ class CIOSBridge:
             }
 
         # Check if any step needs root
-        needs_root = any(_step_needs_root_static(s) for s in steps)
+        needs_root = any(self._privilege.needs_elevation(s) for s in steps)
 
         if needs_root:
-            from cios.skills.package_manager import needs_sudo_password
-
-            if needs_sudo_password():
+            if self._privilege.password_required():
                 # Check if password was provided (from pending_question answer)
                 sudo_password = cmd.get("params", {}).get("sudo_password", "")
                 if not sudo_password:
@@ -619,109 +606,21 @@ class CIOSBridge:
         return self._run_plan_steps(steps, explanation, sudo_password)
 
     def _run_plan_steps(self, steps: list, explanation: str, sudo_password: str) -> dict:
-        """Execute plan steps in background via TaskManager.
+        """Execute plan steps in background via PlanExecutor.
 
         Liberates the prompt immediately. Shows red feedback in history.
         Steps execute asynchronously with progress updates.
+        Delegates entirely to PlanExecutor.
         """
-        from cios.core.task_queue import Task
-
-        task = Task(
-            description=explanation[:60] or "Executando plano",
-            context="plan_execution",
-        )
-
-        executor = self._executor
-        plan_steps = steps
-        password = sudo_password
-
-        def execute_fn(t: Task) -> dict:
-            all_results = []
-            failed = False
-
-            for i, step_cmd in enumerate(plan_steps, 1):
-                actual_cmd = step_cmd.strip()
-                needs_root = _step_needs_root_static(actual_cmd)
-                if actual_cmd.startswith("sudo "):
-                    actual_cmd = actual_cmd[5:]
-                    needs_root = True
-
-                t.add_progress(
-                    f"[{i}/{len(plan_steps)}] {actual_cmd[:50]}", (i / len(plan_steps)) * 90
-                )
-
-                if needs_root and password:
-                    import subprocess
-
-                    try:
-                        proc = subprocess.run(
-                            f"sudo -S {actual_cmd}",
-                            shell=True,
-                            input=password + "\n",
-                            capture_output=True,
-                            text=True,
-                            timeout=120,
-                            env={
-                                "DEBIAN_FRONTEND": "noninteractive",
-                                "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
-                            },
-                        )
-                        if proc.returncode == 0:
-                            all_results.append(f"\u2713 {actual_cmd[:50]}")
-                        else:
-                            error = proc.stderr.strip()[:200] if proc.stderr else "Falhou"
-                            error = "\n".join(
-                                line for line in error.splitlines() if "[sudo]" not in line
-                            )
-                            all_results.append(f"\u2717 {actual_cmd[:50]}")
-                            if error.strip():
-                                all_results.append(f"  {error.strip()}")
-                            failed = True
-                            break
-                    except Exception as e:
-                        all_results.append(f"\u2717 {actual_cmd[:50]}: {e}")
-                        failed = True
-                        break
-                elif needs_root:
-                    result = executor.run(f"sudo -n {actual_cmd}", timeout=120)
-                    if result.success:
-                        all_results.append(f"\u2713 {actual_cmd[:50]}")
-                    else:
-                        all_results.append(f"\u2717 {actual_cmd[:50]}: permissao negada")
-                        failed = True
-                        break
-                else:
-                    result = executor.run(step_cmd, timeout=120)
-                    if result.success:
-                        output = result.stdout.strip()[:150] if result.stdout else ""
-                        all_results.append(f"\u2713 {step_cmd[:50]}")
-                        if output:
-                            all_results.append(f"  {output}")
-                    else:
-                        error = result.stderr.strip()[:200] if result.stderr else "Falhou"
-                        all_results.append(f"\u2717 {step_cmd[:50]}")
-                        all_results.append(f"  {error}")
-                        failed = True
-                        break
-
-            t.add_progress("Concluido", 100.0)
-            return {
-                "steps": [f"Plano ({len(plan_steps)} passos)"],
-                "result": "\n".join(all_results).strip() or "Concluido",
-                "status": "error" if failed else "success",
-                "voice_mode": "full",
-            }
-
-        task._execute_fn = execute_fn
-        task_id = self._task_manager.submit(task)
+        result = self._plan_executor.execute(steps, explanation, password=sudo_password)
 
         return {
-            "steps": [f"\u21bb {explanation[:60]}"],
-            "result": f"Executando: {explanation[:80]}",
-            "status": "background",
+            "steps": result.steps or [f"⟳ {explanation[:60]}"],
+            "result": result.summary or f"Executando: {explanation[:80]}",
+            "status": result.status,
             "confirm": None,
             "voice_mode": "brief",
-            "task_id": task_id,
+            "task_id": result.task_id,
         }
 
     def _execute_multi_step(self, first_cmd: dict, original_input: str) -> dict:
@@ -1547,6 +1446,7 @@ class CIOSBridge:
         Called BEFORE confirmation. Entering the password serves as
         implicit confirmation for the action.
         Returns a password prompt response, or None to proceed.
+        Delegates to PrivilegeManager for the password check.
         """
         if intent.params.get("sudo_password"):
             return None  # already have it
@@ -1565,9 +1465,7 @@ class CIOSBridge:
         if not needs_sudo:
             return None
 
-        from cios.skills.package_manager import needs_sudo_password
-
-        if not needs_sudo_password():
+        if not self._privilege.password_required():
             return None  # NOPASSWD configured, no need to ask
 
         # Build a contextual message so the user knows what the password is for

@@ -2,15 +2,12 @@
 
 import logging
 import os
-import shutil
-import subprocess
 import time
 
 from cios.core.executor import Executor
 from cios.core.handlers._common import PlanResult, sanitize_error
 from cios.core.intent_parser import Intent
 from cios.core.memory import Memory
-from cios.skills.app_launcher import find_app
 from cios.skills.dev_start import (
     _detect_editor,
     _is_port_in_use,
@@ -18,100 +15,12 @@ from cios.skills.dev_start import (
     _open_editor,
     detect_project,
     execute_dev_start,
+    workflow_start,
 )
 from cios.skills.log_analysis import analyze_text
 from cios.skills.process_control import kill_process_on_port
 
 logger = logging.getLogger(__name__)
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-#  PROJECT SCANNING (for workflow_start)
-# ═══════════════════════════════════════════════════════════════════════════
-
-
-def _scan_project_dirs() -> list[str]:
-    """Scan common directories for projects."""
-    home = os.path.expanduser("~")
-    search_roots = [
-        os.path.join(home, d)
-        for d in (
-            "Projetos",
-            "projetos",
-            "projects",
-            "dev",
-            "code",
-            "src",
-            "workspace",
-            "repos",
-            "github",
-            "Development",
-            "Code",
-        )
-    ]
-    search_roots.append(home)
-
-    markers = {
-        "package.json",
-        "pyproject.toml",
-        "Cargo.toml",
-        "go.mod",
-        "pom.xml",
-        "build.gradle",
-        "Makefile",
-        "CMakeLists.txt",
-        "Gemfile",
-        "composer.json",
-        ".git",
-    }
-
-    projects: list[str] = []
-    seen: set[str] = set()
-
-    for root in search_roots:
-        if not os.path.isdir(root):
-            continue
-        try:
-            for entry in os.scandir(root):
-                if not entry.is_dir() or entry.name.startswith("."):
-                    continue
-                path = entry.path
-                if path in seen:
-                    continue
-                try:
-                    contents = set(os.listdir(path))
-                except PermissionError:
-                    continue
-                if contents & markers:
-                    projects.append(path)
-                    seen.add(path)
-        except PermissionError:
-            continue
-
-    return sorted(projects, key=lambda p: os.path.getmtime(p), reverse=True)
-
-
-def _find_project(query: str, project_dirs: list[str]):
-    """Find the best matching project directory for a query."""
-    q = query.lower().strip()
-
-    for d in project_dirs:
-        if os.path.basename(d).lower() == q:
-            return d
-    for d in project_dirs:
-        if os.path.basename(d).lower().startswith(q):
-            return d
-    for d in project_dirs:
-        if q in os.path.basename(d).lower():
-            return d
-
-    q_words = set(q.split())
-    for d in project_dirs:
-        name_words = set(os.path.basename(d).lower().replace("-", " ").replace("_", " ").split())
-        if q_words & name_words:
-            return d
-
-    return None
 
 
 def handle_dev_start(intent: Intent, executor: Executor, memory: Memory) -> PlanResult:
@@ -162,7 +71,7 @@ def handle_dev_start(intent: Intent, executor: Executor, memory: Memory) -> Plan
 
 
 def handle_workflow_start(intent: Intent, executor: Executor, memory: Memory) -> PlanResult:
-    """Start a development workflow for a project (open editor, start server, browser)."""
+    """Start a development workflow for a project — thin wrapper delegating to skill."""
     project_query = intent.params.get("project", "")
     if not project_query:
         return PlanResult(
@@ -172,116 +81,12 @@ def handle_workflow_start(intent: Intent, executor: Executor, memory: Memory) ->
             summary="Which project? e.g., 'quero trabalhar no meu-app'",
         )
 
-    plan_steps = ["Searching for project"]
-    project_dirs = _scan_project_dirs()
-    match = _find_project(project_query, project_dirs)
-
-    if not match:
-        plan_steps.append(f"Creating project '{project_query}'")
-        home = os.path.expanduser("~")
-        base_candidates = [
-            os.path.join(home, "projetos"),
-            os.path.join(home, "projects"),
-            os.path.join(home, "dev"),
-        ]
-        base_dir = next(
-            (d for d in base_candidates if os.path.isdir(d)),
-            os.path.join(home, "projetos"),
-        )
-
-        safe_name = project_query.lower().replace(" ", "-")
-        project_path = os.path.join(base_dir, safe_name)
-
-        try:
-            os.makedirs(project_path, exist_ok=True)
-        except OSError:
-            return PlanResult(
-                plan_steps=plan_steps,
-                results=[],
-                outcome="failure",
-                summary=f"Não consegui criar o projeto '{project_query}'",
-            )
-
-        readme_path = os.path.join(project_path, "README.md")
-        if not os.path.exists(readme_path):
-            try:
-                with open(readme_path, "w") as f:
-                    f.write(f"# {project_query.title()}\n\n")
-            except OSError:
-                pass
-
-        if shutil.which("git") and not os.path.exists(os.path.join(project_path, ".git")):
-            try:
-                subprocess.run(
-                    ["git", "init"],
-                    cwd=project_path,
-                    capture_output=True,
-                    timeout=10,
-                )
-                plan_steps.append("Git initialized")
-            except Exception:
-                pass
-
-        editor_cmd = _detect_editor()
-        if editor_cmd:
-            plan_steps.append(f"Opening in {editor_cmd}")
-            _open_editor(editor_cmd, project_path)
-
-        return PlanResult(
-            plan_steps=plan_steps,
-            results=[],
-            outcome="success" if editor_cmd else "partial",
-            summary=(
-                f"Projeto '{project_query}' criado e aberto no editor"
-                if editor_cmd
-                else f"Projeto '{project_query}' criado em {project_path}\n⚠ Nenhum editor de código encontrado no sistema"
-            ),
-        )
-
-    plan_steps.append(f"Found: {os.path.basename(match)}")
-    project = detect_project(match)
-    plan_steps.append(f"Type: {project.type}")
-
-    editor_opened = False
-    editor_cmd = _detect_editor()
-    if editor_cmd:
-        plan_steps.append(f"Opening in {editor_cmd}")
-        _open_editor(editor_cmd, match)
-        editor_opened = True
-
-    browser_opened = False
-    if project.type in ("node", "python") and project.port:
-        browser_app = find_app("browser") or find_app("chrome") or find_app("firefox")
-        if browser_app:
-            plan_steps.append(f"Opening browser on port {project.port}")
-            try:
-                subprocess.Popen(
-                    [browser_app.exec_command.split()[0], f"http://localhost:{project.port}"],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    start_new_session=True,
-                )
-                browser_opened = True
-            except Exception:
-                pass
-
-    parts = [f"Workspace ready: {os.path.basename(match)}"]
-    if editor_opened:
-        parts.append("Editor opened")
-    elif not editor_opened:
-        parts.append("⚠ Nenhum editor de código encontrado no sistema")
-    if browser_opened:
-        parts.append(f"Browser on localhost:{project.port}")
-
-    from cios.skills.auto_learn import AutoLearner
-
-    learner = AutoLearner()
-    learner.record_execution(
-        intent.raw_input, "workflow_start", {"project": project_query, "path": match}, "success"
-    )
-
+    result = workflow_start(project_query, executor, memory)
     return PlanResult(
-        plan_steps=plan_steps, results=[], outcome="success", summary="\n".join(parts)
+        plan_steps=result.steps,
+        results=[],
+        outcome=result.outcome,
+        summary=result.summary,
     )
 
 

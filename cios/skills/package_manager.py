@@ -33,6 +33,9 @@ def _sudo_cmd() -> list[str]:
 
     Returns ["sudo", "-n"] if NOPASSWD works, otherwise ["sudo", "-S"]
     which reads password from stdin.
+
+    .. deprecated:: Use cios.core.privilege.PrivilegeManager directly.
+        This function is no longer used internally and will be removed in a future release.
     """
     try:
         r = subprocess.run(
@@ -50,16 +53,13 @@ def _sudo_cmd() -> list[str]:
 
 
 def needs_sudo_password() -> bool:
-    """Check if sudo requires a password (no NOPASSWD configured)."""
-    try:
-        r = subprocess.run(
-            ["sudo", "-n", "true"],
-            capture_output=True,
-            timeout=3,
-        )
-        return r.returncode != 0
-    except Exception:
-        return True
+    """Check if sudo requires a password (no NOPASSWD configured).
+
+    .. deprecated:: Use cios.core.privilege.PrivilegeManager.password_required() directly.
+    """
+    from cios.core.privilege import PrivilegeManager
+
+    return PrivilegeManager().password_required()
 
 
 def _run_privileged(
@@ -69,32 +69,21 @@ def _run_privileged(
 ) -> subprocess.CompletedProcess:
     """Run a command with sudo, optionally passing password via stdin.
 
-    If password is provided, uses 'sudo -S' (reads from stdin).
-    If not, uses 'sudo -n' (non-interactive) or 'sudo -S' with empty stdin.
+    .. deprecated:: Use cios.core.privilege.PrivilegeManager.run_elevated() directly.
     """
-    env = {
-        "DEBIAN_FRONTEND": "noninteractive",
-        "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
-    }
+    from cios.core.privilege import PrivilegeManager
 
-    if password:
-        # sudo -S reads password from stdin
-        return subprocess.run(
-            ["sudo", "-S"] + cmd,
-            input=password + "\n",
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            env=env,
-        )
-    else:
-        return subprocess.run(
-            _sudo_cmd() + cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            env=env,
-        )
+    priv = PrivilegeManager()
+    # Join cmd list into a single string for run_elevated
+    command_str = " ".join(cmd)
+    result = priv.run_elevated(command_str, password=password, timeout=timeout)
+    # Convert ElevationResult back to subprocess.CompletedProcess for backward compat
+    return subprocess.CompletedProcess(
+        args=["sudo"] + cmd,
+        returncode=result.returncode,
+        stdout=result.stdout,
+        stderr=result.stderr,
+    )
 
 
 # Packages that should never be removed

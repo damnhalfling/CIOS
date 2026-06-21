@@ -25,8 +25,6 @@ from cios.core.handlers.desktop import (
 
 # Import all handlers
 from cios.core.handlers.dev import (  # noqa: F401
-    _find_project,
-    _scan_project_dirs,
     handle_close_project,
     handle_continue_project,
     handle_dev_start,
@@ -70,47 +68,7 @@ from cios.core.handlers.system import handle_power, handle_session, handle_syste
 from cios.core.intent_parser import Intent, IntentType
 from cios.core.mcp import context as mcp
 from cios.core.memory import Memory, MemoryRecord
-from cios.skills import audio as audio_skill  # noqa: F401
-from cios.skills import bluetooth as bt_skill  # noqa: F401
-from cios.skills import clipboard as clipboard_skill  # noqa: F401
-from cios.skills import network as network_skill  # noqa: F401
-from cios.skills import package_manager as pkg_skill  # noqa: F401
-from cios.skills import power as power_skill  # noqa: F401
-from cios.skills import self_update as update_skill  # noqa: F401
-from cios.skills import window_control as window_skill  # noqa: F401
-from cios.skills.app_launcher import find_app, launch_app  # noqa: F401
 
-# ═══════════════════════════════════════════════════════════════════════════
-#  BACKWARD-COMPATIBLE RE-EXPORTS
-#  Tests patch "cios.core.planner.<name>", so we re-export the symbols
-#  that handlers use. This keeps existing tests working without changes.
-# ═══════════════════════════════════════════════════════════════════════════
-from cios.skills.dev_start import (  # noqa: F401
-    _detect_editor,
-    _is_port_in_use,
-    _open_browser,
-    _open_editor,
-    detect_project,
-    execute_dev_start,
-)
-from cios.skills.disk_analysis import analyze_disk, clean_safe  # noqa: F401
-from cios.skills.explore_system import (  # noqa: F401
-    format_capabilities,
-    list_installed_apps_grouped,
-)
-from cios.skills.file_organize import organize_directory  # noqa: F401
-from cios.skills.file_search import find_and_open, search_files  # noqa: F401
-from cios.skills.log_analysis import analyze_text  # noqa: F401
-from cios.skills.process_control import (  # noqa: F401
-    find_process_on_port,
-    kill_process_on_port,
-    list_listening_ports,
-)
-from cios.skills.session_control import (  # noqa: F401
-    execute_session_action,
-    get_session_action,
-)
-from cios.skills.system_health import check_system_health  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
