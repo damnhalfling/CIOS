@@ -69,7 +69,6 @@ from cios.core.intent_parser import Intent, IntentType
 from cios.core.mcp import context as mcp
 from cios.core.memory import Memory, MemoryRecord
 
-
 logger = logging.getLogger(__name__)
 
 # ═══════════════════════════════════════════════════════════════════════════
