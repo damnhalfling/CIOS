@@ -56,7 +56,7 @@ class TestNetworkSkill:
     def test_list_networks(self):
         from cios.skills.network import list_networks
 
-        nmcli_output = "Starlink:85:WPA2\n" "Vizinho:40:WPA2\n" "OpenNet:60:--\n"
+        nmcli_output = "Starlink:85:WPA2\nVizinho:40:WPA2\nOpenNet:60:--\n"
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout=nmcli_output)
             networks = list_networks()
@@ -196,9 +196,7 @@ class TestAutomountSkill:
 
         watcher = AutomountWatcher()
 
-        lsblk_output = (
-            "/dev/sda 0 disk \n" "/dev/sda1 0 part /\n" "/dev/sdb 1 disk \n" "/dev/sdb1 1 part \n"
-        )
+        lsblk_output = "/dev/sda 0 disk \n/dev/sda1 0 part /\n/dev/sdb 1 disk \n/dev/sdb1 1 part \n"
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout=lsblk_output)
             devices = watcher._scan_removable_devices()

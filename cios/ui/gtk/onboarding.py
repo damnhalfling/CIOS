@@ -303,11 +303,13 @@ def run_onboarding() -> bool:
             def do():
                 ok = _connect_wifi(ssid, pw)
                 GLib.idle_add(
-                    lambda: stack.set_visible_child_name("keyboard")
-                    if ok
-                    else (
-                        connect_btn.set_label("Falhou — Tentar"),
-                        connect_btn.set_sensitive(True),
+                    lambda: (
+                        stack.set_visible_child_name("keyboard")
+                        if ok
+                        else (
+                            connect_btn.set_label("Falhou — Tentar"),
+                            connect_btn.set_sensitive(True),
+                        )
                     )
                 )
 

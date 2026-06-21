@@ -21,9 +21,9 @@ class HealthReport:
 
 def _size_human(b: int) -> str:
     if b >= 1024**3:
-        return f"{b / (1024 ** 3):.1f}GB"
+        return f"{b / (1024**3):.1f}GB"
     if b >= 1024**2:
-        return f"{b / (1024 ** 2):.0f}MB"
+        return f"{b / (1024**2):.0f}MB"
     return f"{b / 1024:.0f}KB"
 
 
@@ -131,7 +131,7 @@ def check_system_health() -> HealthReport:
         summary.append("Most active apps:")
         for p in top_procs:
             mem_str = _size_human(p["memory_bytes"])
-            summary.append(f"  {p['name']} — {mem_str} memory, " f"{p['cpu']:.0f}% processor")
+            summary.append(f"  {p['name']} — {mem_str} memory, {p['cpu']:.0f}% processor")
 
         # Generate actionable suggestions for heavy processes
         heavy = [p for p in top_procs if p["memory_bytes"] > 500 * 1024 * 1024]  # > 500MB

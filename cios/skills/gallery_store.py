@@ -125,7 +125,7 @@ def _move_to_trash(file_path: str) -> str | None:
     # Write .trashinfo file (freedesktop spec)
     info_path = trash_dir / "info" / f"{dest_name}.trashinfo"
     deletion_date = time.strftime("%Y-%m-%dT%H:%M:%S")
-    info_content = "[Trash Info]\n" f"Path={file_path}\n" f"DeletionDate={deletion_date}\n"
+    info_content = f"[Trash Info]\nPath={file_path}\nDeletionDate={deletion_date}\n"
 
     try:
         info_path.write_text(info_content)

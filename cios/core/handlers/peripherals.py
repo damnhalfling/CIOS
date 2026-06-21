@@ -204,7 +204,7 @@ def handle_clipboard(intent: Intent, executor: Executor, memory: Memory) -> Plan
             )
         lines = []
         for i, item in enumerate(items):
-            lines.append(f"  {i+1}. [{item.content_type}] {item.preview}")
+            lines.append(f"  {i + 1}. [{item.content_type}] {item.preview}")
         return PlanResult(
             plan_steps=["Loading clipboard history"],
             results=[],

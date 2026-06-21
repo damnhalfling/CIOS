@@ -67,9 +67,7 @@ class SecondaryPanel:
         self._win.configure(bg=BG)
 
         # Position on secondary monitor (fullscreen, no decoration via openbox rule)
-        geo = (
-            f"{self._monitor.width}x{self._monitor.height}" f"+{self._monitor.x}+{self._monitor.y}"
-        )
+        geo = f"{self._monitor.width}x{self._monitor.height}+{self._monitor.x}+{self._monitor.y}"
         self._win.geometry(geo)
         # Set WM class so openbox applies decor=no rule
         self._win.wm_attributes("-type", "normal")

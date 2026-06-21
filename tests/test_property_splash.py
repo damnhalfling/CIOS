@@ -77,7 +77,7 @@ class TestSplashProgressProtocol:
             parsed_total = int(parts[2])
 
             assert parsed_stage == stage, f"Parsed stage '{parsed_stage}' != original '{stage}'"
-            assert (
-                parsed_current == current
-            ), f"Parsed current {parsed_current} != original {current}"
+            assert parsed_current == current, (
+                f"Parsed current {parsed_current} != original {current}"
+            )
             assert parsed_total == total, f"Parsed total {parsed_total} != original {total}"

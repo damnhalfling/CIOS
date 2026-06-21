@@ -18,14 +18,14 @@ def handle_disk(intent: Intent, executor: Executor, memory: Memory) -> PlanResul
                 plan_steps=steps,
                 results=[],
                 outcome="recovered" if freed > 0 else "failure",
-                summary=f"Freed {freed // (1024*1024)}MB with {len(errors)} errors",
+                summary=f"Freed {freed // (1024 * 1024)}MB with {len(errors)} errors",
                 error=sanitize_error(errors[0], "disk") if errors else None,
             )
         return PlanResult(
             plan_steps=steps,
             results=[],
             outcome="success",
-            summary=f"Freed {freed // (1024*1024)}MB",
+            summary=f"Freed {freed // (1024 * 1024)}MB",
         )
 
     # Default: analyze

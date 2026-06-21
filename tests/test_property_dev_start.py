@@ -123,9 +123,9 @@ class TestDevStartWorkflowProperty:
             assert pid is None, "Unknown project should not produce a server PID"
             assert len(plan) >= 1, "Unknown project should produce at least one plan step"
             plan_text = " ".join(plan).lower()
-            assert (
-                "could not" in plan_text or "not" in plan_text or "unknown" in plan_text
-            ), f"Unknown project plan should contain a human-readable failure message, got: {plan}"
+            assert "could not" in plan_text or "not" in plan_text or "unknown" in plan_text, (
+                f"Unknown project plan should contain a human-readable failure message, got: {plan}"
+            )
             # No further assertions needed for unknown projects
             return
 
@@ -134,23 +134,23 @@ class TestDevStartWorkflowProperty:
             install_steps = [
                 s for s in plan if "install" in s.lower() or "dependencies" in s.lower()
             ]
-            assert (
-                len(install_steps) == 0
-            ), f"Installed deps should skip install step, but found: {install_steps}"
+            assert len(install_steps) == 0, (
+                f"Installed deps should skip install step, but found: {install_steps}"
+            )
         else:
             install_steps = [
                 s for s in plan if "install" in s.lower() or "dependencies" in s.lower()
             ]
-            assert (
-                len(install_steps) >= 1
-            ), f"Missing deps should include an install step, but plan was: {plan}"
+            assert len(install_steps) >= 1, (
+                f"Missing deps should include an install step, but plan was: {plan}"
+            )
 
         # (c) Occupied ports include a port-clearing step before server start
         if port_occupied:
             port_steps = [s for s in plan if "port" in s.lower() or "kill" in s.lower()]
-            assert (
-                len(port_steps) >= 1
-            ), f"Occupied port should include a port-clearing step, but plan was: {plan}"
+            assert len(port_steps) >= 1, (
+                f"Occupied port should include a port-clearing step, but plan was: {plan}"
+            )
             # The port-clearing step should appear before the server start step
             start_indices = [i for i, s in enumerate(plan) if "starting server" in s.lower()]
             port_indices = [
@@ -159,9 +159,9 @@ class TestDevStartWorkflowProperty:
                 if "port" in s.lower() and ("kill" in s.lower() or "in use" in s.lower())
             ]
             if start_indices and port_indices:
-                assert min(port_indices) < min(
-                    start_indices
-                ), "Port-clearing step should appear before server start step"
+                assert min(port_indices) < min(start_indices), (
+                    "Port-clearing step should appear before server start step"
+                )
 
         # (d) Final plan step indicates server running or a clear failure reason
         assert len(plan) >= 1, "Plan should have at least one step"
@@ -178,6 +178,6 @@ class TestDevStartWorkflowProperty:
             or "could not" in final_step
             or "exited" in final_step
         )
-        assert (
-            indicates_running or indicates_failure
-        ), f"Final plan step should indicate server running or failure, got: '{plan[-1]}'"
+        assert indicates_running or indicates_failure, (
+            f"Final plan step should indicate server running or failure, got: '{plan[-1]}'"
+        )

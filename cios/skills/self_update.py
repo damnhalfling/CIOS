@@ -282,7 +282,7 @@ def download_and_install(info: UpdateInfo) -> tuple[list[str], bool, str]:
             return (
                 steps,
                 False,
-                "Falha na instalação. Tente manualmente:\n" f"sudo dpkg -i {deb_path}",
+                f"Falha na instalação. Tente manualmente:\nsudo dpkg -i {deb_path}",
             )
 
     except subprocess.TimeoutExpired:

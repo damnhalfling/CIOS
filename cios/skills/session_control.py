@@ -157,7 +157,7 @@ def execute_session_action(action_name: str) -> tuple[list[str], bool, str | Non
                 return (
                     plan_steps,
                     False,
-                    "Nenhum bloqueador de tela encontrado. " "Instale um com: instalar i3lock",
+                    "Nenhum bloqueador de tela encontrado. Instale um com: instalar i3lock",
                 )
             plan_steps.append(f"{action.description} — executado")
             return plan_steps, True, None

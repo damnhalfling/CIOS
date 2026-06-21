@@ -594,7 +594,7 @@ def _lerp_color(c1: str, c2: str, t: float) -> str:
     r = int(r1 + (r2 - r1) * t)
     g = int(g1 + (g2 - g1) * t)
     b = int(b1 + (b2 - b1) * t)
-    return f"#{max(0,min(255,r)):02x}{max(0,min(255,g)):02x}{max(0,min(255,b)):02x}"
+    return f"#{max(0, min(255, r)):02x}{max(0, min(255, g)):02x}{max(0, min(255, b)):02x}"
 
 
 # ═══════════════════════════════════════════════════════════════════════════

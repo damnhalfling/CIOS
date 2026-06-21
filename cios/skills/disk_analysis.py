@@ -37,9 +37,9 @@ class DiskReport:
 def _size_human(b: int) -> str:
     """Convert bytes to human-readable string."""
     if b >= 1024**3:
-        return f"{b / (1024 ** 3):.1f}GB"
+        return f"{b / (1024**3):.1f}GB"
     if b >= 1024**2:
-        return f"{b / (1024 ** 2):.1f}MB"
+        return f"{b / (1024**2):.1f}MB"
     if b >= 1024:
         return f"{b / 1024:.0f}KB"
     return f"{b}B"

@@ -65,9 +65,9 @@ class TestDependencyRegistry:
         """Degradation messages should be in PT-BR, not technical."""
         registry = _build_registry()
         for dep in registry:
-            assert (
-                "indisponível" in dep.degraded_msg or "indisponíveis" in dep.degraded_msg
-            ), f"{dep.binary} degraded_msg should contain 'indisponível': {dep.degraded_msg}"
+            assert "indisponível" in dep.degraded_msg or "indisponíveis" in dep.degraded_msg, (
+                f"{dep.binary} degraded_msg should contain 'indisponível': {dep.degraded_msg}"
+            )
 
 
 class TestCheckAndInstallDeps:

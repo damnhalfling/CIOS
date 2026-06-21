@@ -68,16 +68,16 @@ class TestTopbarActivitySignaling:
             with patch("cios.ui.topbar._ACTIVITY_FILE", activity_file):
                 # First create the file via processing signal
                 signal_topbar_processing(activity)
-                assert os.path.exists(
-                    activity_file
-                ), "Activity file should exist after signal_topbar_processing"
+                assert os.path.exists(activity_file), (
+                    "Activity file should exist after signal_topbar_processing"
+                )
 
                 # Then idle should remove it
                 signal_topbar_idle()
 
-            assert not os.path.exists(
-                activity_file
-            ), "Activity file should be removed after signal_topbar_idle"
+            assert not os.path.exists(activity_file), (
+                "Activity file should be removed after signal_topbar_idle"
+            )
 
     @given(activity=_activity)
     @settings(max_examples=100)
@@ -97,11 +97,11 @@ class TestTopbarActivitySignaling:
                 content = f.read()
 
             # Parse the format: "processing|{activity}"
-            assert content.startswith(
-                "processing|"
-            ), f"Content should start with 'processing|', got: '{content}'"
+            assert content.startswith("processing|"), (
+                f"Content should start with 'processing|', got: '{content}'"
+            )
 
             recovered = content.split("|", 1)[1]
-            assert (
-                recovered == activity
-            ), f"Recovered activity '{recovered}' != original '{activity}'"
+            assert recovered == activity, (
+                f"Recovered activity '{recovered}' != original '{activity}'"
+            )

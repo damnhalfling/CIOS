@@ -143,6 +143,5 @@ class TestDependencyDegradation:
         # Tools NOT in the missing subset should NOT appear in the result
         for tool_name in result:
             assert tool_name in missing_set or tool_name not in {t for t in ALL_SYSTEM_TOOLS}, (
-                f"Tool '{tool_name}' reported missing but was not in the "
-                f"missing subset: {missing}"
+                f"Tool '{tool_name}' reported missing but was not in the missing subset: {missing}"
             )

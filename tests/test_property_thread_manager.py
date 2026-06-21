@@ -244,12 +244,12 @@ class TestThreadCreationInvariants:
 
             # Verify the thread ID is a valid UUID4 hex (32 hex characters)
             thread_id = decision.thread.id
-            assert (
-                len(thread_id) == 32
-            ), f"Expected 32-char hex ID, got {len(thread_id)} chars: {thread_id!r}"
-            assert re.fullmatch(
-                r"[0-9a-f]{32}", thread_id
-            ), f"Expected valid hex string, got: {thread_id!r}"
+            assert len(thread_id) == 32, (
+                f"Expected 32-char hex ID, got {len(thread_id)} chars: {thread_id!r}"
+            )
+            assert re.fullmatch(r"[0-9a-f]{32}", thread_id), (
+                f"Expected valid hex string, got: {thread_id!r}"
+            )
         finally:
             store.close()
 
@@ -279,7 +279,7 @@ class TestThreadCreationInvariants:
             # Verify created_at is within 1 second of current time
             created_at = decision.thread.created_at
             assert before - 1 <= created_at <= after + 1, (
-                f"Expected created_at between {before - 1} and {after + 1}, " f"got {created_at}"
+                f"Expected created_at between {before - 1} and {after + 1}, got {created_at}"
             )
         finally:
             store.close()
@@ -357,6 +357,6 @@ class TestThreadCreationInvariants:
                 store.close()
 
         # Verify all IDs are unique
-        assert len(thread_ids) == len(
-            set(thread_ids)
-        ), f"Expected all unique IDs, but found duplicates in: {thread_ids}"
+        assert len(thread_ids) == len(set(thread_ids)), (
+            f"Expected all unique IDs, but found duplicates in: {thread_ids}"
+        )

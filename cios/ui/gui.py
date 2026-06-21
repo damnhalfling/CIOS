@@ -694,7 +694,7 @@ class CIOSApp:
             _primary_y = 0
         _TOPBAR_H = 28
         self.root.geometry(
-            f"{screen_w}x{screen_h - _TOPBAR_H}" f"+{_primary_x}+{_primary_y + _TOPBAR_H}"
+            f"{screen_w}x{screen_h - _TOPBAR_H}+{_primary_x}+{_primary_y + _TOPBAR_H}"
         )
         self.root.overrideredirect(False)
         self.root.bind(

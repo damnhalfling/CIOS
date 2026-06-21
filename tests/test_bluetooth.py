@@ -272,9 +272,7 @@ class TestBluetoothSkill:
     def test_parse_device_list(self):
         from cios.skills.bluetooth import _parse_device_list
 
-        output = (
-            "Device AA:BB:CC:DD:EE:FF JBL Flip 5\n" "Device 11:22:33:44:55:66 Galaxy Buds Pro\n"
-        )
+        output = "Device AA:BB:CC:DD:EE:FF JBL Flip 5\nDevice 11:22:33:44:55:66 Galaxy Buds Pro\n"
         devices = _parse_device_list(output)
         assert len(devices) == 2
         assert devices[0].address == "AA:BB:CC:DD:EE:FF"
