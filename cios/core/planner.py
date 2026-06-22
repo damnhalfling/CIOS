@@ -8,9 +8,7 @@ import logging
 import time
 
 from cios.core.executor import Executor
-
-# Re-export PlanResult for backward compatibility
-from cios.core.handlers._common import PlanResult
+from cios.core.handlers._common import PlanResult  # re-exported for backward compat
 from cios.core.handlers.apps import handle_app_launch, handle_explore_system, handle_list_apps
 from cios.core.handlers.audio import handle_audio
 from cios.core.handlers.desktop import (
@@ -22,8 +20,6 @@ from cios.core.handlers.desktop import (
     handle_trash,
     handle_vpn,
 )
-
-# Import all handlers
 from cios.core.handlers.dev import (  # noqa: F401
     handle_close_project,
     handle_continue_project,
