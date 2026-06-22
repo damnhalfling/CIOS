@@ -931,13 +931,13 @@ class CIOSBridge:
                                 timestamp=time.time(),
                             )
                         )
-                    return {
-                        "steps": [],
-                        "result": "Volume de áudio ou espaço em disco?",
-                        "status": "success",
-                        "confirm": None,
-                        "voice_mode": "full",
-                    }
+                        return {
+                            "steps": [],
+                            "result": "Volume de áudio ou espaço em disco?",
+                            "status": "success",
+                            "confirm": None,
+                            "voice_mode": "full",
+                        }
 
         # NETWORK: connect without SSID
         if intent.type == IntentType.NETWORK:
