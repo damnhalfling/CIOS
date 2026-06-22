@@ -487,7 +487,7 @@ class CIOSBridge:
         If any step needs root, we ask for password first via pending_question.
         Delegates to PlanExecutor for actual execution.
         """
-        params = cmd.get("params", {})
+        params = cmd.get("params", cmd)
         steps = params.get("steps", [])
         explanation = params.get("explanation", "")
 
