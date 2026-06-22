@@ -4,12 +4,16 @@ Feature: app-watcher
 """
 
 import concurrent.futures
+import tempfile
 import threading
-from unittest.mock import patch
+import time
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
+from cios.core.app_watcher import AppWatcher
 from cios.skills.app_launcher import (
     AppInfo,
     find_app,
@@ -257,10 +261,6 @@ class TestDesktopExtensionFilter:
 
         **Validates: Requirements 1.5**
         """
-        from unittest.mock import MagicMock
-
-        from cios.core.app_watcher import AppWatcher
-
         watcher = AppWatcher()
         watcher._reset_debounce = MagicMock()
 
@@ -283,10 +283,6 @@ class TestDesktopExtensionFilter:
 
         **Validates: Requirements 1.5**
         """
-        from unittest.mock import MagicMock
-
-        from cios.core.app_watcher import AppWatcher
-
         watcher = AppWatcher()
         watcher._reset_debounce = MagicMock()
 
@@ -299,12 +295,6 @@ class TestDesktopExtensionFilter:
 
 
 # --- Property 2: Resiliência a diretórios inexistentes ---
-
-import tempfile
-from pathlib import Path
-from unittest.mock import MagicMock
-
-from cios.core.app_watcher import AppWatcher
 
 
 class TestDirectoryResilience:
@@ -379,10 +369,6 @@ class TestDirectoryResilience:
 
 
 # --- Property 3: Debounce correto ---
-
-import time
-
-from cios.core.app_watcher import AppWatcher
 
 
 class TestDebounceCorrectness:
