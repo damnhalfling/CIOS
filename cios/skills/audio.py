@@ -126,8 +126,8 @@ def set_volume(level: int) -> tuple[list[str], bool, str]:
     if backend == "pactl":
         ok, _, stderr = _run(["pactl", "set-sink-volume", "@DEFAULT_SINK@", f"{level}%"])
     elif backend == "wpctl":
-        # wpctl uses 0.0-1.0 scale
-        ok, _, stderr = _run(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", f"{level}%"])
+        # wpctl uses 0.0-1.0 scale (not percentage)
+        ok, _, stderr = _run(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", f"{level / 100:.2f}"])
     else:
         return ["Adjusting volume"], False, _no_backend_msg()
 

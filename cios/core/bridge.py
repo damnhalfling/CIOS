@@ -1105,7 +1105,7 @@ class CIOSBridge:
                     )
                 # Single step — execute directly
                 try:
-                    cmd_type = IntentType(cmd["intent"])
+                    cmd_type = IntentType(cmd.get("intent", "unknown"))
                 except ValueError:
                     cmd_type = IntentType.UNKNOWN
                 params = cmd.get("params", {})
@@ -1322,7 +1322,7 @@ class CIOSBridge:
                 # Single-step: execute immediately
                 display_mode = cmd.get("display_mode", "foreground")
                 try:
-                    cmd_type = IntentType(cmd["intent"])
+                    cmd_type = IntentType(cmd.get("intent", "unknown"))
                 except ValueError:
                     cmd_type = IntentType.UNKNOWN
 
