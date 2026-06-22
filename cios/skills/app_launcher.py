@@ -8,6 +8,7 @@ import logging
 import os
 import re
 import subprocess
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -27,12 +28,16 @@ class AppInfo:
 _app_cache: list[AppInfo] = []
 _cache_loaded: bool = False
 
+# Thread-safety: lock e flag para lazy rebuild
+_cache_lock = threading.Lock()
+_cache_dirty: bool = False
+
 
 def invalidate_app_cache() -> None:
-    """Invalidate the app cache (call after installing/removing packages)."""
-    global _app_cache, _cache_loaded
-    _app_cache = []
-    _cache_loaded = False
+    """Marca o cache como sujo (thread-safe). Rebuild ocorre na próxima consulta."""
+    global _cache_dirty
+    with _cache_lock:
+        _cache_dirty = True
 
 
 # Aliases comuns: o que o usuário diz → nome real do .desktop
@@ -175,11 +180,13 @@ def _parse_desktop_file(path: Path) -> AppInfo | None:
 
 
 def _ensure_cache() -> list[AppInfo]:
-    """Load app cache if not loaded yet."""
-    global _app_cache, _cache_loaded
-    if not _cache_loaded:
-        _app_cache = _scan_desktop_files()
-        _cache_loaded = True
+    """Carrega ou reconstrói o cache se necessário (thread-safe)."""
+    global _app_cache, _cache_loaded, _cache_dirty
+    with _cache_lock:
+        if not _cache_loaded or _cache_dirty:
+            _app_cache = _scan_desktop_files()
+            _cache_loaded = True
+            _cache_dirty = False
     return _app_cache
 
 

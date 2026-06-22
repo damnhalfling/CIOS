@@ -225,3 +225,88 @@ class TestSystemContext:
             assert ctx._running is True
             ctx.stop()
             assert ctx._running is False
+
+
+class TestAppWatcherIntegration:
+    """AppWatcher integration with SystemContext (MCP).
+
+    Validates: Requirements 4.1, 4.2, 4.4
+    """
+
+    def test_start_works_even_if_app_watcher_fails(self):
+        """Req 4.4: MCP start() completes even if AppWatcher raises on start()."""
+        ctx = SystemContext()
+
+        mock_watcher_cls = MagicMock()
+        mock_watcher_cls.return_value.start.side_effect = OSError("inotify failed")
+
+        with (
+            patch.object(ctx, "_warmup_parallel"),
+            patch.object(ctx, "_start_watchers"),
+            patch("cios.core.mcp.AppWatcher", mock_watcher_cls),
+            patch("threading.Thread") as mock_thread,
+        ):
+            mock_thread.return_value.start = MagicMock()
+
+            # Should NOT raise despite AppWatcher.start() raising OSError
+            ctx.start()
+
+            assert ctx._running is True
+            # AppWatcher should be None because it failed
+            assert ctx._app_watcher is None
+
+        ctx._running = False  # cleanup
+
+    def test_stop_calls_app_watcher_stop(self):
+        """Req 4.2: MCP stop() calls app_watcher.stop()."""
+        ctx = SystemContext()
+
+        mock_watcher_cls = MagicMock()
+        mock_watcher_instance = MagicMock()
+        mock_watcher_cls.return_value = mock_watcher_instance
+
+        with (
+            patch.object(ctx, "_warmup_parallel"),
+            patch.object(ctx, "_start_watchers"),
+            patch("cios.core.mcp.AppWatcher", mock_watcher_cls),
+            patch("threading.Thread") as mock_thread,
+        ):
+            mock_thread.return_value.start = MagicMock()
+            ctx.start()
+
+        # Now stop
+        ctx.stop()
+
+        mock_watcher_instance.stop.assert_called_once()
+
+    def test_app_watcher_started_after_warmup(self):
+        """Req 4.1: AppWatcher is instantiated and started after warmup completes."""
+        ctx = SystemContext()
+        call_order: list[str] = []
+
+        def track_warmup():
+            call_order.append("warmup")
+
+        mock_watcher_cls = MagicMock()
+
+        def track_watcher_init():
+            call_order.append("app_watcher_init")
+            instance = MagicMock()
+            instance.start = lambda: call_order.append("app_watcher_start")
+            return instance
+
+        mock_watcher_cls.side_effect = track_watcher_init
+
+        with (
+            patch.object(ctx, "_warmup_parallel", side_effect=track_warmup),
+            patch.object(ctx, "_start_watchers"),
+            patch("cios.core.mcp.AppWatcher", mock_watcher_cls),
+            patch("threading.Thread") as mock_thread,
+        ):
+            mock_thread.return_value.start = MagicMock()
+            ctx.start()
+
+        # Verify order: warmup happens before AppWatcher init/start
+        assert call_order == ["warmup", "app_watcher_init", "app_watcher_start"]
+
+        ctx._running = False  # cleanup

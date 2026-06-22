@@ -35,6 +35,8 @@ from dataclasses import dataclass, field
 
 import psutil
 
+from cios.core.app_watcher import AppWatcher
+
 logger = logging.getLogger(__name__)
 
 
@@ -371,6 +373,8 @@ class SystemContext:
         self._boot_times: dict[str, float] = {}
         # Thread pool for parallel execution
         self._pool = ThreadPoolExecutor(max_workers=6, thread_name_prefix="mcp")
+        # App watcher (inotify-based .desktop file monitor)
+        self._app_watcher: AppWatcher | None = None
         # Progress callback for splash
         self._on_progress: Callable[[str, int, int], None] | None = None
 
@@ -391,6 +395,14 @@ class SystemContext:
         warmup_ms = (time.monotonic() - boot_start) * 1000
         self._boot_times["warmup_total"] = warmup_ms
         logger.info("MCP warmup completed in %.0fms (parallel)", warmup_ms)
+
+        # App watcher (após warmup)
+        try:
+            self._app_watcher = AppWatcher()
+            self._app_watcher.start()
+        except Exception as e:
+            logger.warning("App watcher failed to start: %s", e)
+            self._app_watcher = None
 
         # Start adaptive polling
         self._thread = threading.Thread(target=self._poll_loop, daemon=True)
@@ -457,6 +469,9 @@ class SystemContext:
         """Stop background polling, watchers, and thread pool."""
         self._running = False
         self._force_event.set()  # unblock poll loop
+        # Stop app watcher
+        if self._app_watcher:
+            self._app_watcher.stop()
         # Kill watcher subprocesses
         for proc in self._watcher_procs:
             try:
