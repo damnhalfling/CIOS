@@ -198,8 +198,8 @@ def _execute_handler_for_audit(intent_type: IntentType):
         "cios.core.handlers.files.find_and_open": MagicMock(
             return_value=(["Searching for file"], False, "File not found")
         ),
-        "cios.core.handlers.dev._scan_project_dirs": MagicMock(return_value=[]),
-        "cios.core.handlers.dev._find_project": MagicMock(return_value=None),
+        "cios.skills.dev_start._scan_project_dirs": MagicMock(return_value=[]),
+        "cios.skills.dev_start._find_project": MagicMock(return_value=None),
         "cios.core.handlers.dev._is_port_in_use": MagicMock(return_value=False),
         "cios.core.handlers.dev.time.sleep": MagicMock(),
         "cios.core.handlers.logs.time.sleep": MagicMock(),
