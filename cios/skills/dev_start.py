@@ -8,7 +8,7 @@ import shutil
 import subprocess
 import time
 import webbrowser
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from cios.core.executor import ExecResult, Executor
@@ -27,6 +27,17 @@ class WorkflowResult:
     project_path: str | None = None
     editor_opened: bool = False
     browser_opened: bool = False
+
+
+@dataclass
+class ContinueResult:
+    """Result of a workflow_continue skill execution."""
+
+    steps: list[str]
+    outcome: str  # "success" | "failure"
+    summary: str
+    error: str | None = None
+    results: list[ExecResult] = field(default_factory=list)
 
 
 @dataclass
@@ -690,3 +701,120 @@ def _record_workflow(project_query: str, project_path: str) -> None:
         )
     except Exception:
         logger.debug("Failed to record workflow in AutoLearner")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  WORKFLOW CONTINUE SKILL
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def workflow_continue(
+    project_name: str,
+    executor: Executor,
+    memory: Memory,
+) -> ContinueResult:
+    """Restore a previous workspace session — encapsulates all continue_project logic."""
+    if not project_name:
+        latest = memory.get_latest_session()
+        if latest is None:
+            return ContinueResult(
+                steps=["Looking for recent project"],
+                outcome="failure",
+                summary="No recent projects found. Start a project first.",
+                error="No sessions in memory",
+            )
+        session = latest
+    else:
+        session = memory.get_session(project_name)  # type: ignore[assignment]
+        if session is None:
+            all_sessions = memory.list_sessions()
+            for s in all_sessions:
+                if project_name.lower() in s.project_name.lower():
+                    session = s
+                    break
+
+        if session is None:
+            all_sessions = memory.list_sessions()
+            if all_sessions:
+                names = [f"  📁 {s.project_name}" for s in all_sessions[:8]]
+                return ContinueResult(
+                    steps=["Searching for project"],
+                    outcome="failure",
+                    summary="Projeto não encontrado.\n\nProjetos disponíveis:\n" + "\n".join(names),
+                    error="Project not found in sessions",
+                )
+            return ContinueResult(
+                steps=["Searching for project"],
+                outcome="failure",
+                summary="Projeto não encontrado. Nenhum projeto salvo.",
+                error="No sessions in memory",
+            )
+
+    plan_steps = [f"Restoring project: {session.project_name}"]
+
+    if not os.path.exists(session.project_path):
+        all_sessions = memory.list_sessions()
+        suggestions = [
+            f"  📁 {s.project_name}"
+            for s in all_sessions
+            if s.project_name != session.project_name and os.path.exists(s.project_path)
+        ]
+        msg = "Projeto não encontrado — o diretório foi removido."
+        if suggestions:
+            msg += "\n\nProjetos disponíveis:\n" + "\n".join(suggestions[:8])
+        return ContinueResult(
+            steps=plan_steps,
+            outcome="failure",
+            summary=msg,
+            error="Project path does not exist",
+        )
+
+    server_running = session.server_port > 0 and _is_port_in_use(session.server_port)
+
+    if server_running:
+        plan_steps.append(f"Server already running on port {session.server_port}")
+        editor_cmd = session.editor_command or _detect_editor()
+        if editor_cmd:
+            _open_editor(editor_cmd, session.project_path)
+            plan_steps.append(f"Editor opened ({editor_cmd})")
+
+        browser_url = session.browser_url or f"http://localhost:{session.server_port}"
+        _open_browser(browser_url)
+        plan_steps.append(f"Browser opened ({browser_url})")
+
+        return ContinueResult(
+            steps=plan_steps,
+            outcome="success",
+            summary=f"Workspace restored: {session.project_name}. Server already running.",
+        )
+    else:
+        plan_steps.append("Server not running — starting full Dev Start")
+        project = detect_project(session.project_path)
+        dev_plan, dev_results, pid = execute_dev_start(
+            executor,
+            project=project,
+            memory=memory,
+        )
+        plan_steps.extend(dev_plan)
+
+        failed = [r for r in dev_results if not r.success]
+        if failed:
+            from cios.core.handlers._common import sanitize_error
+
+            return ContinueResult(
+                steps=plan_steps,
+                results=dev_results,
+                outcome="failure",
+                summary=f"Failed to restart project {session.project_name}.",
+                error=sanitize_error(
+                    "; ".join(r.stderr[:100] for r in failed if r.stderr),
+                    "dev_start",
+                ),
+            )
+
+        return ContinueResult(
+            steps=plan_steps,
+            results=dev_results,
+            outcome="success",
+            summary=f"Workspace restored: {session.project_name}. Server restarted.",
+        )

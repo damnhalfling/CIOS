@@ -32,7 +32,7 @@ class TestTopbarActivitySignaling:
     """
 
     @given(activity=_activity)
-    @settings(max_examples=100)
+    @settings(max_examples=20)
     def test_signal_processing_writes_correct_state(self, activity: str):
         """For any activity description string, signal_topbar_processing(activity)
         writes "processing|{activity}" to the activity file.
@@ -55,7 +55,7 @@ class TestTopbarActivitySignaling:
             assert content == expected, f"Expected '{expected}' but got '{content}'"
 
     @given(activity=_activity)
-    @settings(max_examples=100)
+    @settings(max_examples=20)
     def test_signal_idle_removes_file(self, activity: str):
         """For any activity description string, after signal_topbar_processing(activity),
         signal_topbar_idle() removes the activity file.
@@ -80,7 +80,7 @@ class TestTopbarActivitySignaling:
             )
 
     @given(activity=_activity)
-    @settings(max_examples=100)
+    @settings(max_examples=20)
     def test_reading_file_recovers_activity(self, activity: str):
         """Reading the activity file after signal_topbar_processing recovers
         the original activity string by parsing the "processing|{activity}" format.

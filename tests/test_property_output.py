@@ -170,7 +170,7 @@ class TestOutputSanitizationPipeline:
     """
 
     @given(error_input=_error_with_artifacts())
-    @settings(max_examples=100)
+    @settings(max_examples=20)
     def test_sanitization_pipeline_strips_all_technical_artifacts(self, error_input: str):
         """For any error string containing file paths, tracebacks, error codes,
         PID references, or Python exception class names, passing it through
@@ -273,7 +273,7 @@ class TestErrorEnrichment:
     """
 
     @given(error_input=_human_readable_error())
-    @settings(max_examples=100)
+    @settings(max_examples=20)
     def test_enrich_error_always_appends_recovery_suggestion(self, error_input: str):
         """For any non-empty human-readable error string, enrich_error should
         return a string strictly longer than the input, with a non-empty

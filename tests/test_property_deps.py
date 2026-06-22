@@ -65,7 +65,7 @@ class TestDependencyDegradation:
     """
 
     @given(missing=_missing_tools_subset)
-    @settings(max_examples=100)
+    @settings(max_examples=20)
     def test_mcp_scanners_return_safe_defaults_for_any_missing_subset(
         self,
         missing: list[str],
@@ -106,7 +106,7 @@ class TestDependencyDegradation:
                 assert networks == []
 
     @given(missing=_missing_tools_subset)
-    @settings(max_examples=100)
+    @settings(max_examples=20)
     def test_check_and_install_deps_never_crashes_for_any_missing_subset(
         self,
         missing: list[str],

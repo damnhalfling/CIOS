@@ -291,10 +291,10 @@ class TestContinueProjectHandler:
         )
 
         with (
-            patch("cios.core.handlers.dev._is_port_in_use", return_value=True),
-            patch("cios.core.handlers.dev._detect_editor", return_value="code"),
-            patch("cios.core.handlers.dev._open_editor") as mock_editor,
-            patch("cios.core.handlers.dev._open_browser") as mock_browser,
+            patch("cios.skills.dev_start._is_port_in_use", return_value=True),
+            patch("cios.skills.dev_start._detect_editor", return_value="code"),
+            patch("cios.skills.dev_start._open_editor") as mock_editor,
+            patch("cios.skills.dev_start._open_browser") as mock_browser,
             patch("os.path.exists", return_value=True),
         ):
             result = planner._handle_continue_project(intent)
@@ -334,10 +334,10 @@ class TestContinueProjectHandler:
         )
 
         with (
-            patch("cios.core.handlers.dev._is_port_in_use", return_value=True),
-            patch("cios.core.handlers.dev._detect_editor", return_value="code"),
-            patch("cios.core.handlers.dev._open_editor") as mock_editor,
-            patch("cios.core.handlers.dev._open_browser") as mock_browser,
+            patch("cios.skills.dev_start._is_port_in_use", return_value=True),
+            patch("cios.skills.dev_start._detect_editor", return_value="code"),
+            patch("cios.skills.dev_start._open_editor") as mock_editor,
+            patch("cios.skills.dev_start._open_browser") as mock_browser,
             patch("os.path.exists", return_value=True),
         ):
             result = planner._handle_continue_project(intent)

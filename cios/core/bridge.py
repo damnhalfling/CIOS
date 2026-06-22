@@ -15,12 +15,16 @@ Features:
 """
 
 import logging
-import re
 import time
 from collections.abc import Callable
-from dataclasses import dataclass, field
 
 from cios.core.config import ensure_dirs
+from cios.core.conversation import (
+    ConversationManager,
+    GuidedFlow,  # noqa: F401 — re-exported for backward compat
+    GuidedFlowStep,
+    PendingQuestion,
+)
 from cios.core.error_recovery import enrich_error, is_retryable
 from cios.core.executor import Executor
 from cios.core.humanizer import humanize_error, humanize_result
@@ -31,6 +35,7 @@ from cios.core.plan_executor import PlanExecutor
 from cios.core.planner import Planner, PlanResult
 from cios.core.privilege import PrivilegeManager
 from cios.core.thread_manager import (
+    ConversationTurn,
     ThreadManager,
     ThreadStore,
 )
@@ -57,75 +62,6 @@ _STATE_CHANGING_INTENTS = frozenset(
 )
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-#  CONVERSATION CONTEXT (#74)
-# ═══════════════════════════════════════════════════════════════════════════
-
-
-@dataclass
-class ConversationTurn:
-    """A single turn in the conversation."""
-
-    user_input: str
-    intent_type: str  # IntentType.value
-    params: dict = field(default_factory=dict)
-    result_summary: str = ""
-    outcome: str = ""
-    timestamp: float = 0.0
-
-
-@dataclass
-class GuidedFlowStep:
-    """A single step in a multi-step guided flow."""
-
-    question: str  # Human-readable question
-    question_type: str  # "choice", "text", "password"
-    options: list[str] = field(default_factory=list)  # Available choices (for "choice" type)
-    param_key: str = ""  # Which intent param this fills
-
-
-@dataclass
-class GuidedFlow:
-    """State for a multi-step guided conversation flow."""
-
-    intent: Intent  # The original intent being built
-    steps: list[GuidedFlowStep] = field(default_factory=list)  # All steps
-    current_step: int = 0  # Index of current step
-    collected: dict = field(default_factory=dict)  # Params collected so far
-
-
-@dataclass
-class PendingQuestion:
-    """A question waiting for user's answer."""
-
-    intent: Intent
-    question_type: str  # "ssid", "password", "target", "app", "port", "confirm_action"
-    options: list[str] = field(default_factory=list)  # available choices
-    timestamp: float = 0.0
-    # Multi-step guided flow support
-    flow_steps: list[GuidedFlowStep] | None = None
-    flow_collected: dict = field(default_factory=dict)
-
-
-# Pronouns that reference previous context
-_PRONOUNS_PT = {
-    "esse",
-    "essa",
-    "isso",
-    "este",
-    "esta",
-    "nesse",
-    "nessa",
-    "nisso",
-    "dele",
-    "dela",
-    "aquele",
-    "aquela",
-}
-_PRONOUNS_EN = {"that", "this", "it", "those", "the same", "that one"}
-_ALL_PRONOUNS = _PRONOUNS_PT | _PRONOUNS_EN
-
-
 class CIOSBridge:
     """Single entry point for all UI → backend communication."""
 
@@ -146,6 +82,8 @@ class CIOSBridge:
         # Conversation state — delegated to ThreadManager
         self._thread_store = ThreadStore()
         self._thread_manager = ThreadManager(self._thread_store)
+        # Conversation logic (answer routing, pronoun resolution)
+        self._conversation = ConversationManager(self._thread_manager)
         # Background task execution
         from cios.core.task_queue import TaskManager
 
@@ -1107,16 +1045,8 @@ class CIOSBridge:
     def _handle_answer(self, answer: str, confirmed: bool, pending_question=None) -> dict:
         """Process user's answer to a pending question.
 
-        When the pending question has flow_steps, advances through the
-        guided flow one step at a time, collecting params into
-        flow_collected.  Once all steps are consumed (or a step is
-        skipped because it's not needed), executes the completed intent.
-
-        Args:
-            answer: The user's answer text.
-            confirmed: Whether the action has been confirmed.
-            pending_question: The pending question from the routing decision,
-                              or None to retrieve from thread manager.
+        Delegates answer classification to ConversationManager, then acts
+        on the returned AnswerAction (execute, ask_next, orchestrator, etc.).
         """
         from cios.core.mcp import context
 
@@ -1131,310 +1061,83 @@ class CIOSBridge:
         if not question:
             return self._process(answer, confirmed)
 
-        # Check if answer is too old (>60s)
-        if time.time() - question.timestamp > 60:
-            # Expired — treat as new command
+        # Delegate classification to ConversationManager
+        action = self._conversation.classify_answer(answer, question)
+
+        # Act on the routing decision
+        if action.action == "delegate_process":
             return self._process(answer, confirmed)
 
-        intent = question.intent
-        answer_clean = answer.strip()
+        if action.action == "cancelled":
+            return action.response
 
-        # --- Multi-step guided flow path ---
-        if question.flow_steps is not None:
-            return self._advance_guided_flow(question, answer_clean, confirmed)
+        if action.action == "ask_next":
+            self._thread_manager.set_pending_question(action.pending_question)
+            return action.response
 
-        # --- Orchestrator mid-execution input ---
-        if question.question_type == "orchestrator_input":
-            # User answered a question from the Maestro during multi-step execution.
-            # Send the answer back to Maestro and continue the execution loop.
-            from cios.core.intelligence import intelligence
+        if action.action == "execute_confirmed":
+            result = self._execute_intent(action.intent, context)
+            self._record_turn(action.answer_text, action.intent, result)
+            return result
 
-            try:
-                # Send user's answer to Maestro (it has the execution context)
-                result = intelligence.query(answer_clean, intent="chat")
-                if result.os_command:
-                    # Maestro returned next step(s) — continue multi-step
-                    cmd = result.os_command
-                    if cmd.get("has_next"):
-                        return self._execute_multi_step(
-                            cmd, intent.params.get("_original_input", answer_clean)
-                        )
-                    # Single step — execute directly
-                    try:
-                        cmd_type = IntentType(cmd["intent"])
-                    except ValueError:
-                        cmd_type = IntentType.UNKNOWN
-                    params = cmd.get("params", {})
-                    params["_display_mode"] = cmd.get("display_mode", "foreground")
-                    exec_intent = Intent(
-                        type=cmd_type, params=params, raw_input=answer_clean, confidence=1.0
+        if action.action == "orchestrator_resume":
+            return self._handle_orchestrator_resume(action.intent, action.answer_text)
+
+        if action.action == "execute":
+            result = self._execute_intent(action.intent, context)
+            self._record_turn(action.answer_text, action.intent, result)
+            return result
+
+        # Fallback — shouldn't happen
+        return self._process(answer, confirmed)
+
+    def _handle_orchestrator_resume(self, intent: Intent, answer: str) -> dict:
+        """Handle resuming an orchestrated multi-step flow after user answered a question."""
+        from cios.core.intelligence import intelligence
+
+        try:
+            result = intelligence.query(answer, intent="chat")
+            if result.os_command:
+                cmd = result.os_command
+                if cmd.get("has_next"):
+                    return self._execute_multi_step(
+                        cmd, intent.params.get("_original_input", answer)
                     )
-                    plan_result = self._execute_with_retry(exec_intent)
-                    steps, summary, outcome, voice_mode = humanize_result(plan_result)
-                    prev_steps = intent.params.get("_steps_done", [])
-                    return {
-                        "steps": prev_steps + steps,
-                        "result": summary or "Concluído.",
-                        "status": outcome,
-                        "confirm": None,
-                        "voice_mode": voice_mode,
-                    }
-                elif result.success and result.text:
-                    return {
-                        "steps": intent.params.get("_steps_done", []),
-                        "result": result.text,
-                        "status": "success",
-                        "confirm": None,
-                    }
-            except Exception as e:
-                logger.warning("Orchestrator resume failed: %s", e)
-            return {
-                "steps": [],
-                "result": "Não consegui continuar a execução.",
-                "status": "error",
-                "confirm": None,
-            }
-
-        # --- Legacy single-question path (backward compatible) ---
-        # Inject answer into intent params based on question type
-        if question.question_type == "confirm_action":
-            # User is answering a confirmation prompt (sim/não)
-            answer_lower = answer_clean.lower()
-            negatives = (
-                "não",
-                "nao",
-                "no",
-                "n",
-                "cancela",
-                "cancelar",
-                "cancel",
-                "nope",
-                "nah",
-                "nunca",
-                "deixa",
-                "esquece",
-                "para",
-            )
-            if (
-                answer_lower in negatives
-                or answer_lower.startswith("não")
-                or answer_lower.startswith("nao")
-            ):
+                # Single step — execute directly
+                try:
+                    cmd_type = IntentType(cmd["intent"])
+                except ValueError:
+                    cmd_type = IntentType.UNKNOWN
+                params = cmd.get("params", {})
+                params["_display_mode"] = cmd.get("display_mode", "foreground")
+                exec_intent = Intent(
+                    type=cmd_type, params=params, raw_input=answer, confidence=1.0
+                )
+                plan_result = self._execute_with_retry(exec_intent)
+                steps, summary, outcome, voice_mode = humanize_result(plan_result)
+                prev_steps = intent.params.get("_steps_done", [])
                 return {
-                    "steps": [],
-                    "result": "Ok, cancelado.",
+                    "steps": prev_steps + steps,
+                    "result": summary or "Concluído.",
+                    "status": outcome,
+                    "confirm": None,
+                    "voice_mode": voice_mode,
+                }
+            elif result.success and result.text:
+                return {
+                    "steps": intent.params.get("_steps_done", []),
+                    "result": result.text,
                     "status": "success",
                     "confirm": None,
-                    "voice_mode": "full",
                 }
-            # Positive confirmation — re-execute with confirmed=True
-            result = self._execute_intent(intent, context)
-            self._record_turn(answer_clean, intent, result)
-            return result
-
-        if question.question_type == "sudo_password":
-            intent.params["sudo_password"] = answer_clean
-            # Execute directly (already confirmed)
-            result = self._execute_intent(intent, context)
-            self._record_turn("[senha]", intent, result)
-            return result
-
-        elif question.question_type == "ssid":
-            # User might say the SSID name or a number (index)
-            if answer_clean.isdigit() and question.options:
-                idx = int(answer_clean) - 1
-                if 0 <= idx < len(question.options):
-                    intent.params["ssid"] = question.options[idx]
-                else:
-                    intent.params["ssid"] = answer_clean
-            else:
-                # Match against available options (fuzzy)
-                matched = self._fuzzy_match_option(answer_clean, question.options)
-                intent.params["ssid"] = matched or answer_clean
-
-        elif question.question_type == "password":
-            intent.params["password"] = answer_clean
-
-        elif question.question_type == "app":
-            intent.params["app"] = answer_clean
-
-        elif question.question_type == "port":
-            # Extract number from answer
-            port_match = re.search(r"(\d{2,5})", answer_clean)
-            if port_match:
-                intent.params["port"] = int(port_match.group(1))
-            else:
-                return {
-                    "steps": [],
-                    "result": "Não entendi a porta. Diga um número, ex: 3000",
-                    "status": "error",
-                    "confirm": None,
-                    "voice_mode": "full",
-                }
-
-        elif question.question_type == "target":
-            intent.params["target"] = answer_clean
-
-        elif question.question_type == "choice":
-            # Ambiguity resolution — user picks between options
-            answer_lower = answer_clean.lower()
-            if question.options:
-                matched = self._fuzzy_match_option(answer_lower, question.options)
-                if matched == "audio" or "áudio" in answer_lower or "som" in answer_lower:
-                    # Re-classify as audio status check
-                    intent = Intent(
-                        type=IntentType.AUDIO,
-                        confidence=0.95,
-                        params={"action": "status"},
-                        raw_input=intent.raw_input,
-                    )
-                elif matched == "disco" or "disco" in answer_lower or "disk" in answer_lower:
-                    # Re-classify as disk analysis
-                    intent = Intent(
-                        type=IntentType.DISK_ANALYSIS,
-                        confidence=0.95,
-                        params={"action": "analyze"},
-                        raw_input=intent.raw_input,
-                    )
-                else:
-                    # Couldn't resolve — treat answer as new input
-                    return self._process(answer_clean, confirmed)
-
-        # Now check if we need password for wifi
-        if intent.type == IntentType.NETWORK and intent.params.get("action") == "connect":
-            ssid = intent.params.get("ssid", "")
-            if ssid and not intent.params.get("password"):
-                # Check if it's a known network (no password needed)
-                from cios.core.mcp import context as mcp
-
-                known = [n.lower() for n in mcp.known_networks]
-                if ssid.lower() not in known:
-                    # Ask for password
-                    self._thread_manager.set_pending_question(
-                        PendingQuestion(
-                            intent=intent,
-                            question_type="password",
-                            timestamp=time.time(),
-                        )
-                    )
-                    return {
-                        "steps": [],
-                        "result": f"Senha para {ssid}?",
-                        "status": "success",
-                        "confirm": None,
-                        "voice_mode": "full",
-                    }
-
-        # Execute with the completed intent
-        result = self._execute_intent(intent, context)
-        self._record_turn(answer_clean, intent, result)
-        return result
-
-    def _advance_guided_flow(
-        self,
-        question: PendingQuestion,
-        answer: str,
-        confirmed: bool,
-    ) -> dict:
-        """Advance through a multi-step guided flow, collecting one param per step.
-
-        After collecting the current step's answer:
-        1. Store the param in flow_collected
-        2. Check if the next step should be skipped (e.g. known network → skip password)
-        3. If more steps remain, set a new PendingQuestion for the next step
-        4. If all steps are done, inject collected params and execute
-        """
-        from cios.core.mcp import context
-
-        intent = question.intent
-        flow_steps = question.flow_steps
-        collected = dict(question.flow_collected)
-        current_idx = 0
-
-        # Determine which step we're answering
-        # The current step is the first step whose param_key is not yet collected
-        for i, step in enumerate(flow_steps):
-            if step.param_key not in collected:
-                current_idx = i
-                break
-
-        current_step = flow_steps[current_idx]
-
-        # Collect the answer for the current step
-        if current_step.question_type == "choice":
-            # Support numeric index or fuzzy match
-            if answer.isdigit() and current_step.options:
-                idx = int(answer) - 1
-                if 0 <= idx < len(current_step.options):
-                    collected[current_step.param_key] = current_step.options[idx]
-                else:
-                    collected[current_step.param_key] = answer
-            else:
-                matched = self._fuzzy_match_option(answer, current_step.options)
-                collected[current_step.param_key] = matched or answer
-        elif current_step.question_type == "password" or current_step.question_type == "text":
-            collected[current_step.param_key] = answer
-
-        # Check remaining steps — skip steps that are no longer needed
-        next_idx = current_idx + 1
-        while next_idx < len(flow_steps):
-            next_step = flow_steps[next_idx]
-            if self._should_skip_flow_step(next_step, intent, collected):
-                next_idx += 1
-                continue
-            break
-
-        # If there are more steps, present the next question
-        if next_idx < len(flow_steps):
-            next_step = flow_steps[next_idx]
-            # Interpolate collected values into the question text
-            question_text = next_step.question.format(**collected)
-            self._thread_manager.set_pending_question(
-                PendingQuestion(
-                    intent=intent,
-                    question_type=next_step.param_key,
-                    options=next_step.options,
-                    timestamp=time.time(),
-                    flow_steps=flow_steps,
-                    flow_collected=collected,
-                )
-            )
-            return {
-                "steps": [],
-                "result": question_text,
-                "status": "success",
-                "confirm": None,
-                "voice_mode": "full",
-            }
-
-        # All steps done — inject collected params into intent and execute
-        for key, value in collected.items():
-            intent.params[key] = value
-
-        result = self._execute_intent(intent, context)
-        self._record_turn(answer, intent, result)
-        return result
-
-    def _should_skip_flow_step(
-        self,
-        step: GuidedFlowStep,
-        intent: Intent,
-        collected: dict,
-    ) -> bool:
-        """Determine if a guided flow step should be skipped.
-
-        For example, skip the password step if the selected network is
-        a known/saved network (no password needed).
-        """
-        if step.param_key == "password" and intent.type == IntentType.NETWORK:
-            ssid = collected.get("ssid", "")
-            if ssid:
-                from cios.core.mcp import context as mcp
-
-                known = [n.lower() for n in mcp.known_networks]
-                if ssid.lower() in known:
-                    return True  # Known network — skip password
-        return False
+        except Exception as e:
+            logger.warning("Orchestrator resume failed: %s", e)
+        return {
+            "steps": [],
+            "result": "Não consegui continuar a execução.",
+            "status": "error",
+            "confirm": None,
+        }
 
     # ═══════════════════════════════════════════════════════════════════
     #  SUDO PASSWORD (#sudo)
@@ -1499,17 +1202,8 @@ class CIOSBridge:
         }
 
     def _fuzzy_match_option(self, answer: str, options: list[str]) -> str | None:
-        """Fuzzy match user answer against available options."""
-        answer_lower = answer.lower()
-        # Exact match
-        for opt in options:
-            if opt.lower() == answer_lower:
-                return opt
-        # Substring match
-        for opt in options:
-            if answer_lower in opt.lower() or opt.lower() in answer_lower:
-                return opt
-        return None
+        """Fuzzy match user answer against available options. Delegates to ConversationManager."""
+        return ConversationManager.fuzzy_match_option(answer, options)
 
     # ═══════════════════════════════════════════════════════════════════
     #  PRONOUN RESOLUTION (#76)
@@ -1517,81 +1211,7 @@ class CIOSBridge:
 
     def _resolve_pronouns(self, user_input: str) -> str:
         """Replace pronouns with concrete references from conversation context."""
-        context_turns = self._thread_manager.get_conversation_context()
-        if not context_turns:
-            return user_input
-
-        # Check if input contains a pronoun
-        words = set(user_input.lower().split())
-        has_pronoun = bool(words & _ALL_PRONOUNS)
-        if not has_pronoun:
-            return user_input
-
-        last = context_turns[-1] if context_turns else None
-        if not last:
-            return user_input
-
-        # Extract the "object" from the last turn
-        obj = self._extract_object(last)
-        if not obj:
-            return user_input
-
-        # Replace the pronoun with the object
-        result = user_input
-        for pronoun in _ALL_PRONOUNS:
-            # Word boundary replacement
-            pattern = re.compile(r"\b" + re.escape(pronoun) + r"\b", re.IGNORECASE)
-            if pattern.search(result):
-                result = pattern.sub(obj, result, count=1)
-                logger.debug("Pronoun resolved: '%s' → '%s' (object: %s)", user_input, result, obj)
-                break
-
-        return result
-
-    def _extract_object(self, turn: ConversationTurn) -> str | None:
-        """Extract the main object/target from a conversation turn."""
-        params = turn.params
-
-        # App launch → app name
-        if turn.intent_type == "app_launch":
-            return params.get("app", "")
-
-        # Network → SSID
-        if turn.intent_type == "network":
-            return params.get("ssid", "")
-
-        # File organize → target folder
-        if turn.intent_type == "file_organize":
-            return params.get("target", "")
-
-        # Process control → port
-        if turn.intent_type == "process_control":
-            port = params.get("port")
-            return str(port) if port else ""
-
-        # Package → package name
-        if turn.intent_type == "package":
-            return params.get("package", "")
-
-        # Window → target
-        if turn.intent_type == "window":
-            return params.get("target", "")
-
-        # Workflow → project name
-        if turn.intent_type == "workflow_start":
-            return params.get("project", "")
-
-        # File search → query
-        if turn.intent_type in ("files_search", "files_open"):
-            return params.get("query", "")
-
-        # Audio → try to extract from input
-        if turn.intent_type == "audio":
-            return ""
-
-        # Fallback: try to extract a noun from the original input
-        # Simple heuristic: last word that's not a verb/preposition
-        return ""
+        return self._conversation.resolve_pronouns(user_input)
 
     # ═══════════════════════════════════════════════════════════════════
     #  RETRY, VALIDATION, ERROR HANDLING

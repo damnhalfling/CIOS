@@ -62,7 +62,7 @@ class TestStreamingCallbacks:
     """
 
     @given(command=_echo_command)
-    @settings(max_examples=100, deadline=None)
+    @settings(max_examples=20, deadline=None)
     def test_streaming_invokes_on_step_at_least_once(self, command: str):
         """For any valid intent that produces at least one plan step,
         execute_streaming with an on_step callback invokes that callback

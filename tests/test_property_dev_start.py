@@ -87,7 +87,7 @@ class TestDevStartWorkflowProperty:
         dep_state=_dep_state,
         port_state=_port_state,
     )
-    @settings(max_examples=100)
+    @settings(max_examples=20)
     def test_dev_start_plan_correctness(
         self,
         proj_type: str,

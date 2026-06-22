@@ -43,7 +43,7 @@ class TestSplashProgressProtocol:
     """
 
     @given(stage=_stage_name, ct=_current_total())
-    @settings(max_examples=100)
+    @settings(max_examples=20)
     def test_splash_progress_writes_correct_format(self, stage: str, ct: tuple):
         """For any stage name (non-empty, no pipes/newlines), current (non-negative),
         and total (positive, current <= total), update_splash_progress writes

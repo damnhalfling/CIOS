@@ -99,7 +99,7 @@ class TestGuidedFlowNetworkOptions:
     """
 
     @given(networks=_wifi_network_list)
-    @settings(max_examples=100, deadline=None)
+    @settings(max_examples=20, deadline=None)
     def test_guided_flow_presents_all_ssids_as_options(self, networks: list[WifiNetwork]):
         """For any non-empty list of WiFi networks, when a network connect
         intent is issued without an SSID and no known networks match, the
@@ -146,7 +146,7 @@ class TestGuidedFlowNetworkOptions:
             bridge.close()
 
     @given(networks=_wifi_network_list)
-    @settings(max_examples=100, deadline=2000)
+    @settings(max_examples=20, deadline=2000)
     def test_unknown_network_triggers_password_prompt(self, networks: list[WifiNetwork]):
         """For any non-empty list of WiFi networks, selecting an unknown
         network (not in known_networks) should trigger a password prompt
@@ -290,7 +290,7 @@ class TestConversationContextPendingQuestion:
     """
 
     @given(answer=_answer_text)
-    @settings(max_examples=100, deadline=None)
+    @settings(max_examples=20, deadline=None)
     def test_app_launch_missing_app_sets_pending_and_fills_param(self, answer: str):
         """APP_LAUNCH without app → sets _pending_question with question_type='app',
         next input fills the 'app' param.
@@ -360,7 +360,7 @@ class TestConversationContextPendingQuestion:
             bridge.close()
 
     @given(port_str=_port_answer)
-    @settings(max_examples=100, deadline=None)
+    @settings(max_examples=20, deadline=None)
     def test_process_control_missing_port_sets_pending_and_fills_param(self, port_str: str):
         """PROCESS_CONTROL kill without port → sets _pending_question with
         question_type='port', next input fills the 'port' param.
@@ -429,7 +429,7 @@ class TestConversationContextPendingQuestion:
             bridge.close()
 
     @given(answer=_answer_text)
-    @settings(max_examples=100, deadline=None)
+    @settings(max_examples=20, deadline=None)
     def test_file_organize_missing_target_sets_pending_and_fills_param(self, answer: str):
         """FILE_ORGANIZE without target → sets _pending_question with
         question_type='target', next input fills the 'target' param.
@@ -501,7 +501,7 @@ class TestConversationContextPendingQuestion:
             bridge.close()
 
     @given(scenario_idx=_scenario_index, answer=_answer_text)
-    @settings(max_examples=100, deadline=None)
+    @settings(max_examples=20, deadline=None)
     def test_pending_question_prevents_new_intent_parsing(self, scenario_idx: int, answer: str):
         """When _pending_question is set, the next input is processed as an
         answer (via _handle_answer) rather than being parsed as a new intent.

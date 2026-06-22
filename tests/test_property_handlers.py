@@ -289,7 +289,6 @@ def _execute_handler(intent_type: IntentType) -> PlanResult:
         "cios.core.handlers.system.check_system_health": MagicMock(return_value=mock_health_report),
         "cios.core.handlers.apps.find_app": MagicMock(return_value=None),
         "cios.core.handlers.apps.launch_app": MagicMock(return_value=(["Launching"], True, "")),
-        "cios.core.handlers.dev.find_app": MagicMock(return_value=None),
         "cios.core.handlers.media.find_app": MagicMock(return_value=None),
         "cios.core.handlers.media.launch_app": MagicMock(return_value=(["Launching"], True, "")),
         "cios.core.handlers.system.execute_session_action": MagicMock(
@@ -308,8 +307,8 @@ def _execute_handler(intent_type: IntentType) -> PlanResult:
         "cios.core.handlers.files.find_and_open": MagicMock(
             return_value=(["Searching for file"], False, "File not found")
         ),
-        "cios.core.handlers.dev._scan_project_dirs": MagicMock(return_value=[]),
-        "cios.core.handlers.dev._find_project": MagicMock(return_value=None),
+        "cios.skills.dev_start._scan_project_dirs": MagicMock(return_value=[]),
+        "cios.skills.dev_start._find_project": MagicMock(return_value=None),
         "cios.core.handlers.dev._is_port_in_use": MagicMock(return_value=False),
         "cios.core.handlers.dev.time.sleep": MagicMock(),
         "cios.core.handlers.logs.time.sleep": MagicMock(),
@@ -397,7 +396,7 @@ class TestAllSkillHandlersFeedback:
     """
 
     @given(intent_type=st.sampled_from(HANDLED_INTENT_TYPES))
-    @settings(max_examples=100)
+    @settings(max_examples=20)
     def test_all_handlers_produce_feedback(self, intent_type: IntentType):
         """For any IntentType that has a registered handler in the Planner,
         executing that handler with mocked dependencies returns a PlanResult

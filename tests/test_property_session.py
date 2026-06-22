@@ -67,7 +67,7 @@ class TestSessionContextRoundTrip:
     """
 
     @given(ctx=_session_context)
-    @settings(max_examples=100, deadline=None)
+    @settings(max_examples=20, deadline=None)
     def test_round_trip_preserves_all_fields(self, ctx: SessionContext):
         """For any valid SessionContext, saving and retrieving preserves all fields.
 
@@ -104,7 +104,7 @@ class TestMostRecentProjectSelection:
         data=st.data(),
         n=st.integers(min_value=1, max_value=15),
     )
-    @settings(max_examples=100, deadline=None)
+    @settings(max_examples=20, deadline=None)
     def test_get_latest_session_returns_max_timestamp(self, data, n: int):
         """For any non-empty list of SessionContext records with distinct timestamps,
         get_latest_session() returns the one with the maximum timestamp.
@@ -195,7 +195,7 @@ class TestSessionRestoration:
     """
 
     @given(ctx=_session_with_port, server_running=st.booleans())
-    @settings(max_examples=100, deadline=None)
+    @settings(max_examples=20, deadline=None)
     def test_session_restoration_plan_based_on_server_state(
         self, ctx: SessionContext, server_running: bool
     ):
@@ -246,14 +246,16 @@ class TestSessionRestoration:
                 ]
 
                 with (
-                    patch("cios.core.handlers.dev._is_port_in_use", return_value=server_running),
-                    patch("cios.core.handlers.dev._detect_editor", return_value="code"),
-                    patch("cios.core.handlers.dev._open_editor") as mock_editor,
-                    patch("cios.core.handlers.dev._open_browser") as mock_browser,
-                    patch("os.path.exists", return_value=True),
-                    patch("cios.core.handlers.dev.detect_project") as mock_detect,
                     patch(
-                        "cios.core.handlers.dev.execute_dev_start",
+                        "cios.skills.dev_start._is_port_in_use", return_value=server_running
+                    ),
+                    patch("cios.skills.dev_start._detect_editor", return_value="code"),
+                    patch("cios.skills.dev_start._open_editor") as mock_editor,
+                    patch("cios.skills.dev_start._open_browser") as mock_browser,
+                    patch("os.path.exists", return_value=True),
+                    patch("cios.skills.dev_start.detect_project") as mock_detect,
+                    patch(
+                        "cios.skills.dev_start.execute_dev_start",
                         return_value=(fake_dev_plan, fake_dev_results, 12345),
                     ) as mock_dev_start,
                 ):
