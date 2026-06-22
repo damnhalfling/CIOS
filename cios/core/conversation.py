@@ -196,6 +196,7 @@ class ConversationManager:
         """
         intent = question.intent
         flow_steps = question.flow_steps
+        assert flow_steps is not None  # caller checks this before calling
         collected = dict(question.flow_collected)
 
         # Determine which step we're answering

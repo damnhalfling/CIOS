@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 
 from cios.core.intent_types import IntentType
 
-RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
+RULES: list[tuple[re.Pattern, IntentType, Callable | None, float]] = [
     # --- greetings (PT + EN) — instant response, no LLM needed ---
     (
         re.compile(

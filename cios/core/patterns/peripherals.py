@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 
 from cios.core.intent_types import IntentType, _normalize_position
 
-RULES: list[tuple[re.Pattern, IntentType, callable | None, float]] = [
+RULES: list[tuple[re.Pattern, IntentType, Callable | None, float]] = [
     # --- bluetooth (PT + EN) — MUST be before network, session, status, package ---
     (
         re.compile(
