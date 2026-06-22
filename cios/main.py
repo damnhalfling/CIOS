@@ -10,6 +10,7 @@ Modes:
 """
 
 import logging
+import os
 import sys
 
 from cios.core.config import LOG_DIR, ensure_dirs
@@ -113,6 +114,15 @@ def main() -> None:
         return
 
     # Native GUI (default) — try GTK4 first (Wayland-native), fallback to Tkinter
+    # Auto-detect WAYLAND_DISPLAY if running inside cios-shell (compositor sets
+    # the socket but doesn't always export the env var to child processes)
+    if not os.environ.get("WAYLAND_DISPLAY"):
+        runtime_dir = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+        for candidate in ("wayland-0", "wayland-1"):
+            if os.path.exists(os.path.join(runtime_dir, candidate)):
+                os.environ["WAYLAND_DISPLAY"] = candidate
+                break
+
     try:
         import gi
 
