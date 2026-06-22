@@ -550,7 +550,12 @@ class CIOSBridge:
         Steps execute asynchronously with progress updates.
         Delegates entirely to PlanExecutor.
         """
-        result = self._plan_executor.execute(steps, explanation, password=sudo_password)
+        # Use sync execution for simple plans (<=3 steps, no sudo needed)
+        needs_root = any(self._privilege.needs_elevation(s) for s in steps)
+        if len(steps) <= 3 and not needs_root and not sudo_password:
+            result = self._plan_executor.execute_sync(steps, explanation, password=sudo_password)
+        else:
+            result = self._plan_executor.execute(steps, explanation, password=sudo_password)
 
         return {
             "steps": result.steps or [f"⟳ {explanation[:60]}"],
