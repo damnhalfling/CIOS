@@ -557,9 +557,16 @@ class CIOSBridge:
         else:
             result = self._plan_executor.execute(steps, explanation, password=sudo_password)
 
+        # For sync results, show actual command output
+        if result.status in ("success", "error") and result.step_results:
+            output_parts = [r.output for r in result.step_results if r.output]
+            display_result = "\n".join(output_parts) if output_parts else result.summary
+        else:
+            display_result = result.summary or f"Executando: {explanation[:80]}"
+
         return {
             "steps": result.steps or [f"⟳ {explanation[:60]}"],
-            "result": result.summary or f"Executando: {explanation[:80]}",
+            "result": display_result,
             "status": result.status,
             "confirm": None,
             "voice_mode": "brief",
@@ -917,13 +924,13 @@ class CIOSBridge:
                     else:
                         # Ambiguous — ask user
                         self._thread_manager.set_pending_question(
-                        PendingQuestion(
-                            intent=intent,
-                            question_type="choice",
-                            options=["audio", "disco"],
-                            timestamp=time.time(),
+                            PendingQuestion(
+                                intent=intent,
+                                question_type="choice",
+                                options=["audio", "disco"],
+                                timestamp=time.time(),
+                            )
                         )
-                    )
                     return {
                         "steps": [],
                         "result": "Volume de áudio ou espaço em disco?",
@@ -1321,7 +1328,11 @@ class CIOSBridge:
                 logger.info("Intelligence resolved: os_command=%s", cmd.get("intent"))
 
                 # Execution plan: sequential shell steps with confirmation
-                if cmd.get("intent") == "execution_plan" or cmd.get("type") == "plan" or cmd.get("steps"):
+                if (
+                    cmd.get("intent") == "execution_plan"
+                    or cmd.get("type") == "plan"
+                    or cmd.get("steps")
+                ):
                     return self._execute_plan_steps(cmd, user_input)
 
                 # Multi-step execution loop
