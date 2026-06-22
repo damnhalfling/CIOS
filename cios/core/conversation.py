@@ -472,9 +472,7 @@ class ConversationManager:
             pattern = re.compile(r"\b" + re.escape(pronoun) + r"\b", re.IGNORECASE)
             if pattern.search(result):
                 result = pattern.sub(obj, result, count=1)
-                logger.debug(
-                    "Pronoun resolved: '%s' → '%s' (object: %s)", user_input, result, obj
-                )
+                logger.debug("Pronoun resolved: '%s' → '%s' (object: %s)", user_input, result, obj)
                 break
 
         return result

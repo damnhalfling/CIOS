@@ -1110,9 +1110,7 @@ class CIOSBridge:
                     cmd_type = IntentType.UNKNOWN
                 params = cmd.get("params", {})
                 params["_display_mode"] = cmd.get("display_mode", "foreground")
-                exec_intent = Intent(
-                    type=cmd_type, params=params, raw_input=answer, confidence=1.0
-                )
+                exec_intent = Intent(type=cmd_type, params=params, raw_input=answer, confidence=1.0)
                 plan_result = self._execute_with_retry(exec_intent)
                 steps, summary, outcome, voice_mode = humanize_result(plan_result)
                 prev_steps = intent.params.get("_steps_done", [])

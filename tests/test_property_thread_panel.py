@@ -144,9 +144,9 @@ class TestThreadEntryRenderingCompleteness:
         """
         result = _format_timestamp(thread.created_at)
         assert isinstance(result, str), f"Expected str, got {type(result).__name__}"
-        assert len(result) > 0, (
-            f"Timestamp formatting produced empty string for ts={thread.created_at}"
-        )
+        assert (
+            len(result) > 0
+        ), f"Timestamp formatting produced empty string for ts={thread.created_at}"
 
     @given(outcome=_outcome)
     @settings(max_examples=30, deadline=None)
@@ -193,9 +193,9 @@ class TestThreadEntryRenderingCompleteness:
 
         # 2. Formatted timestamp is non-empty
         timestamp_str = _format_timestamp(thread.created_at)
-        assert timestamp_str and len(timestamp_str) > 0, (
-            f"Empty timestamp for thread {thread.id} (ts={thread.created_at})"
-        )
+        assert (
+            timestamp_str and len(timestamp_str) > 0
+        ), f"Empty timestamp for thread {thread.id} (ts={thread.created_at})"
 
         # 3. Outcome status indicator is valid
         outcome = thread.outcome or ""
@@ -204,6 +204,6 @@ class TestThreadEntryRenderingCompleteness:
 
         # 4. Outcome color is valid (non-empty hex color)
         color = _OUTCOME_COLORS.get(outcome, "#6b7280")
-        assert color.startswith("#") and len(color) == 7, (
-            f"Invalid outcome color for thread {thread.id}: {color!r}"
-        )
+        assert (
+            color.startswith("#") and len(color) == 7
+        ), f"Invalid outcome color for thread {thread.id}: {color!r}"

@@ -121,16 +121,16 @@ class TestGuidedFlowNetworkOptions:
                 result = bridge.execute_command("conectar wifi")
 
             # The response should be successful (it's a clarification, not an error)
-            assert result["status"] == "success", (
-                f"Expected success status, got '{result['status']}'"
-            )
+            assert (
+                result["status"] == "success"
+            ), f"Expected success status, got '{result['status']}'"
 
             # All SSIDs should appear in the response text
             response_text = result["result"]
             for net in networks:
-                assert net.ssid in response_text, (
-                    f"SSID '{net.ssid}' not found in response: {response_text}"
-                )
+                assert (
+                    net.ssid in response_text
+                ), f"SSID '{net.ssid}' not found in response: {response_text}"
 
             # A pending question should be set with flow_steps
             pq = bridge._pending_question
@@ -139,9 +139,9 @@ class TestGuidedFlowNetworkOptions:
 
             # The options in the pending question should contain all SSIDs
             expected_ssids = [n.ssid for n in networks]
-            assert pq.options == expected_ssids, (
-                f"Expected options {expected_ssids}, got {pq.options}"
-            )
+            assert (
+                pq.options == expected_ssids
+            ), f"Expected options {expected_ssids}, got {pq.options}"
         finally:
             bridge.close()
 
@@ -180,9 +180,9 @@ class TestGuidedFlowNetworkOptions:
 
             # The password step should be of type "password"
             pw_step = password_steps[0]
-            assert pw_step.question_type == "password", (
-                f"Expected password step type 'password', got '{pw_step.question_type}'"
-            )
+            assert (
+                pw_step.question_type == "password"
+            ), f"Expected password step type 'password', got '{pw_step.question_type}'"
 
             # Step 2: Answer with the first SSID (unknown network → should ask password)
             first_ssid = networks[0].ssid
@@ -314,12 +314,12 @@ class TestConversationContextPendingQuestion:
                 result = bridge.execute_command("abrir")
 
             # 1. _pending_question should be set
-            assert bridge._pending_question is not None, (
-                "Expected _pending_question to be set for APP_LAUNCH without app"
-            )
-            assert bridge._pending_question.question_type == "app", (
-                f"Expected question_type='app', got '{bridge._pending_question.question_type}'"
-            )
+            assert (
+                bridge._pending_question is not None
+            ), "Expected _pending_question to be set for APP_LAUNCH without app"
+            assert (
+                bridge._pending_question.question_type == "app"
+            ), f"Expected question_type='app', got '{bridge._pending_question.question_type}'"
 
             # 2. Next input should be processed as an answer, not a new intent
             # Mock the planner execution to capture what intent gets executed
@@ -345,17 +345,17 @@ class TestConversationContextPendingQuestion:
                 result2 = bridge.execute_command(answer)
 
             # 3. The answer should have filled the 'app' param
-            assert len(executed_intents) == 1, (
-                f"Expected exactly 1 intent execution, got {len(executed_intents)}"
-            )
-            assert executed_intents[0].params.get("app") == answer, (
-                f"Expected app='{answer}', got '{executed_intents[0].params.get('app')}'"
-            )
+            assert (
+                len(executed_intents) == 1
+            ), f"Expected exactly 1 intent execution, got {len(executed_intents)}"
+            assert (
+                executed_intents[0].params.get("app") == answer
+            ), f"Expected app='{answer}', got '{executed_intents[0].params.get('app')}'"
 
             # 4. _pending_question should be cleared after answering
-            assert bridge._pending_question is None, (
-                "Expected _pending_question to be None after answer was processed"
-            )
+            assert (
+                bridge._pending_question is None
+            ), "Expected _pending_question to be None after answer was processed"
         finally:
             bridge.close()
 
@@ -383,12 +383,12 @@ class TestConversationContextPendingQuestion:
                 result = bridge.execute_command("matar processo")
 
             # 1. _pending_question should be set
-            assert bridge._pending_question is not None, (
-                "Expected _pending_question to be set for PROCESS_CONTROL without port"
-            )
-            assert bridge._pending_question.question_type == "port", (
-                f"Expected question_type='port', got '{bridge._pending_question.question_type}'"
-            )
+            assert (
+                bridge._pending_question is not None
+            ), "Expected _pending_question to be set for PROCESS_CONTROL without port"
+            assert (
+                bridge._pending_question.question_type == "port"
+            ), f"Expected question_type='port', got '{bridge._pending_question.question_type}'"
 
             # 2. Next input should be processed as an answer
             executed_intents = []
@@ -413,18 +413,18 @@ class TestConversationContextPendingQuestion:
                 result2 = bridge.execute_command(port_str)
 
             # 3. The answer should have filled the 'port' param as an integer
-            assert len(executed_intents) == 1, (
-                f"Expected exactly 1 intent execution, got {len(executed_intents)}"
-            )
+            assert (
+                len(executed_intents) == 1
+            ), f"Expected exactly 1 intent execution, got {len(executed_intents)}"
             expected_port = int(port_str)
-            assert executed_intents[0].params.get("port") == expected_port, (
-                f"Expected port={expected_port}, got '{executed_intents[0].params.get('port')}'"
-            )
+            assert (
+                executed_intents[0].params.get("port") == expected_port
+            ), f"Expected port={expected_port}, got '{executed_intents[0].params.get('port')}'"
 
             # 4. _pending_question should be cleared
-            assert bridge._pending_question is None, (
-                "Expected _pending_question to be None after answer was processed"
-            )
+            assert (
+                bridge._pending_question is None
+            ), "Expected _pending_question to be None after answer was processed"
         finally:
             bridge.close()
 
@@ -452,12 +452,12 @@ class TestConversationContextPendingQuestion:
                 result = bridge.execute_command("organizar")
 
             # 1. _pending_question should be set
-            assert bridge._pending_question is not None, (
-                "Expected _pending_question to be set for FILE_ORGANIZE without target"
-            )
-            assert bridge._pending_question.question_type == "target", (
-                f"Expected question_type='target', got '{bridge._pending_question.question_type}'"
-            )
+            assert (
+                bridge._pending_question is not None
+            ), "Expected _pending_question to be set for FILE_ORGANIZE without target"
+            assert (
+                bridge._pending_question.question_type == "target"
+            ), f"Expected question_type='target', got '{bridge._pending_question.question_type}'"
 
             # 2. Next input should be processed as an answer, not a new intent
             # For FILE_ORGANIZE, after filling target, it needs confirmation.
@@ -486,17 +486,17 @@ class TestConversationContextPendingQuestion:
                 result2 = bridge.execute_command(answer)
 
             # 3. The answer should have filled the 'target' param
-            assert len(executed_intents) == 1, (
-                f"Expected exactly 1 intent execution, got {len(executed_intents)}"
-            )
-            assert executed_intents[0].params.get("target") == answer, (
-                f"Expected target='{answer}', got '{executed_intents[0].params.get('target')}'"
-            )
+            assert (
+                len(executed_intents) == 1
+            ), f"Expected exactly 1 intent execution, got {len(executed_intents)}"
+            assert (
+                executed_intents[0].params.get("target") == answer
+            ), f"Expected target='{answer}', got '{executed_intents[0].params.get('target')}'"
 
             # 4. _pending_question should be cleared
-            assert bridge._pending_question is None, (
-                "Expected _pending_question to be None after answer was processed"
-            )
+            assert (
+                bridge._pending_question is None
+            ), "Expected _pending_question to be None after answer was processed"
         finally:
             bridge.close()
 
@@ -524,9 +524,9 @@ class TestConversationContextPendingQuestion:
             ):
                 bridge.execute_command(intent.raw_input)
 
-            assert bridge._pending_question is not None, (
-                f"Scenario '{scenario_name}': expected _pending_question to be set"
-            )
+            assert (
+                bridge._pending_question is not None
+            ), f"Scenario '{scenario_name}': expected _pending_question to be set"
 
             # Step 2: Send the answer — parse_intent should NOT be called
             parse_intent_calls = []

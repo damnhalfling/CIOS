@@ -246,9 +246,7 @@ class TestSessionRestoration:
                 ]
 
                 with (
-                    patch(
-                        "cios.skills.dev_start._is_port_in_use", return_value=server_running
-                    ),
+                    patch("cios.skills.dev_start._is_port_in_use", return_value=server_running),
                     patch("cios.skills.dev_start._detect_editor", return_value="code"),
                     patch("cios.skills.dev_start._open_editor") as mock_editor,
                     patch("cios.skills.dev_start._open_browser") as mock_browser,
@@ -281,18 +279,18 @@ class TestSessionRestoration:
                     mock_dev_start.assert_called_once()
 
                 # (c) Always includes editor open
-                assert "editor" in plan_text, (
-                    f"Expected editor step in plan, got: {result.plan_steps}"
-                )
+                assert (
+                    "editor" in plan_text
+                ), f"Expected editor step in plan, got: {result.plan_steps}"
 
                 # (d) Always includes browser open
-                assert "browser" in plan_text, (
-                    f"Expected browser step in plan, got: {result.plan_steps}"
-                )
+                assert (
+                    "browser" in plan_text
+                ), f"Expected browser step in plan, got: {result.plan_steps}"
 
                 # Outcome should be success
-                assert result.outcome == "success", (
-                    f"Expected success outcome, got: {result.outcome} (error: {result.error})"
-                )
+                assert (
+                    result.outcome == "success"
+                ), f"Expected success outcome, got: {result.outcome} (error: {result.error})"
             finally:
                 mem.close()

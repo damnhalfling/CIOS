@@ -107,52 +107,52 @@ class TestThreadPersistenceRoundTrip:
 
             # Verify all persisted fields match
             assert retrieved.id == thread.id, f"ID mismatch: {retrieved.id!r} != {thread.id!r}"
-            assert retrieved.created_at == thread.created_at, (
-                f"created_at mismatch: {retrieved.created_at} != {thread.created_at}"
-            )
-            assert retrieved.closed_at == thread.closed_at, (
-                f"closed_at mismatch: {retrieved.closed_at} != {thread.closed_at}"
-            )
-            assert retrieved.summary == thread.summary, (
-                f"summary mismatch: {retrieved.summary!r} != {thread.summary!r}"
-            )
-            assert retrieved.status == thread.status, (
-                f"status mismatch: {retrieved.status!r} != {thread.status!r}"
-            )
-            assert retrieved.dominant_intent == thread.dominant_intent, (
-                f"dominant_intent mismatch: {retrieved.dominant_intent!r} != {thread.dominant_intent!r}"
-            )
-            assert retrieved.outcome == thread.outcome, (
-                f"outcome mismatch: {retrieved.outcome!r} != {thread.outcome!r}"
-            )
+            assert (
+                retrieved.created_at == thread.created_at
+            ), f"created_at mismatch: {retrieved.created_at} != {thread.created_at}"
+            assert (
+                retrieved.closed_at == thread.closed_at
+            ), f"closed_at mismatch: {retrieved.closed_at} != {thread.closed_at}"
+            assert (
+                retrieved.summary == thread.summary
+            ), f"summary mismatch: {retrieved.summary!r} != {thread.summary!r}"
+            assert (
+                retrieved.status == thread.status
+            ), f"status mismatch: {retrieved.status!r} != {thread.status!r}"
+            assert (
+                retrieved.dominant_intent == thread.dominant_intent
+            ), f"dominant_intent mismatch: {retrieved.dominant_intent!r} != {thread.dominant_intent!r}"
+            assert (
+                retrieved.outcome == thread.outcome
+            ), f"outcome mismatch: {retrieved.outcome!r} != {thread.outcome!r}"
 
             # Verify turns count
-            assert len(retrieved.turns) == len(thread.turns), (
-                f"turns count mismatch: {len(retrieved.turns)} != {len(thread.turns)}"
-            )
+            assert len(retrieved.turns) == len(
+                thread.turns
+            ), f"turns count mismatch: {len(retrieved.turns)} != {len(thread.turns)}"
 
             # Verify each turn's fields
             for i, (orig_turn, ret_turn) in enumerate(
                 zip(thread.turns, retrieved.turns, strict=False)
             ):
-                assert ret_turn.user_input == orig_turn.user_input, (
-                    f"Turn {i} user_input mismatch: {ret_turn.user_input!r} != {orig_turn.user_input!r}"
-                )
-                assert ret_turn.intent_type == orig_turn.intent_type, (
-                    f"Turn {i} intent_type mismatch: {ret_turn.intent_type!r} != {orig_turn.intent_type!r}"
-                )
-                assert ret_turn.params == orig_turn.params, (
-                    f"Turn {i} params mismatch: {ret_turn.params!r} != {orig_turn.params!r}"
-                )
-                assert ret_turn.result_summary == orig_turn.result_summary, (
-                    f"Turn {i} result_summary mismatch: {ret_turn.result_summary!r} != {orig_turn.result_summary!r}"
-                )
-                assert ret_turn.outcome == orig_turn.outcome, (
-                    f"Turn {i} outcome mismatch: {ret_turn.outcome!r} != {orig_turn.outcome!r}"
-                )
-                assert ret_turn.timestamp == orig_turn.timestamp, (
-                    f"Turn {i} timestamp mismatch: {ret_turn.timestamp} != {orig_turn.timestamp}"
-                )
+                assert (
+                    ret_turn.user_input == orig_turn.user_input
+                ), f"Turn {i} user_input mismatch: {ret_turn.user_input!r} != {orig_turn.user_input!r}"
+                assert (
+                    ret_turn.intent_type == orig_turn.intent_type
+                ), f"Turn {i} intent_type mismatch: {ret_turn.intent_type!r} != {orig_turn.intent_type!r}"
+                assert (
+                    ret_turn.params == orig_turn.params
+                ), f"Turn {i} params mismatch: {ret_turn.params!r} != {orig_turn.params!r}"
+                assert (
+                    ret_turn.result_summary == orig_turn.result_summary
+                ), f"Turn {i} result_summary mismatch: {ret_turn.result_summary!r} != {orig_turn.result_summary!r}"
+                assert (
+                    ret_turn.outcome == orig_turn.outcome
+                ), f"Turn {i} outcome mismatch: {ret_turn.outcome!r} != {orig_turn.outcome!r}"
+                assert (
+                    ret_turn.timestamp == orig_turn.timestamp
+                ), f"Turn {i} timestamp mismatch: {ret_turn.timestamp} != {orig_turn.timestamp}"
         finally:
             store.close()
 
@@ -212,9 +212,9 @@ class TestStorageLimitInvariant:
 
             # Verify stored count does not exceed 50
             stored = store.get_by_date_range(0.0, 3_000_000_000.0)
-            assert len(stored) <= 50, (
-                f"Storage limit violated: {len(stored)} threads stored, expected <= 50"
-            )
+            assert (
+                len(stored) <= 50
+            ), f"Storage limit violated: {len(stored)} threads stored, expected <= 50"
         finally:
             store.close()
 
@@ -511,9 +511,9 @@ class TestCloudSyncPayloadSanitization:
 
             # Verify "params" does NOT appear anywhere in the payload
             payload_json = json.dumps(payload)
-            assert '"params"' not in payload_json, (
-                "Payload contains 'params' key which should be excluded"
-            )
+            assert (
+                '"params"' not in payload_json
+            ), "Payload contains 'params' key which should be excluded"
 
             # Verify sensitive values from params do NOT appear in the serialized payload
             for turn in thread.turns:

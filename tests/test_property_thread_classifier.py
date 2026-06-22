@@ -136,9 +136,9 @@ class TestContinuationSignalsProduceContinue:
         """
         classifier = ThreadClassifier()
         result = classifier.classify(user_input, active_thread)
-        assert result == Classification.CONTINUE, (
-            f"Expected CONTINUE for input with pronoun: {user_input!r}, got {result}"
-        )
+        assert (
+            result == Classification.CONTINUE
+        ), f"Expected CONTINUE for input with pronoun: {user_input!r}, got {result}"
 
     @given(
         user_input=_input_with_continuation_phrase,
@@ -152,9 +152,9 @@ class TestContinuationSignalsProduceContinue:
         """
         classifier = ThreadClassifier()
         result = classifier.classify(user_input, active_thread)
-        assert result == Classification.CONTINUE, (
-            f"Expected CONTINUE for input with continuation phrase: {user_input!r}, got {result}"
-        )
+        assert (
+            result == Classification.CONTINUE
+        ), f"Expected CONTINUE for input with continuation phrase: {user_input!r}, got {result}"
 
     @given(
         user_input=_input_with_signal,
@@ -168,6 +168,6 @@ class TestContinuationSignalsProduceContinue:
         """
         classifier = ThreadClassifier()
         result = classifier.classify(user_input, active_thread)
-        assert result == Classification.CONTINUE, (
-            f"Expected CONTINUE for input with signal: {user_input!r}, got {result}"
-        )
+        assert (
+            result == Classification.CONTINUE
+        ), f"Expected CONTINUE for input with signal: {user_input!r}, got {result}"
