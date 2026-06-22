@@ -104,14 +104,12 @@ class TestThreadSafetyConcurrentReads:
                     # Result must never be None
                     assert result is not None, "get_installed_apps() returned None"
                     # Result must be a list
-                    assert isinstance(result, list), (
-                        f"get_installed_apps() returned {type(result)}, expected list"
-                    )
+                    assert isinstance(
+                        result, list
+                    ), f"get_installed_apps() returned {type(result)}, expected list"
                     # Every element must be a complete AppInfo (not partially constructed)
                     for item in result:
-                        assert isinstance(item, AppInfo), (
-                            f"Expected AppInfo, got {type(item)}"
-                        )
+                        assert isinstance(item, AppInfo), f"Expected AppInfo, got {type(item)}"
                         assert item.name is not None, "AppInfo.name is None"
                         assert item.exec_command is not None, "AppInfo.exec_command is None"
                     with results_lock:
@@ -128,9 +126,9 @@ class TestThreadSafetyConcurrentReads:
                     result = find_app(query)
                     # find_app can return None (no match) but should never raise
                     if result is not None:
-                        assert isinstance(result, AppInfo), (
-                            f"find_app() returned {type(result)}, expected AppInfo or None"
-                        )
+                        assert isinstance(
+                            result, AppInfo
+                        ), f"find_app() returned {type(result)}, expected AppInfo or None"
                         assert result.name is not None, "AppInfo.name is None from find_app()"
                     with results_lock:
                         results.append(result)
@@ -204,16 +202,14 @@ class TestThreadSafetyConcurrentReads:
                     if op == "read_all":
                         result = get_installed_apps()
                         assert result is not None, "get_installed_apps() returned None"
-                        assert isinstance(result, list), (
-                            f"Expected list, got {type(result)}"
-                        )
+                        assert isinstance(result, list), f"Expected list, got {type(result)}"
                         # Validate list is not partially constructed:
                         # length must be 0 (not yet loaded) or equal to len(apps)
                         if len(result) > 0:
                             for item in result:
-                                assert isinstance(item, AppInfo), (
-                                    f"Partial data: got {type(item)} in list"
-                                )
+                                assert isinstance(
+                                    item, AppInfo
+                                ), f"Partial data: got {type(item)} in list"
                     elif op == "find":
                         query = apps[0].name if apps else "x"
                         result = find_app(query)
@@ -235,13 +231,10 @@ class TestThreadSafetyConcurrentReads:
                 futures = [executor.submit(execute_op, op) for op in operations]
                 concurrent.futures.wait(futures)
 
-            assert len(errors) == 0, (
-                f"Exceptions during concurrent operations: {[str(e) for e in errors]}"
-            )
-            assert len(invalid_results) == 0, (
-                f"Invalid/partial data returned: {invalid_results}"
-            )
-
+            assert (
+                len(errors) == 0
+            ), f"Exceptions during concurrent operations: {[str(e) for e in errors]}"
+            assert len(invalid_results) == 0, f"Invalid/partial data returned: {invalid_results}"
 
 
 # --- Property 1: Filtro de extensão .desktop ---
@@ -267,13 +260,13 @@ class TestDesktopExtensionFilter:
         watcher._on_event(filename)
 
         if filename.endswith(".desktop"):
-            assert watcher._reset_debounce.called, (
-                f"Expected _reset_debounce to be called for '{filename}'"
-            )
+            assert (
+                watcher._reset_debounce.called
+            ), f"Expected _reset_debounce to be called for '{filename}'"
         else:
-            assert not watcher._reset_debounce.called, (
-                f"Expected _reset_debounce NOT to be called for '{filename}'"
-            )
+            assert (
+                not watcher._reset_debounce.called
+            ), f"Expected _reset_debounce NOT to be called for '{filename}'"
 
     @given(base=st.text(min_size=0, max_size=100))
     @settings(max_examples=100, deadline=None)
@@ -289,9 +282,9 @@ class TestDesktopExtensionFilter:
         filename = base + ".desktop"
         watcher._on_event(filename)
 
-        assert watcher._reset_debounce.called, (
-            f"Expected _reset_debounce to be called for '{filename}'"
-        )
+        assert (
+            watcher._reset_debounce.called
+        ), f"Expected _reset_debounce to be called for '{filename}'"
 
 
 # --- Property 2: Resiliência a diretórios inexistentes ---
@@ -337,9 +330,7 @@ class TestDirectoryResilience:
 
         with (
             patch.object(AppWatcher, "WATCHED_DIRS", dirs),
-            patch(
-                "cios.core.app_watcher._inotify_init", return_value=999
-            ),
+            patch("cios.core.app_watcher._inotify_init", return_value=999),
             patch(
                 "cios.core.app_watcher._inotify_add_watch",
                 side_effect=fake_inotify_add_watch,
@@ -351,9 +342,7 @@ class TestDirectoryResilience:
             watcher.start()
 
             # Verify watches were added only for existing directories
-            expected_watched = [
-                str(dirs[i]) for i, exists in enumerate(dir_exists) if exists
-            ]
+            expected_watched = [str(dirs[i]) for i, exists in enumerate(dir_exists) if exists]
             assert sorted(watched_dirs) == sorted(expected_watched), (
                 f"Expected watches on {expected_watched}, got {watched_dirs}. "
                 f"dir_exists={dir_exists}"
@@ -409,9 +398,7 @@ class TestDebounceCorrectness:
             watcher._debounce_timer = None
             watcher._debounce_lock = threading.Lock()
 
-            with patch(
-                "cios.skills.app_launcher.invalidate_app_cache"
-            ) as mock_invalidate:
+            with patch("cios.skills.app_launcher.invalidate_app_cache") as mock_invalidate:
                 # Fire events at each interval
                 for interval in intervals:
                     watcher._on_event("test.desktop")

@@ -104,9 +104,7 @@ def _parse_events(buffer: bytes) -> list[tuple[int, int, str]]:
 
         if length > 0:
             name = (
-                buffer[offset : offset + length]
-                .rstrip(b"\x00")
-                .decode("utf-8", errors="replace")
+                buffer[offset : offset + length].rstrip(b"\x00").decode("utf-8", errors="replace")
             )
             events.append((wd, mask, name))
 
@@ -215,9 +213,7 @@ class AppWatcher:
         """
         while self._running:
             try:
-                readable, _, _ = select.select(
-                    [self._inotify_fd], [], [], 1.0
-                )
+                readable, _, _ = select.select([self._inotify_fd], [], [], 1.0)
             except (OSError, ValueError):
                 # fd foi fechado (stop() chamado) ou inválido
                 break
@@ -261,9 +257,7 @@ class AppWatcher:
         with self._debounce_lock:
             if self._debounce_timer is not None:
                 self._debounce_timer.cancel()
-            self._debounce_timer = threading.Timer(
-                self.DEBOUNCE_SECONDS, self._on_debounce_expire
-            )
+            self._debounce_timer = threading.Timer(self.DEBOUNCE_SECONDS, self._on_debounce_expire)
             self._debounce_timer.daemon = True
             self._debounce_timer.start()
 
