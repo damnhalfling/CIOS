@@ -906,8 +906,12 @@ class CIOSBridge:
                 has_disk_context = any(w in raw for w in disk_words)
 
                 if not has_audio_context and not has_disk_context:
-                    # Ambiguous — ask user
-                    self._thread_manager.set_pending_question(
+                    # Skip ambiguity if parser already confident (>= 0.9)
+                    if intent.type == IntentType.AUDIO and intent.confidence >= 0.9:
+                        pass  # Parser is confident — no ambiguity needed
+                    else:
+                        # Ambiguous — ask user
+                        self._thread_manager.set_pending_question(
                         PendingQuestion(
                             intent=intent,
                             question_type="choice",
@@ -1312,7 +1316,7 @@ class CIOSBridge:
                 logger.info("Intelligence resolved: os_command=%s", cmd.get("intent"))
 
                 # Execution plan: sequential shell steps with confirmation
-                if cmd.get("intent") == "execution_plan" or cmd.get("type") == "plan":
+                if cmd.get("intent") == "execution_plan" or cmd.get("type") == "plan" or cmd.get("steps"):
                     return self._execute_plan_steps(cmd, user_input)
 
                 # Multi-step execution loop
