@@ -6,7 +6,6 @@ Feature: app-watcher
 import concurrent.futures
 import tempfile
 import threading
-import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -367,57 +366,63 @@ class TestDebounceCorrectness:
     """
 
     @given(
-        intervals=st.lists(
-            st.floats(min_value=0.001, max_value=0.05),
-            min_size=1,
-            max_size=10,
-        ),
+        num_events=st.integers(min_value=1, max_value=50),
     )
     @settings(max_examples=100, deadline=None)
     def test_single_rescan_after_burst_of_events(
         self,
-        intervals: list[float],
+        num_events: int,
     ):
-        """For any sequence of N events (N >= 1) where all occur with less than
-        2 second intervals between them, followed by at least 2 seconds of silence,
-        the number of rescans triggered must be exactly 1.
+        """For any number of rapid .desktop events, the debounce mechanism must
+        cancel previous timers and only the last timer fires — resulting in
+        exactly 1 call to invalidate_app_cache.
+
+        This test verifies the debounce logic without real sleeps by directly
+        invoking the timer callback after all events are fired.
 
         **Validates: Requirements 2.1, 2.2, 2.3, 2.4**
         """
-        # Use a very short debounce to keep tests fast
-        original_debounce = AppWatcher.DEBOUNCE_SECONDS
-        AppWatcher.DEBOUNCE_SECONDS = 0.1
+        watcher = AppWatcher.__new__(AppWatcher)
+        watcher._inotify_fd = -1
+        watcher._watch_descriptors = {}
+        watcher._running = False
+        watcher._thread = None
+        watcher._debounce_timer = None
+        watcher._debounce_lock = threading.Lock()
 
-        try:
-            watcher = AppWatcher.__new__(AppWatcher)
-            # Manually initialize the instance without starting inotify
-            watcher._inotify_fd = -1
-            watcher._watch_descriptors = {}
-            watcher._running = False
-            watcher._thread = None
-            watcher._debounce_timer = None
-            watcher._debounce_lock = threading.Lock()
+        # Track all timers created and cancelled
+        timers_created: list[MagicMock] = []
 
-            with patch("cios.skills.app_launcher.invalidate_app_cache") as mock_invalidate:
-                # Fire events at each interval
-                for interval in intervals:
-                    watcher._on_event("test.desktop")
-                    time.sleep(interval)
+        def fake_timer(interval, callback):
+            timer = MagicMock()
+            timer.daemon = True
+            timer._callback = callback
+            timers_created.append(timer)
+            return timer
 
-                # Wait for debounce to expire (debounce + epsilon)
-                time.sleep(0.15)
+        with patch("threading.Timer", side_effect=fake_timer):
+            # Fire N events rapidly (no real sleep needed)
+            for _ in range(num_events):
+                watcher._on_event("app.desktop")
 
-                # Exactly 1 rescan should have been triggered
-                assert mock_invalidate.call_count == 1, (
-                    f"Expected exactly 1 call to invalidate_app_cache after burst of "
-                    f"{len(intervals)} events, but got {mock_invalidate.call_count}"
-                )
-        finally:
-            # Restore original debounce value
-            AppWatcher.DEBOUNCE_SECONDS = original_debounce
-            # Clean up any lingering timer
-            if watcher._debounce_timer is not None:
-                watcher._debounce_timer.cancel()
+        # Verify: N timers were created (one per event)
+        assert (
+            len(timers_created) == num_events
+        ), f"Expected {num_events} timers created, got {len(timers_created)}"
+
+        # Verify: all timers except the last were cancelled
+        for i, timer in enumerate(timers_created[:-1]):
+            assert timer.cancel.called, f"Timer {i} should have been cancelled"
+
+        # Verify: the last timer was NOT cancelled and was started
+        last_timer = timers_created[-1]
+        assert not last_timer.cancel.called, "Last timer should NOT be cancelled"
+        assert last_timer.start.called, "Last timer should be started"
+
+        # Verify: when the last timer fires, exactly 1 invalidation happens
+        with patch("cios.skills.app_launcher.invalidate_app_cache") as mock_invalidate:
+            last_timer._callback()
+            assert mock_invalidate.call_count == 1
 
 
 # --- Property 4: Round-trip de invalidação do cache ---
