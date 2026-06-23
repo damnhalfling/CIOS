@@ -67,7 +67,7 @@ static void handle_xdg_surface_map(struct wl_listener *listener, void *data) {
 }
 
 static void handle_xdg_surface_unmap(struct wl_listener *listener, void *data) {
-    struct CiosSurface *surface = wl_container_of(listener, surface, map);
+    struct CiosSurface *surface = wl_container_of(listener, surface, unmap);
 
     LOG_INFO("xdg surface unmapped: s_%u", surface->id);
 
