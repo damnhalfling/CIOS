@@ -253,6 +253,17 @@ RULES: list[tuple[re.Pattern, IntentType, Callable | None, float]] = [
     ),
     (
         re.compile(
+            r"(?:o\s+que\s+(?:tenho|tem|falta)\s+(?:pendente|pra\s+fazer|fazer)|"
+            r"o\s+que\s+falta|(?:quais?\s+(?:são\s+)?(?:minhas?\s+)?pendências)|"
+            r"(?:what(?:'s|\s+is)\s+pending|what\s+do\s+i\s+(?:have|need)\s+to\s+do))",
+            re.IGNORECASE,
+        ),
+        IntentType.TODO,
+        lambda m: {"action": "list"},
+        0.92,
+    ),
+    (
+        re.compile(
             r"(?:marca(?:r)?|completa(?:r)?|feit[ao]|done)\s+(?:a?\s+)?(?:tarefa|task|todo)\s+#?(\d+)",
             re.IGNORECASE,
         ),
