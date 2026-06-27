@@ -244,6 +244,15 @@ RULES: list[tuple[re.Pattern, IntentType, Callable | None, float]] = [
     ),
     (
         re.compile(
+            r"(?:show|list|display|get)\s+(?:my\s+)?(?:todo|todos|tasks?|task\s*list|pending)",
+            re.IGNORECASE,
+        ),
+        IntentType.TODO,
+        lambda m: {"action": "list"},
+        0.93,
+    ),
+    (
+        re.compile(
             r"(?:minhas?\s+)?(?:tarefas|tasks|todos|pendências|pendencias)",
             re.IGNORECASE,
         ),

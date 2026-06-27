@@ -140,6 +140,16 @@ RULES: list[tuple[re.Pattern, IntentType, Callable | None, float]] = [
     ),
     (
         re.compile(
+            r"(?:i\s+wanna|i\s+want\s+to|i(?:'d|\s+would)\s+like\s+to)\s+"
+            r"(?:hear|listen\s+to|play)\s+(?:some\s+)?(.+)",
+            re.IGNORECASE,
+        ),
+        IntentType.MEDIA_PLAY,
+        lambda m: {"query": m.group(1).strip()},
+        0.92,
+    ),
+    (
+        re.compile(
             r"(?:coloca|bota|põe)\s+(?:uma?\s+)?(?:m[uú]sica|song|music)(?:\s+(.+))?",
             re.IGNORECASE,
         ),

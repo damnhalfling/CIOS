@@ -160,6 +160,16 @@ RULES: list[tuple[re.Pattern, IntentType, Callable | None, float]] = [
     ),
     (
         re.compile(
+            r"(?:i\s+wanna|i\s+want\s+to|let\s*(?:'s|me)|gonna|i(?:'ll|\s+will))\s+"
+            r"(?:work\s+on|code|develop|hack\s+on)\s+(?:the\s+)?(?:project\s+)?(.+)",
+            re.IGNORECASE,
+        ),
+        IntentType.WORKFLOW_START,
+        lambda m: {"project": m.group(1).strip()},
+        0.95,
+    ),
+    (
+        re.compile(
             r"(?:abr[aei]r?|open|start|iniciar)\s+(?:o\s+)?(?:meu\s+)?(?:workspace|ambiente)\s+"
             r"(?:do?\s+|de\s+|for\s+)?(.+)",
             re.IGNORECASE,
